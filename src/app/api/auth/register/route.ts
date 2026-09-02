@@ -5,6 +5,12 @@ import { registerSchema } from "@/lib/validation";
 import { createSession } from "@/lib/auth";
 import { checkRateLimit, clientKeyFromRequest } from "@/lib/rateLimit";
 
+// Without this, Next.js can statically cache the GET handler below at build
+// time — which is exactly what caused the course list to get frozen as
+// empty before any courses existed in the database.
+export const dynamic = "force-dynamic";
+
+
 export async function POST(req: Request) {
   const rl = checkRateLimit(clientKeyFromRequest(req, "register"), 5, 10 * 60 * 1000);
   if (!rl.allowed) {

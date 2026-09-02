@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { hashPassword } from "@/lib/password";
 
+// Same reasoning as the course-list route: never let this get statically cached.
+export const dynamic = "force-dynamic";
+
+
 const COURSES = [
   "Brand Strategy & Positioning",
   "Project Management for Brands",
