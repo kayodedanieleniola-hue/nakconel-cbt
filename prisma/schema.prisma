@@ -19,8 +19,35 @@ model Course {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   students  Student[]
+  exams     Exam[]
 
   @@map("courses")
+}
+
+// Phase 2 scope: the exam's schedule/config and the status shown on the
+// student dashboard. Question bank, attempts, and scoring are later phases —
+// this model is deliberately built so those can attach to it without
+// reshaping what's here.
+model Exam {
+  id             String    @id @default(cuid())
+  courseId       String
+  course         Course    @relation(fields: [courseId], references: [id])
+  name           String // e.g. "Test 1", "Final Test"
+  order          Int       @default(0) // display order within the course
+  numQuestions   Int
+  durationMinutes Int
+  passingScore   Int       @default(50) // percentage
+  instructions   String?
+  published      Boolean   @default(false)
+  shuffleQuestions Boolean @default(true)
+  shuffleOptions Boolean   @default(true)
+  startAt        DateTime?
+  endAt          DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([courseId])
+  @@map("exams")
 }
 
 model Student {

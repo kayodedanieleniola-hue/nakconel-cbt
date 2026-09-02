@@ -2,6 +2,9 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import LogoutButton from "@/components/LogoutButton";
+import { getExamStatus, STATUS_LABEL, type ExamStatus } from "@/lib/examStatus";
+
+export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const session = await getSession();
@@ -11,12 +14,24 @@ export default async function DashboardPage() {
 
   const student = await prisma.student.findUnique({
     where: { id: session.sub },
-    include: { course: true },
+    include: {
+      course: {
+        include: {
+          exams: { orderBy: { order: "asc" } },
+        },
+      },
+    },
   });
 
   if (!student || student.status !== "active") {
     redirect("/login");
   }
+
+  const now = new Date();
+  const exams = student.course.exams.map((exam) => ({
+    ...exam,
+    status: getExamStatus(exam, now),
+  }));
 
   return (
     <main style={{ minHeight: "100dvh", background: "var(--cream-50)" }}>
@@ -36,7 +51,7 @@ export default async function DashboardPage() {
         <LogoutButton />
       </header>
 
-      <section style={{ padding: "5vh 6vw", maxWidth: 720 }}>
+      <section style={{ padding: "5vh 6vw", maxWidth: 780 }}>
         <p style={{ color: "var(--gold-600)", fontWeight: 600, fontSize: "0.9rem", marginBottom: "0.4rem" }}>
           Welcome back
         </p>
@@ -51,7 +66,7 @@ export default async function DashboardPage() {
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
             gap: "1.25rem",
-            marginBottom: "2rem",
+            marginBottom: "2.5rem",
           }}
         >
           <div>
@@ -68,21 +83,80 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        <div
-          style={{
-            border: "1px dashed var(--gold-400)",
-            borderRadius: 6,
-            padding: "1.5rem",
-            color: "var(--ink-600)",
-          }}
-        >
-          Your exam schedule, upcoming tests, and results will appear here once the exam
-          engine is live.
-        </div>
+        <h2 style={{ fontSize: "1.3rem", marginBottom: "1rem" }}>
+          {student.course.name.toUpperCase()}
+        </h2>
+
+        {exams.length === 0 ? (
+          <div style={emptyState}>
+            No assessments have been set up for this course yet.
+          </div>
+        ) : (
+          <div style={{ display: "grid", gap: "0.9rem" }}>
+            {exams.map((exam) => (
+              <div key={exam.id} style={examCard}>
+                <div>
+                  <p style={{ fontFamily: "var(--font-display)", fontSize: "1.2rem", margin: "0 0 0.35rem", color: "var(--burgundy-900)" }}>
+                    {exam.name}
+                  </p>
+                  <p style={{ color: "var(--ink-600)", fontSize: "0.9rem", margin: 0 }}>
+                    {exam.numQuestions} Questions &middot; Duration: {exam.durationMinutes} Minutes
+                  </p>
+                </div>
+                <StatusBadge status={exam.status} />
+              </div>
+            ))}
+          </div>
+        )}
       </section>
     </main>
   );
 }
 
+function StatusBadge({ status }: { status: ExamStatus }) {
+  const colors: Record<ExamStatus, { bg: string; fg: string }> = {
+    NOT_CONFIGURED: { bg: "#efe9e0", fg: "var(--ink-600)" },
+    UPCOMING: { bg: "#f1e2c2", fg: "var(--gold-600)" },
+    ONGOING: { bg: "#e4f0e6", fg: "var(--success)" },
+    CLOSED: { bg: "#f2e3e0", fg: "var(--danger)" },
+  };
+  const c = colors[status];
+  return (
+    <span
+      style={{
+        background: c.bg,
+        color: c.fg,
+        padding: "0.35rem 0.75rem",
+        borderRadius: 4,
+        fontSize: "0.82rem",
+        fontWeight: 600,
+        whiteSpace: "nowrap",
+        alignSelf: "center",
+      }}
+    >
+      {STATUS_LABEL[status]}
+    </span>
+  );
+}
+
 const fieldLabel = { fontSize: "0.8rem", color: "var(--ink-600)", marginBottom: "0.2rem" };
 const fieldValue = { fontFamily: "var(--font-display)", fontSize: "1.15rem", color: "var(--burgundy-900)", margin: 0 };
+
+const emptyState = {
+  border: "1px dashed var(--gold-400)",
+  borderRadius: 6,
+  padding: "1.5rem",
+  color: "var(--ink-600)",
+} as const;
+
+const examCard = {
+  background: "#fff",
+  border: "1px solid var(--line)",
+  borderRadius: 6,
+  padding: "1.15rem 1.4rem",
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: "1rem",
+  flexWrap: "wrap",
+} as const;

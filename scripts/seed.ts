@@ -12,15 +12,28 @@ const COURSES = [
   "Content Design (Intro Track)",
 ];
 
+const DEFAULT_EXAMS = [
+  { name: "Test 1", order: 1, numQuestions: 45, durationMinutes: 60 },
+  { name: "Test 2", order: 2, numQuestions: 45, durationMinutes: 60 },
+  { name: "Final Test", order: 3, numQuestions: 50, durationMinutes: 75 },
+];
+
 async function main() {
   for (const name of COURSES) {
-    await prisma.course.upsert({
+    const course = await prisma.course.upsert({
       where: { name },
       create: { name },
       update: {},
     });
+
+    const existingExams = await prisma.exam.findMany({ where: { courseId: course.id } });
+    if (existingExams.length === 0) {
+      await prisma.exam.createMany({
+        data: DEFAULT_EXAMS.map((e) => ({ ...e, courseId: course.id })),
+      });
+    }
   }
-  console.log(`Seeded ${COURSES.length} courses.`);
+  console.log(`Seeded ${COURSES.length} courses with default exams.`);
 
   const adminEmail = process.env.SEED_ADMIN_EMAIL;
   const adminPassword = process.env.SEED_ADMIN_PASSWORD;

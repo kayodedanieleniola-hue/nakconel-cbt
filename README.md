@@ -66,8 +66,9 @@ revisit this URL later — it won't create duplicates.
 - `https://YOUR-APP.vercel.app/login` — log in with either the email or the
   Student ID you were given, plus the password
 
-## What's included in Phase 1
+## What's included so far
 
+**Phase 1 — Authentication & registration**
 - Student registration (name, email, phone, age, gender, address, social
   media, password, course) with server-side validation
 - Automatic, race-safe Student ID generation (`NAK-2026-001`, `NAK-2026-002`, …)
@@ -77,16 +78,23 @@ revisit this URL later — it won't create duplicates.
   never trusting client-supplied course IDs or roles
 - Basic rate limiting on register/login endpoints
 - An audit log table recording registrations and logins
-- A minimal dashboard stub confirming the login flow end-to-end (the real
-  dashboard with exams/results is Phase 2)
 
-## What's intentionally NOT in Phase 1
+**Phase 2 — Student dashboard & course display**
+- Real exam data model (`Exam`) with schedule, publish state, question
+  count, duration, and randomization settings — ready for the admin screens
+  and exam engine to build on
+- Dashboard shows the student's enrolled course and its Test 1 / Test 2 /
+  Final Test rows, each with a status computed **only** from the schedule
+  and publish flag — never shown as "Ongoing" just because a row exists
+- `/api/setup` now also creates default (unpublished) Test 1 / Test 2 /
+  Final Test rows for every course — safe to re-run, won't duplicate
 
-Everything from Phase 2 onward: the real student dashboard, admin portal
-screens, courses/exam management, the question bank, the exam-taking
-interface, randomization, scoring, camera/identity monitoring, live
-monitoring, and the suspicious-activity center. The database schema is
-already structured so those can be added without reworking what's here.
+## What's intentionally NOT here yet
+
+Admin portal screens, the question bank, the exam-taking interface,
+randomization in action, scoring, exam attempts/results, camera/identity
+monitoring, live monitoring, and the suspicious-activity center. The schema
+is structured so those attach without reworking what's here.
 
 ## Local development (optional, if you ever use a computer)
 
