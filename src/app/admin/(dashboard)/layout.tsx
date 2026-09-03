@@ -11,8 +11,8 @@ const NAV = [
   { href: "/admin/exams", label: "Exams", enabled: true },
   { href: "/admin/questions", label: "Question Bank", enabled: true },
   { href: "/admin/results", label: "Results", enabled: true },
-  { href: "/admin/monitoring", label: "Live Monitoring", enabled: false },
-  { href: "/admin/suspicious", label: "Suspicious Activity", enabled: false },
+  { href: "/admin/monitoring", label: "Live Monitoring", enabled: true },
+  { href: "/admin/suspicious", label: "Suspicious Activity", enabled: true },
   { href: "/admin/settings", label: "Settings", enabled: false },
 ];
 
