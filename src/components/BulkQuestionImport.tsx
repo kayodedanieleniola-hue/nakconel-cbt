@@ -92,25 +92,25 @@ async function parseDocx(source: ArrayBuffer): Promise<ImportedRow[]> {
   for (const block of blocks) {
     const text = block.textContent?.replace(/\s+/g, " ").trim() ?? "";
     if (!text) continue;
-    if (/^(answer\s*key|answers?)\s*:?$/i.test(text)) { inAnswerKey = true; current = null; continue; }
+    if (/^(answer\s*key|answers?)\s*:?/i.test(text)) { inAnswerKey = true; current = null; continue; }
     const inlineAnswerMatch = text.match(/^(?:correct\s+)?answer\s*:\s*([A-D1-4])\b/i);
     if (current && inlineAnswerMatch) {
       const answer = inlineAnswerMatch[1].toUpperCase();
       current.markedAnswer = /^[A-D]$/.test(answer) ? answer.charCodeAt(0) - 65 : Number(answer) - 1;
       continue;
     }
-    const keyMatch = text.match(/^(\d+)\s*[.)-]?\s*([A-D])\b/i);
-    if (inAnswerKey && keyMatch) {
+    const keyMatch = text.match(/^(\d+)\s*(?:[.):\-]|\s)\s*([A-D])\s*$/i);
+    if (keyMatch && (inAnswerKey || !current || text.length <= 8)) {
       answerKey.set(Number(keyMatch[1]), keyMatch[2].toUpperCase().charCodeAt(0) - 65);
       continue;
     }
-    const questionMatch = text.match(/^(\d+)\s*[.)-]\s*(.+)$/);
+    const questionMatch = text.match(/^(?:question\s*)?(\d+)\s*[.):\-]\s*(.+)$/i);
     if (questionMatch) {
       current = { number: Number(questionMatch[1]), text: questionMatch[2], options: [], markedAnswer: null };
       questions.push(current);
       continue;
     }
-    const optionMatch = text.match(/^([A-D])\s*[.)-]\s*(.+)$/i);
+    const optionMatch = text.match(/^\(?([A-D])\)?\s*[.):\-]\s*(.+)$/i);
     if (current && optionMatch) {
       const optionIndex = optionMatch[1].toUpperCase().charCodeAt(0) - 65;
       const optionText = optionMatch[2].replace(/^(?:correct\s+)?answer\s*:\s*/i, "").trim();
