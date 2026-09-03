@@ -36,18 +36,30 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   }
 
   const b = body as {
+    courseId?: string;
+    examId?: string;
     text?: string;
     options?: string[];
     correctIndex?: number;
     active?: boolean;
   };
 
+  if (b.examId !== undefined) {
+    const exam = await prisma.exam.findFirst({ where: { id: b.examId, courseId: b.courseId ?? existing.courseId } });
+    if (!exam) return NextResponse.json({ error: "Test not found for this course" }, { status: 400 });
+  }
+
   const data: {
+    courseId?: string;
+    examId?: string;
     text?: string;
     options?: string[];
     correctIndex?: number;
     active?: boolean;
   } = {};
+
+  if (b.courseId !== undefined) data.courseId = b.courseId;
+  if (b.examId !== undefined) data.examId = b.examId;
 
   if (b.text !== undefined) {
     if (!b.text.trim()) {

@@ -59,6 +59,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   // it must pass the full checklist every time, matching the spec.
   if (b.action === "publish") {
     const merged = {
+      id,
       numQuestions: b.numQuestions ?? existing.numQuestions,
       durationMinutes: b.durationMinutes ?? existing.durationMinutes,
       passingScore: b.passingScore ?? existing.passingScore,

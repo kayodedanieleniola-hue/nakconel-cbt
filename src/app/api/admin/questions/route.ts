@@ -24,15 +24,20 @@ export async function GET(req: Request) {
 
   const url = new URL(req.url);
   const courseId = url.searchParams.get("courseId") ?? "";
+  const examId = url.searchParams.get("examId") ?? "";
   const search = url.searchParams.get("search")?.trim() ?? "";
 
   const questions = await prisma.question.findMany({
     where: {
       ...(courseId ? { courseId } : {}),
+      ...(examId ? { examId } : {}),
       ...(search ? { text: { contains: search, mode: "insensitive" } } : {}),
     },
     orderBy: [{ courseId: "asc" }, { createdAt: "desc" }],
-    include: { course: { select: { id: true, name: true } } },
+    include: {
+      course: { select: { id: true, name: true } },
+      exam: { select: { id: true, name: true } },
+    },
   });
 
   return NextResponse.json({ questions });
@@ -51,19 +56,25 @@ export async function POST(req: Request) {
 
   const b = body as {
     courseId?: string;
+    examId?: string;
     text?: string;
     options?: string[];
     correctIndex?: number;
     active?: boolean;
   };
 
-  if (!b.courseId || !b.text?.trim()) {
-    return NextResponse.json({ error: "Course and question text are required" }, { status: 400 });
+  if (!b.courseId || !b.examId || !b.text?.trim()) {
+    return NextResponse.json({ error: "Course, test, and question text are required" }, { status: 400 });
   }
 
   const course = await prisma.course.findUnique({ where: { id: b.courseId } });
   if (!course) {
     return NextResponse.json({ error: "Course not found" }, { status: 400 });
+  }
+
+  const exam = await prisma.exam.findFirst({ where: { id: b.examId, courseId: b.courseId } });
+  if (!exam) {
+    return NextResponse.json({ error: "Test not found for this course" }, { status: 400 });
   }
 
   const optionsError = validateOptions(b.options, b.correctIndex);
@@ -76,6 +87,7 @@ export async function POST(req: Request) {
   const question = await prisma.question.create({
     data: {
       courseId: b.courseId,
+      examId: b.examId,
       text: b.text.trim(),
       options,
       correctIndex: Number(b.correctIndex),
@@ -88,7 +100,7 @@ export async function POST(req: Request) {
       actorType: "admin",
       actorId: guard.session.sub,
       action: "admin.create_question",
-      detail: `${course.name}: ${question.text.slice(0, 80)}`,
+      detail: `${course.name} / ${exam.name}: ${question.text.slice(0, 80)}`,
     },
   });
 

@@ -54,7 +54,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   }
 
   const questionPool = await prisma.question.findMany({
-    where: { courseId: exam.courseId, active: true },
+    where: { courseId: exam.courseId, examId, active: true },
     select: { id: true, text: true, options: true, correctIndex: true },
   });
 

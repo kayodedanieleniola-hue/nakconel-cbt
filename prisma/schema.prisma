@@ -31,7 +31,9 @@ model Course {
 model Question {
   id           String   @id @default(cuid())
   courseId     String
+  examId       String?
   course       Course   @relation(fields: [courseId], references: [id])
+  exam         Exam?    @relation(fields: [examId], references: [id], onDelete: SetNull)
   text         String
   options      String[] // 2+ answer options, in display order
   correctIndex Int // index into `options` of the correct answer
@@ -65,6 +67,7 @@ model Exam {
   endAt          DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
+  questions      Question[]
   attempts       ExamAttempt[]
 
   @@index([courseId])

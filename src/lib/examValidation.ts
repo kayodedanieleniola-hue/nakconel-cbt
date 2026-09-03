@@ -13,6 +13,7 @@ export type PublishValidation = {
  * questions actually exists as a valid question in the bank.
  */
 export async function getPublishValidation(exam: {
+  id?: string;
   numQuestions: number;
   durationMinutes: number;
   passingScore: number;
@@ -21,7 +22,7 @@ export async function getPublishValidation(exam: {
   courseId: string;
 }): Promise<PublishValidation> {
   // Will start returning a real count once the Question model exists.
-  const availableQuestions = await countAvailableQuestions(exam.courseId);
+  const availableQuestions = await countAvailableQuestions(exam.courseId, exam.id);
 
   const checks: PublishCheck[] = [
     { label: `${exam.numQuestions} question(s) configured`, ok: exam.numQuestions >= 1 },
@@ -42,6 +43,6 @@ export async function getPublishValidation(exam: {
   return { canPublish: checks.every((c) => c.ok), checks };
 }
 
-async function countAvailableQuestions(courseId: string): Promise<number> {
-  return prisma.question.count({ where: { courseId, active: true } });
+async function countAvailableQuestions(courseId: string, examId?: string): Promise<number> {
+  return prisma.question.count({ where: { courseId, examId, active: true } });
 }
