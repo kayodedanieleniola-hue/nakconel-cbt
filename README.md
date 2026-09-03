@@ -89,12 +89,29 @@ revisit this URL later — it won't create duplicates.
 - `/api/setup` now also creates default (unpublished) Test 1 / Test 2 /
   Final Test rows for every course — safe to re-run, won't duplicate
 
+**Phase 3 — Admin dashboard & student management**
+- Admin login screen at `/admin/login` (also linked from the homepage footer)
+- Admin overview at `/admin` — total students, active courses, exams by
+  status (upcoming/ongoing/closed), recent registrations
+- Student management at `/admin/students` — search by name/email/Student
+  ID/phone, filter by course and status, view full registration detail per
+  student, activate/disable accounts (a disabled student is blocked at login)
+- Export to Excel (`.xlsx`) with all registration fields, one click from the
+  students list
+- Every admin action re-verifies the session AND the admin's live status in
+  the database — a disabled admin loses access immediately, not just when
+  their token expires. All destructive actions are logged to the audit trail.
+- Sidebar shows the remaining sections (Courses, Exams, Question Bank,
+  Results, Live Monitoring, Suspicious Activity, Settings) as visibly
+  disabled placeholders for the phases ahead
+
 ## What's intentionally NOT here yet
 
-Admin portal screens, the question bank, the exam-taking interface,
-randomization in action, scoring, exam attempts/results, camera/identity
-monitoring, live monitoring, and the suspicious-activity center. The schema
-is structured so those attach without reworking what's here.
+Course/exam management (admin can't yet schedule or publish exams — that's
+Phase 4), the question bank, the exam-taking interface, randomization in
+action, scoring, exam attempts/results, camera/identity monitoring, live
+monitoring, and the suspicious-activity center. The schema is structured so
+those attach without reworking what's here.
 
 ## Local development (optional, if you ever use a computer)
 

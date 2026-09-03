@@ -74,9 +74,12 @@ export default async function HomePage() {
           padding: "1.25rem 6vw",
           fontSize: "0.85rem",
           color: "var(--gold-200)",
+          display: "flex",
+          justifyContent: "space-between",
         }}
       >
-        Nakconel &middot; Student examination portal
+        <span>Nakconel &middot; Student examination portal</span>
+        <Link href="/admin/login" style={{ color: "var(--gold-200)" }}>Admin</Link>
       </footer>
     </main>
   );

@@ -1,31 +1,46 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 
-// Edge-safe check: just verifies a valid, unexpired session cookie exists.
-// The actual page/API still re-checks role and account status server-side —
-// this is a first line of defense, not the source of truth.
+// Edge-safe first line of defense: confirms a valid session cookie exists
+// AND carries the right role for the area being accessed. Every page and
+// API route still re-checks server-side (see requireAdmin / getSession) —
+// this just stops obviously-unauthenticated requests before they render.
 
-const PROTECTED_PREFIXES = ["/dashboard"];
-
-export async function middleware(req: NextRequest) {
-  const isProtected = PROTECTED_PREFIXES.some((p) => req.nextUrl.pathname.startsWith(p));
-  if (!isProtected) return NextResponse.next();
-
-  const token = req.cookies.get("nak_session")?.value;
-  if (!token) {
-    return NextResponse.redirect(new URL("/login", req.url));
-  }
-
+async function verify(token: string | undefined) {
+  if (!token) return null;
   try {
     const secret = process.env.AUTH_SECRET;
     if (!secret) throw new Error("missing secret");
-    await jwtVerify(token, new TextEncoder().encode(secret));
-    return NextResponse.next();
+    const { payload } = await jwtVerify(token, new TextEncoder().encode(secret));
+    return payload as { role?: string };
   } catch {
-    return NextResponse.redirect(new URL("/login", req.url));
+    return null;
   }
 }
 
+export async function middleware(req: NextRequest) {
+  const { pathname } = req.nextUrl;
+  const token = req.cookies.get("nak_session")?.value;
+
+  if (pathname.startsWith("/dashboard")) {
+    const payload = await verify(token);
+    if (!payload || payload.role !== "student") {
+      return NextResponse.redirect(new URL("/login", req.url));
+    }
+    return NextResponse.next();
+  }
+
+  if (pathname.startsWith("/admin") && pathname !== "/admin/login") {
+    const payload = await verify(token);
+    if (!payload || payload.role !== "admin") {
+      return NextResponse.redirect(new URL("/admin/login", req.url));
+    }
+    return NextResponse.next();
+  }
+
+  return NextResponse.next();
+}
+
 export const config = {
-  matcher: ["/dashboard/:path*"],
+  matcher: ["/dashboard/:path*", "/admin/:path*"],
 };
