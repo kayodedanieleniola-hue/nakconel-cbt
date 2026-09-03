@@ -38,6 +38,7 @@ model Question {
   active       Boolean  @default(true) // inactive questions are excluded from the exam-ready count
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  attemptQuestions AttemptQuestion[]
 
   @@index([courseId])
   @@map("questions")
@@ -64,6 +65,7 @@ model Exam {
   endAt          DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
+  attempts       ExamAttempt[]
 
   @@index([courseId])
   @@map("exams")
@@ -85,6 +87,7 @@ model Student {
   course       Course   @relation(fields: [courseId], references: [id])
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  attempts     ExamAttempt[]
 
   @@index([courseId])
   @@map("students")
@@ -124,4 +127,41 @@ model AuditLog {
 
   @@index([actorType, actorId])
   @@map("audit_logs")
+}
+
+model ExamAttempt {
+  id           String            @id @default(cuid())
+  examId       String
+  studentId    String
+  exam         Exam              @relation(fields: [examId], references: [id], onDelete: Cascade)
+  student      Student           @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  status       String            @default("IN_PROGRESS")
+  startedAt    DateTime          @default(now())
+  expiresAt    DateTime
+  submittedAt  DateTime?
+  score        Int?
+  passed       Boolean?
+  questions    AttemptQuestion[]
+
+  @@unique([examId, studentId])
+  @@index([studentId, status])
+  @@map("exam_attempts")
+}
+
+model AttemptQuestion {
+  id            String      @id @default(cuid())
+  attemptId     String
+  questionId    String
+  attempt       ExamAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question      Question    @relation(fields: [questionId], references: [id])
+  position      Int
+  text          String
+  options       String[]
+  correctIndex  Int
+  selectedIndex Int?
+
+  @@unique([attemptId, questionId])
+  @@unique([attemptId, position])
+  @@index([questionId])
+  @@map("attempt_questions")
 }

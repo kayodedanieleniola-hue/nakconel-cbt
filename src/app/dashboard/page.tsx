@@ -48,7 +48,10 @@ export default async function DashboardPage() {
         <span style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontSize: "1.15rem" }}>
           Nakconel Examinations
         </span>
-        <LogoutButton />
+        <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+          <a href="/results" style={{ color: "inherit", textDecoration: "none", fontSize: "0.9rem" }}>Results</a>
+          <LogoutButton />
+        </div>
       </header>
 
       <section style={{ padding: "5vh 6vw", maxWidth: 780 }}>
@@ -103,7 +106,11 @@ export default async function DashboardPage() {
                     {exam.numQuestions} Questions &middot; Duration: {exam.durationMinutes} Minutes
                   </p>
                 </div>
-                <StatusBadge status={exam.status} />
+                {exam.status === "ONGOING" ? (
+                  <a href={`/exam/${exam.id}`} style={startButton}>Start exam</a>
+                ) : (
+                  <StatusBadge status={exam.status} />
+                )}
               </div>
             ))}
           </div>
@@ -159,4 +166,15 @@ const examCard = {
   alignItems: "center",
   gap: "1rem",
   flexWrap: "wrap",
+} as const;
+
+const startButton = {
+  background: "var(--burgundy-900)",
+  color: "#fff",
+  padding: "0.55rem 0.8rem",
+  borderRadius: 4,
+  fontSize: "0.82rem",
+  fontWeight: 600,
+  textDecoration: "none",
+  whiteSpace: "nowrap",
 } as const;

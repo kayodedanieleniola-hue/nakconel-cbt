@@ -1,0 +1,106 @@
+import { NextResponse } from "next/server";
+import { getSession } from "@/lib/auth";
+import { prisma } from "@/lib/db";
+
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const attempt = await getStudentAttempt(params);
+  if (!attempt) return NextResponse.json({ error: "Attempt not found" }, { status: 404 });
+  if (attempt.status !== "IN_PROGRESS") {
+    return NextResponse.json({ error: "This attempt is no longer active" }, { status: 409 });
+  }
+
+  if (attempt.expiresAt <= new Date()) {
+    await markTimedOut(attempt.id);
+    return NextResponse.json({ error: "The exam time has expired" }, { status: 409 });
+  }
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
+
+  const questionId = typeof (body as { questionId?: unknown }).questionId === "string"
+    ? (body as { questionId: string }).questionId
+    : "";
+  const rawSelectedIndex = (body as { selectedIndex?: unknown }).selectedIndex;
+  if (!questionId || !Number.isInteger(rawSelectedIndex)) {
+    return NextResponse.json({ error: "questionId and selectedIndex are required" }, { status: 400 });
+  }
+  const selectedIndex = rawSelectedIndex as number;
+
+  const question = attempt.questions.find((item) => item.id === questionId);
+  if (!question || selectedIndex < 0 || selectedIndex >= question.options.length) {
+    return NextResponse.json({ error: "Invalid question or answer" }, { status: 400 });
+  }
+
+  await prisma.attemptQuestion.update({
+    where: { id: question.id },
+    data: { selectedIndex },
+  });
+
+  return NextResponse.json({ ok: true, questionId, selectedIndex });
+}
+
+export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const attempt = await getStudentAttempt(params);
+  if (!attempt) return NextResponse.json({ error: "Attempt not found" }, { status: 404 });
+  if (attempt.status === "SUBMITTED" || attempt.status === "TIMED_OUT") {
+    return NextResponse.json({ error: "This attempt has already ended" }, { status: 409 });
+  }
+
+  const timedOut = attempt.expiresAt <= new Date();
+  const correctAnswers = timedOut
+    ? 0
+    : attempt.questions.filter((question) => question.selectedIndex === question.correctIndex).length;
+  const score = Math.round((correctAnswers / attempt.questions.length) * 100);
+  const passed = score >= attempt.exam.passingScore;
+  const status = timedOut ? "TIMED_OUT" : "SUBMITTED";
+
+  const completed = await prisma.examAttempt.update({
+    where: { id: attempt.id },
+    data: { status, score, passed, submittedAt: new Date() },
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      actorType: "student",
+      actorId: attempt.studentId,
+      action: timedOut ? "student.exam_timeout" : "student.submit_exam",
+      detail: attempt.exam.name,
+    },
+  });
+
+  return NextResponse.json({
+    result: {
+      attemptId: completed.id,
+      status: completed.status,
+      score: completed.score,
+      passed: completed.passed,
+      correctAnswers: timedOut ? 0 : correctAnswers,
+      totalQuestions: attempt.questions.length,
+    },
+  });
+}
+
+async function getStudentAttempt(params: Promise<{ id: string }>) {
+  const session = await getSession();
+  if (!session || session.role !== "student") return null;
+  const { id } = await params;
+
+  return prisma.examAttempt.findFirst({
+    where: { id, studentId: session.sub },
+    include: {
+      exam: { select: { name: true, passingScore: true } },
+      questions: { orderBy: { position: "asc" } },
+    },
+  });
+}
+
+async function markTimedOut(id: string) {
+  await prisma.examAttempt.update({
+    where: { id },
+    data: { status: "TIMED_OUT", submittedAt: new Date(), score: 0, passed: false },
+  });
+}
