@@ -105,6 +105,25 @@ revisit this URL later — it won't create duplicates.
   Results, Live Monitoring, Suspicious Activity, Settings) as visibly
   disabled placeholders for the phases ahead
 
+**Phase 4 — Course & exam management**
+- `/admin/courses` — add courses, rename them, activate/deactivate (a
+  deactivated course is hidden from new registrations but existing students
+  stay enrolled)
+- `/admin/exams` — every exam across every course, filterable by course, each
+  showing its live status
+- Create/edit exams with the full config from the spec: question count,
+  duration, passing score, start/end date & time, instructions, shuffle
+  questions, shuffle answer options, display order
+- A real **Exam Validation** checklist on each exam's page, matching the
+  spec's publishing workflow — publish is blocked (422) until every check
+  passes, including a "valid questions available in the Question Bank"
+  check. That check is always 0-of-N right now, on purpose: the question
+  bank doesn't exist yet (Phase 5), so no exam can be truly ready to publish
+  until then — this deliberately refuses to fake that check rather than
+  let something un-publishable-in-spirit go live
+- Editing a published exam automatically unpublishes it, so a schedule or
+  question-count change always gets re-validated before going live again
+
 ## What's intentionally NOT here yet
 
 Course/exam management (admin can't yet schedule or publish exams — that's
