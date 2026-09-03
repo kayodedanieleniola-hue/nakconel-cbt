@@ -124,13 +124,23 @@ revisit this URL later — it won't create duplicates.
 - Editing a published exam automatically unpublishes it, so a schedule or
   question-count change always gets re-validated before going live again
 
+**Phase 5 — Question Bank**
+- `/admin/questions` — add, edit, activate/deactivate, and delete questions
+  per course (question text, 2+ answer options, one marked correct)
+- Filter by course and search by question text; each course shows how many
+  active questions it has
+- The exam-publishing checklist now checks a real, live count of active
+  questions for the exam's course instead of always showing 0 — an exam
+  becomes publishable once that count matches its configured question total
+- Deactivating a question (instead of deleting it) removes it from that
+  count without losing the question, e.g. while it's being reviewed
+
 ## What's intentionally NOT here yet
 
-Course/exam management (admin can't yet schedule or publish exams — that's
-Phase 4), the question bank, the exam-taking interface, randomization in
-action, scoring, exam attempts/results, camera/identity monitoring, live
-monitoring, and the suspicious-activity center. The schema is structured so
-those attach without reworking what's here.
+The exam-taking interface, randomization in action, scoring, exam
+attempts/results, camera/identity monitoring, live monitoring, and the
+suspicious-activity center. The schema is structured so those attach
+without reworking what's here.
 
 ## Local development (optional, if you ever use a computer)
 

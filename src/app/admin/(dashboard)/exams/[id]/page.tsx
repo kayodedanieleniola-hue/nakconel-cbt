@@ -221,8 +221,11 @@ export default function ExamDetailPage({ params }: { params: Promise<{ id: strin
         </div>
         {!canPublish && !exam.published && checks.some((c) => c.label.includes("Question Bank")) && (
           <p style={{ fontSize: "0.85rem", color: "var(--ink-600)", marginTop: "0.75rem" }}>
-            Question Bank management is coming in a later phase — exams can't be published until
-            their questions actually exist.
+            Add active questions for this course in the{" "}
+            <Link href={`/admin/questions?courseId=${exam.course.id}`} style={{ color: "var(--gold-600)", fontWeight: 600 }}>
+              Question Bank
+            </Link>{" "}
+            until the count matches this exam&apos;s configured question total.
           </p>
         )}
       </div>

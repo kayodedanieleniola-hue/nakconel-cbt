@@ -20,8 +20,27 @@ model Course {
   updatedAt DateTime  @updatedAt
   students  Student[]
   exams     Exam[]
+  questions Question[]
 
   @@map("courses")
+}
+
+// Phase 5 scope: the Question Bank. Kept intentionally simple (single
+// correct answer, per-course, no categories/tags yet) — the exam engine
+// (Phase 6) only needs a pool of active questions per course to draw from.
+model Question {
+  id           String   @id @default(cuid())
+  courseId     String
+  course       Course   @relation(fields: [courseId], references: [id])
+  text         String
+  options      String[] // 2+ answer options, in display order
+  correctIndex Int // index into `options` of the correct answer
+  active       Boolean  @default(true) // inactive questions are excluded from the exam-ready count
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([courseId])
+  @@map("questions")
 }
 
 // Phase 2 scope: the exam's schedule/config and the status shown on the

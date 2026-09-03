@@ -1,3 +1,5 @@
+import { prisma } from "@/lib/db";
+
 export type PublishCheck = { label: string; ok: boolean };
 
 export type PublishValidation = {
@@ -8,10 +10,7 @@ export type PublishValidation = {
 /**
  * Mirrors the spec's exam-publishing checklist exactly (section 37/10):
  * an exam can never be published unless every one of its configured
- * questions actually exists as a valid question in the bank. Until the
- * Question Bank ships (Phase 5), the available count is always 0 — so
- * this correctly blocks publishing rather than pretending an exam with
- * no real questions behind it is ready.
+ * questions actually exists as a valid question in the bank.
  */
 export async function getPublishValidation(exam: {
   numQuestions: number;
@@ -43,9 +42,6 @@ export async function getPublishValidation(exam: {
   return { canPublish: checks.every((c) => c.ok), checks };
 }
 
-// Placeholder until the Question Bank (Phase 5) exists — always 0 for now,
-// which is what correctly keeps every exam unpublishable until then.
-async function countAvailableQuestions(_courseId: string): Promise<number> {
-  void _courseId;
-  return 0;
+async function countAvailableQuestions(courseId: string): Promise<number> {
+  return prisma.question.count({ where: { courseId, active: true } });
 }
