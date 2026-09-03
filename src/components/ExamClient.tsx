@@ -31,7 +31,7 @@ export default function ExamClient({ examId }: { examId: string }) {
   const [attempt, setAttempt] = useState<Attempt | null>(null);
   const [result, setResult] = useState<Result | null>(null);
   const [current, setCurrent] = useState(0);
-  const [secondsLeft, setSecondsLeft] = useState(0);
+  const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
   const [message, setMessage] = useState("Starting exam...");
   const [busy, setBusy] = useState(false);
 
@@ -55,7 +55,7 @@ export default function ExamClient({ examId }: { examId: string }) {
   }, [attempt]);
 
   useEffect(() => {
-    if (attempt && secondsLeft === 0 && !result && !busy) submitExam();
+    if (attempt && secondsLeft !== null && secondsLeft === 0 && !result && !busy) submitExam();
   }, [secondsLeft, attempt, result, busy]);
 
   async function chooseAnswer(selectedIndex: number) {
@@ -86,8 +86,9 @@ export default function ExamClient({ examId }: { examId: string }) {
   if (!attempt) return <main style={shell}><section style={panel}><p>{message}</p></section></main>;
 
   const question = attempt.questions[current];
-  const minutes = Math.floor(secondsLeft / 60).toString().padStart(2, "0");
-  const seconds = (secondsLeft % 60).toString().padStart(2, "0");
+  const safeSecondsLeft = secondsLeft ?? 0;
+  const minutes = Math.floor(safeSecondsLeft / 60).toString().padStart(2, "0");
+  const seconds = (safeSecondsLeft % 60).toString().padStart(2, "0");
 
   return <main style={shell}><section style={{ ...panel, maxWidth: 780 }}><CameraCheck attemptId={attempt.id} /><div style={topbar}><span>Question {current + 1} of {attempt.questions.length}</span><strong>{minutes}:{seconds}</strong></div><h1>{question.text}</h1><div style={{ display: "grid", gap: "0.7rem" }}>{question.options.map((option, index) => <button key={option} type="button" onClick={() => chooseAnswer(index)} style={{ ...optionButton, ...(question.selectedIndex === index ? selectedOption : {}) }}>{option}</button>)}</div><div style={controls}><button type="button" disabled={current === 0} onClick={() => setCurrent(current - 1)} style={button}>Previous</button>{current < attempt.questions.length - 1 ? <button type="button" onClick={() => setCurrent(current + 1)} style={button}>Next</button> : <button type="button" onClick={submitExam} disabled={busy} style={button}>{busy ? "Submitting..." : "Submit exam"}</button>}</div></section></main>;
 }
