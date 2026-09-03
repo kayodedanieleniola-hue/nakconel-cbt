@@ -7,8 +7,8 @@ import LogoutButton from "@/components/LogoutButton";
 const NAV = [
   { href: "/admin", label: "Overview", enabled: true },
   { href: "/admin/students", label: "Students", enabled: true },
-  { href: "/admin/courses", label: "Courses", enabled: false },
-  { href: "/admin/exams", label: "Exams", enabled: false },
+  { href: "/admin/courses", label: "Courses", enabled: true },
+  { href: "/admin/exams", label: "Exams", enabled: true },
   { href: "/admin/questions", label: "Question Bank", enabled: false },
   { href: "/admin/results", label: "Results", enabled: false },
   { href: "/admin/monitoring", label: "Live Monitoring", enabled: false },
