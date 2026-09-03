@@ -93,6 +93,12 @@ async function parseDocx(source: ArrayBuffer): Promise<ImportedRow[]> {
     const text = block.textContent?.replace(/\s+/g, " ").trim() ?? "";
     if (!text) continue;
     if (/^(answer\s*key|answers?)\s*:?$/i.test(text)) { inAnswerKey = true; current = null; continue; }
+    const inlineAnswerMatch = text.match(/^(?:correct\s+)?answer\s*:\s*([A-D1-4])\b/i);
+    if (current && inlineAnswerMatch) {
+      const answer = inlineAnswerMatch[1].toUpperCase();
+      current.markedAnswer = /^[A-D]$/.test(answer) ? answer.charCodeAt(0) - 65 : Number(answer) - 1;
+      continue;
+    }
     const keyMatch = text.match(/^(\d+)\s*[.)-]?\s*([A-D])\b/i);
     if (inAnswerKey && keyMatch) {
       answerKey.set(Number(keyMatch[1]), keyMatch[2].toUpperCase().charCodeAt(0) - 65);
@@ -107,7 +113,8 @@ async function parseDocx(source: ArrayBuffer): Promise<ImportedRow[]> {
     const optionMatch = text.match(/^([A-D])\s*[.)-]\s*(.+)$/i);
     if (current && optionMatch) {
       const optionIndex = optionMatch[1].toUpperCase().charCodeAt(0) - 65;
-      current.options.push(optionMatch[2]);
+      const optionText = optionMatch[2].replace(/^(?:correct\s+)?answer\s*:\s*/i, "").trim();
+      current.options.push(optionText);
       if (block.querySelector("strong, b, u")) current.markedAnswer = optionIndex;
     }
   }

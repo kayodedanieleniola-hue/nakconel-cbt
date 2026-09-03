@@ -28,7 +28,8 @@ export async function POST(request: Request) {
     const options = Array.isArray(row.options) ? row.options.map((option) => typeof option === "string" ? option.trim() : "") : [];
     const correctIndex = Number(row.correctIndex);
     if (!text || options.length < 2 || options.some((option) => !option) || !Number.isInteger(correctIndex) || correctIndex < 0 || correctIndex >= options.length) {
-      return NextResponse.json({ error: `Invalid question data on row ${rowIndex + 1}` }, { status: 422 });
+      const reason = !text ? "missing question text" : options.length < 2 ? "at least 2 options are required" : options.some((option) => !option) ? "an option is blank" : "the correct answer must be 1, 2, 3, or 4";
+      return NextResponse.json({ error: `Invalid question data on row ${rowIndex + 1}: ${reason}` }, { status: 422 });
     }
     questions.push({ text, options, correctIndex });
   }
