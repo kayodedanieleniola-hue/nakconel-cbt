@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import mammoth from "mammoth";
 
 type Exam = { id: string; name: string };
 
@@ -16,7 +17,9 @@ export default function BulkQuestionImport({ courseId, exams, onImported }: { co
     setError(null);
     setFileName(file.name);
     if (!examId) { setError("Choose a test first"); return; }
-    const rows = parseCsv(await file.text());
+    const rows = file.name.toLowerCase().endsWith(".docx")
+      ? await parseDocx(await file.arrayBuffer())
+      : parseCsv(await file.text());
     if (!rows.length) { setError("The CSV file has no question rows"); return; }
     setBusy(true);
     try {
@@ -35,16 +38,16 @@ export default function BulkQuestionImport({ courseId, exams, onImported }: { co
 
   return (
     <section style={panel}>
-      <h2 style={{ fontSize: "1.1rem", margin: "0 0 0.45rem" }}>Import questions from CSV</h2>
-      <p style={help}>Choose the test, then upload a CSV with columns: question, option1, option2, option3, option4, correct_answer.</p>
+      <h2 style={{ fontSize: "1.1rem", margin: "0 0 0.45rem" }}>Import questions</h2>
+      <p style={help}>Choose the test, then upload CSV or Word (.docx). Word questions must be numbered with A-D options; mark one option bold/underlined or add an answer key at the end.</p>
       <div style={row}>
         <select value={examId} onChange={(event) => setExamId(event.target.value)} style={input} disabled={busy || !courseId}>
           <option value="">Select a test</option>
           {exams.map((exam) => <option key={exam.id} value={exam.id}>{exam.name}</option>)}
         </select>
         <label style={{ ...upload, opacity: busy || !examId ? 0.5 : 1 }}>
-          {busy ? "Importing..." : "Choose CSV file"}
-          <input type="file" accept=".csv,text/csv" disabled={busy || !examId} onChange={(event) => { const file = event.target.files?.[0]; if (file) void importFile(file); }} style={{ display: "none" }} />
+          {busy ? "Importing..." : "Choose CSV or Word file"}
+          <input type="file" accept=".csv,.docx,text/csv,application/vnd.openxmlformats-officedocument.wordprocessingml.document" disabled={busy || !examId} onChange={(event) => { const file = event.target.files?.[0]; if (file) void importFile(file); }} style={{ display: "none" }} />
         </label>
       </div>
       {fileName && <p style={help}>{fileName}</p>}
@@ -75,6 +78,45 @@ function parseCsv(source: string): ImportedRow[] {
   if (row.some(Boolean)) cells.push(row);
   const start = cells[0]?.[0]?.toLowerCase() === "question" ? 1 : 0;
   return cells.slice(start).map((values) => ({ text: values[0] ?? "", options: values.slice(1, 5), correctIndex: Number(values[5]) - 1 }));
+}
+
+async function parseDocx(source: ArrayBuffer): Promise<ImportedRow[]> {
+  const result = await mammoth.convertToHtml({ arrayBuffer: source });
+  const document = new DOMParser().parseFromString(result.value, "text/html");
+  const blocks = Array.from(document.body.querySelectorAll("p, li"));
+  const answerKey = new Map<number, number>();
+  let inAnswerKey = false;
+  const questions: Array<{ number: number; text: string; options: string[]; markedAnswer: number | null }> = [];
+  let current: (typeof questions)[number] | null = null;
+
+  for (const block of blocks) {
+    const text = block.textContent?.replace(/\s+/g, " ").trim() ?? "";
+    if (!text) continue;
+    if (/^(answer\s*key|answers?)\s*:?$/i.test(text)) { inAnswerKey = true; current = null; continue; }
+    const keyMatch = text.match(/^(\d+)\s*[.)-]?\s*([A-D])\b/i);
+    if (inAnswerKey && keyMatch) {
+      answerKey.set(Number(keyMatch[1]), keyMatch[2].toUpperCase().charCodeAt(0) - 65);
+      continue;
+    }
+    const questionMatch = text.match(/^(\d+)\s*[.)-]\s*(.+)$/);
+    if (questionMatch) {
+      current = { number: Number(questionMatch[1]), text: questionMatch[2], options: [], markedAnswer: null };
+      questions.push(current);
+      continue;
+    }
+    const optionMatch = text.match(/^([A-D])\s*[.)-]\s*(.+)$/i);
+    if (current && optionMatch) {
+      const optionIndex = optionMatch[1].toUpperCase().charCodeAt(0) - 65;
+      current.options.push(optionMatch[2]);
+      if (block.querySelector("strong, b, u")) current.markedAnswer = optionIndex;
+    }
+  }
+
+  return questions.map((question) => ({
+    text: question.text,
+    options: question.options,
+    correctIndex: question.markedAnswer ?? answerKey.get(question.number) ?? -1,
+  }));
 }
 
 const panel = { background: "#fff", border: "1px solid var(--line)", borderRadius: 6, padding: "1.25rem", marginBottom: "2rem" } as const;
