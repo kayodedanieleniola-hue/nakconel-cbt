@@ -1,0 +1,46 @@
+import { NextResponse } from "next/server";
+import { AccessToken } from "livekit-server-sdk";
+import { getSession } from "@/lib/auth";
+import { prisma } from "@/lib/db";
+
+export async function GET(request: Request) {
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+
+  const url = new URL(request.url);
+  const attemptId = url.searchParams.get("attemptId") ?? "";
+  if (!attemptId) return NextResponse.json({ error: "attemptId is required" }, { status: 400 });
+
+  const attempt = await prisma.examAttempt.findUnique({
+    where: { id: attemptId },
+    include: { student: { select: { studentId: true } } },
+  });
+  if (!attempt) return NextResponse.json({ error: "Attempt not found" }, { status: 404 });
+
+  const isStudent = session.role === "student" && attempt.studentId === session.sub;
+  const isAdmin = session.role === "admin";
+  if (!isStudent && !isAdmin) return NextResponse.json({ error: "Access denied" }, { status: 403 });
+  if (isStudent && attempt.status !== "IN_PROGRESS") {
+    return NextResponse.json({ error: "This exam attempt is no longer active" }, { status: 409 });
+  }
+
+  const apiKey = process.env.LIVEKIT_API_KEY;
+  const apiSecret = process.env.LIVEKIT_API_SECRET;
+  const livekitUrl = process.env.LIVEKIT_URL ?? process.env.NEXT_PUBLIC_LIVEKIT_URL;
+  if (!apiKey || !apiSecret || !livekitUrl) {
+    return NextResponse.json({ error: "Live video is not configured" }, { status: 503 });
+  }
+
+  const room = `exam-${attempt.id}`;
+  const identity = isStudent ? `student-${attempt.student.studentId}` : `admin-${session.sub}`;
+  const token = new AccessToken(apiKey, apiSecret, { identity, name: identity });
+  token.addGrant({
+    roomJoin: true,
+    room,
+    canPublish: isStudent,
+    canSubscribe: true,
+    canPublishData: false,
+  });
+
+  return NextResponse.json({ token: await token.toJwt(), url: livekitUrl, room });
+}
