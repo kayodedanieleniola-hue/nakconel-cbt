@@ -15,28 +15,51 @@ function euclideanDistance(a: number[], b: number[]): number {
   return Math.sqrt(sum);
 }
 
-async function getActiveAttempt(id: string) {
-  const session = await getSession();
-  if (!session || session.role !== "student") return null;
+type Lookup =
+  | { ok: true; attempt: NonNullable<Awaited<ReturnType<typeof findAttempt>>>; studentId: string }
+  | { ok: false; reason: "unauthenticated" | "not_found" };
 
-  const attempt = await prisma.examAttempt.findFirst({
-    where: { id, studentId: session.sub },
+async function findAttempt(id: string, studentId: string) {
+  return prisma.examAttempt.findFirst({
+    where: { id, studentId },
     include: { exam: { select: { name: true } } },
   });
-  if (!attempt || attempt.status !== "IN_PROGRESS") return null;
-  return { attempt, studentId: session.sub };
+}
+
+// Distinguishes "you're not logged in right now" (recoverable — log back in
+// and resume, your answers are already saved) from "this attempt genuinely
+// doesn't exist for you" (not recoverable). Collapsing these into the same
+// 404 was actively misleading a student whose session cookie just didn't
+// make it through a background tab reload.
+async function getActiveAttempt(id: string): Promise<Lookup> {
+  const session = await getSession();
+  if (!session || session.role !== "student") return { ok: false, reason: "unauthenticated" };
+
+  const attempt = await findAttempt(id, session.sub);
+  if (!attempt || attempt.status !== "IN_PROGRESS") return { ok: false, reason: "not_found" };
+  return { ok: true, attempt, studentId: session.sub };
 }
 
 // Unlike getActiveAttempt, this doesn't require IN_PROGRESS — the whole
 // point of a heartbeat is to also detect and report when an admin has just
 // ended the attempt out from under a still-open tab.
-async function getAttemptAnyStatus(id: string) {
+async function getAttemptAnyStatus(id: string): Promise<Lookup> {
   const session = await getSession();
-  if (!session || session.role !== "student") return null;
+  if (!session || session.role !== "student") return { ok: false, reason: "unauthenticated" };
 
-  const attempt = await prisma.examAttempt.findFirst({ where: { id, studentId: session.sub } });
-  if (!attempt) return null;
-  return { attempt, studentId: session.sub };
+  const attempt = await findAttempt(id, session.sub);
+  if (!attempt) return { ok: false, reason: "not_found" };
+  return { ok: true, attempt, studentId: session.sub };
+}
+
+function lookupFailureResponse(result: Extract<Lookup, { ok: false }>) {
+  if (result.reason === "unauthenticated") {
+    return NextResponse.json(
+      { error: "Your session has expired. Log in again to continue — your answers are saved." },
+      { status: 401 }
+    );
+  }
+  return NextResponse.json({ error: "Attempt not found" }, { status: 404 });
 }
 
 type Body =
@@ -60,9 +83,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // Heartbeat uses its own lookup (doesn't require IN_PROGRESS) so it can
   // report back when an admin has just ended the attempt.
   if (b.type === "heartbeat") {
-    const ctx = await getAttemptAnyStatus(id);
-    if (!ctx) return NextResponse.json({ error: "Attempt not found" }, { status: 404 });
-    const { attempt } = ctx;
+    const result = await getAttemptAnyStatus(id);
+    if (!result.ok) return lookupFailureResponse(result);
+    const { attempt } = result;
+
     const sessionId = b.sessionId;
     if (typeof sessionId !== "string" || !sessionId) {
       return NextResponse.json({ error: "Missing session identifier" }, { status: 400 });
@@ -90,9 +114,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ ok: true, warning: attempt.pendingWarning ?? undefined, endsAt: updated.expiresAt });
   }
 
-  const ctx = await getActiveAttempt(id);
-  if (!ctx) return NextResponse.json({ error: "Attempt not found" }, { status: 404 });
-  const { attempt, studentId } = ctx;
+  const result = await getActiveAttempt(id);
+  if (!result.ok) return lookupFailureResponse(result);
+  const { attempt, studentId } = result;
 
   if (b.type === "identity") {
     const descriptor = b.descriptor;
@@ -119,7 +143,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         data: {
           actorType: "student",
           actorId: studentId,
-        attemptId: attempt.id,
+          attemptId: attempt.id,
           action: "student.identity_baseline_set",
           detail: attempt.exam.name,
         },
@@ -159,7 +183,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         data: {
           actorType: "student",
           actorId: studentId,
-        attemptId: attempt.id,
+          attemptId: attempt.id,
           action: count === 0 ? "student.presence_no_face" : "student.presence_multiple_faces",
           detail: attempt.exam.name,
         },
@@ -178,7 +202,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         data: {
           actorType: "student",
           actorId: studentId,
-        attemptId: attempt.id,
+          attemptId: attempt.id,
           action: b.event === "blocked" ? "student.camera_blocked" : "student.camera_disconnected",
           detail: attempt.exam.name,
         },

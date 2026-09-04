@@ -64,6 +64,7 @@ export default function ExamClient({ examId }: { examId: string }) {
   const [message, setMessage] = useState("Starting exam...");
   const [actionError, setActionError] = useState<string | null>(null);
   const [attemptGone, setAttemptGone] = useState(false);
+  const [sessionExpired, setSessionExpired] = useState(false);
   const [ended, setEnded] = useState<EndedInfo | null>(null);
   const [superseded, setSuperseded] = useState(false);
   const [warningBanner, setWarningBanner] = useState<string | null>(null);
@@ -97,16 +98,16 @@ export default function ExamClient({ examId }: { examId: string }) {
   }, [attempt]);
 
   useEffect(() => {
-    if (attempt && secondsLeft !== null && secondsLeft === 0 && !result && !busy && !attemptGone && !ended && !superseded) {
+    if (attempt && secondsLeft !== null && secondsLeft === 0 && !result && !busy && !attemptGone && !sessionExpired && !ended && !superseded) {
       submitExam();
     }
-  }, [secondsLeft, attempt, result, busy, attemptGone, ended, superseded]);
+  }, [secondsLeft, attempt, result, busy, attemptGone, sessionExpired, ended, superseded]);
 
   // Heartbeat — keeps this session's lease alive for duplicate-session
   // detection, and is how admin warnings/terminations/force-submits reach
   // an already-open exam tab without needing a live socket connection.
   useEffect(() => {
-    if (!attempt || result || attemptGone || ended || superseded) return;
+    if (!attempt || result || attemptGone || sessionExpired || ended || superseded) return;
     const tick = async () => {
       try {
         const response = await fetch(`/api/attempts/${attempt.id}/monitor`, {
@@ -114,6 +115,13 @@ export default function ExamClient({ examId }: { examId: string }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ type: "heartbeat", sessionId: sessionIdRef.current }),
         });
+        if (response.status === 401) {
+          // A background-tab reload sometimes drops the session cookie —
+          // the attempt itself and every saved answer are still intact
+          // server-side, so this is recoverable, not "exam over."
+          setSessionExpired(true);
+          return;
+        }
         const data = await response.json().catch(() => ({}));
         if (!response.ok) return;
         if (data.superseded) {
@@ -132,7 +140,7 @@ export default function ExamClient({ examId }: { examId: string }) {
     void tick();
     const timer = window.setInterval(tick, HEARTBEAT_INTERVAL_MS);
     return () => window.clearInterval(timer);
-  }, [attempt, result, attemptGone, ended, superseded]);
+  }, [attempt, result, attemptGone, sessionExpired, ended, superseded]);
 
   useEffect(() => {
     setFullscreenSupported(!!document.documentElement.requestFullscreen);
@@ -219,6 +227,10 @@ export default function ExamClient({ examId }: { examId: string }) {
   }
 
   function handleActionFailure(status: number, serverError: string | undefined, fallback: string) {
+    if (status === 401) {
+      setSessionExpired(true);
+      return;
+    }
     if (status === 404) {
       setAttemptGone(true);
       setActionError("This exam session is no longer valid. It may have been reset by an administrator.");
@@ -229,6 +241,10 @@ export default function ExamClient({ examId }: { examId: string }) {
 
   if (result) {
     return <main style={shell}><section style={panel}><p style={eyebrow}>Exam complete</p><h1>Your result</h1><p style={{ fontSize: "2rem", color: "var(--burgundy-900)" }}>{result.score}%</p><p>{result.passed ? "Passed" : "Did not pass"} · {result.correctAnswers} of {result.totalQuestions} correct</p><a href="/dashboard" style={button}>Return to dashboard</a></section></main>;
+  }
+
+  if (sessionExpired) {
+    return <main style={shell}><section style={panel}><p style={eyebrow}>Please log in again</p><h1>Your session expired</h1><p style={{ color: "var(--ink-600)", margin: "0.75rem 0 1.5rem" }}>This can happen if your browser reloaded the page in the background — for example after switching tabs for a while. Your answers so far are saved. Log in again, then tap Start Exam for this same test to pick up right where you left off.</p><a href="/login" style={button}>Log in again</a></section></main>;
   }
 
   if (superseded) {

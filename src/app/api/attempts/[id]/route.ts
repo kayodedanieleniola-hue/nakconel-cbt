@@ -3,9 +3,37 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { endAttempt } from "@/lib/attemptEnd";
 
+async function getStudentAttempt(params: Promise<{ id: string }>) {
+  const session = await getSession();
+  if (!session || session.role !== "student") return { ok: false as const, reason: "unauthenticated" as const };
+  const { id } = await params;
+
+  const attempt = await prisma.examAttempt.findFirst({
+    where: { id, studentId: session.sub },
+    include: {
+      exam: { select: { name: true, passingScore: true } },
+      questions: { orderBy: { position: "asc" } },
+    },
+  });
+  if (!attempt) return { ok: false as const, reason: "not_found" as const };
+  return { ok: true as const, attempt };
+}
+
+function lookupFailureResponse(reason: "unauthenticated" | "not_found") {
+  if (reason === "unauthenticated") {
+    return NextResponse.json(
+      { error: "Your session has expired. Log in again to continue — your answers are saved." },
+      { status: 401 }
+    );
+  }
+  return NextResponse.json({ error: "Attempt not found" }, { status: 404 });
+}
+
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const attempt = await getStudentAttempt(params);
-  if (!attempt) return NextResponse.json({ error: "Attempt not found" }, { status: 404 });
+  const result = await getStudentAttempt(params);
+  if (!result.ok) return lookupFailureResponse(result.reason);
+  const { attempt } = result;
+
   if (attempt.status !== "IN_PROGRESS") {
     return NextResponse.json({ error: "This attempt is no longer active" }, { status: 409 });
   }
@@ -45,8 +73,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 }
 
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const attempt = await getStudentAttempt(params);
-  if (!attempt) return NextResponse.json({ error: "Attempt not found" }, { status: 404 });
+  const result = await getStudentAttempt(params);
+  if (!result.ok) return lookupFailureResponse(result.reason);
+  const { attempt } = result;
+
   if (attempt.status !== "IN_PROGRESS") {
     return NextResponse.json({ error: "This attempt has already ended" }, { status: 409 });
   }
@@ -67,20 +97,6 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       passed: outcome.attempt.passed,
       correctAnswers,
       totalQuestions: outcome.questionCount,
-    },
-  });
-}
-
-async function getStudentAttempt(params: Promise<{ id: string }>) {
-  const session = await getSession();
-  if (!session || session.role !== "student") return null;
-  const { id } = await params;
-
-  return prisma.examAttempt.findFirst({
-    where: { id, studentId: session.sub },
-    include: {
-      exam: { select: { name: true, passingScore: true } },
-      questions: { orderBy: { position: "asc" } },
     },
   });
 }
