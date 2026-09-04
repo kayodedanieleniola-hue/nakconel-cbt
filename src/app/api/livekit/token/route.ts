@@ -3,6 +3,8 @@ import { AccessToken } from "livekit-server-sdk";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Authentication required" }, { status: 401 });
@@ -38,7 +40,7 @@ export async function GET(request: Request) {
     roomJoin: true,
     room,
     canPublish: isStudent,
-    canSubscribe: true,
+    canSubscribe: isAdmin, // students only ever publish here; nothing for them to subscribe to
     canPublishData: false,
   });
 
