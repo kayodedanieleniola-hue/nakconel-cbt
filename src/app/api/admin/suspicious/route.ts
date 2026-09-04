@@ -9,7 +9,20 @@ export async function GET() {
   if (!guard.ok) return guard.response;
 
   const events = await prisma.auditLog.findMany({
-    where: { action: { in: ["student.login_failed", "admin.login_failed", "student.exam_timeout"] } },
+    where: {
+      action: {
+        in: [
+          "student.login_failed",
+          "admin.login_failed",
+          "student.exam_timeout",
+          "student.identity_mismatch",
+          "student.presence_no_face",
+          "student.presence_multiple_faces",
+          "student.camera_blocked",
+          "student.camera_disconnected",
+        ],
+      },
+    },
     orderBy: { createdAt: "desc" },
     take: 100,
   });

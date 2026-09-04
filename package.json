@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@prisma/client": "^5.20.0",
+    "@vladmandic/face-api": "^1.7.15",
     "bcryptjs": "^2.4.3",
     "jose": "^5.9.6",
     "livekit-client": "^2.22.2",

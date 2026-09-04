@@ -92,6 +92,18 @@ model Student {
   updatedAt    DateTime @updatedAt
   attempts     ExamAttempt[]
 
+  // Phase 11 — identity verification. Captured from the student's first
+  // consented exam-camera session (an "approved live capture" per the
+  // spec), not at registration — nothing here until they actually sit an
+  // exam. Descriptor is a face-recognition embedding (128 floats, JSON
+  // encoded), used only to compare against future attempts; it is not a
+  // photo and cannot be reversed into one. Both fields are deletable by an
+  // admin at any time (see the student detail page) per the spec's
+  // retention/deletion requirement.
+  verificationPhoto      String? // small base64 JPEG data URL
+  verificationDescriptor String? // JSON-encoded Float32Array
+  verificationCapturedAt DateTime?
+
   @@index([courseId])
   @@map("students")
 }

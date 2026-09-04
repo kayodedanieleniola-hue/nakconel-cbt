@@ -18,8 +18,27 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     return NextResponse.json({ error: "Student not found" }, { status: 404 });
   }
 
-  const { passwordHash, ...safe } = student;
-  void passwordHash; // never send this to the client, under any circumstance
+  // Explicit allowlist, not a blocklist — new sensitive fields (like the
+  // face-recognition descriptor) must be deliberately opted in here, never
+  // leaked by default the way spreading "everything except X" would.
+  const safe = {
+    id: student.id,
+    studentId: student.studentId,
+    fullName: student.fullName,
+    email: student.email,
+    phone: student.phone,
+    age: student.age,
+    gender: student.gender,
+    address: student.address,
+    socialMedia: student.socialMedia,
+    status: student.status,
+    courseId: student.courseId,
+    course: student.course,
+    createdAt: student.createdAt,
+    updatedAt: student.updatedAt,
+    hasVerificationData: !!student.verificationDescriptor,
+    verificationCapturedAt: student.verificationCapturedAt,
+  };
   return NextResponse.json({ student: safe });
 }
 
