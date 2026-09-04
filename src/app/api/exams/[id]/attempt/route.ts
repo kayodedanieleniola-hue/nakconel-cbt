@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getExamStatus } from "@/lib/examStatus";
+import { endAttempt } from "@/lib/attemptEnd";
 
 function shuffle<T>(items: T[]) {
   const copy = [...items];
@@ -12,10 +13,25 @@ function shuffle<T>(items: T[]) {
   return copy;
 }
 
-export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+const SESSION_STALE_MS = 45_000; // matches the client's ~20s heartbeat with room for one missed beat
+
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
   if (!session || session.role !== "student") {
     return NextResponse.json({ error: "You must be logged in as a student" }, { status: 401 });
+  }
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    body = {};
+  }
+  const sessionId = typeof (body as { sessionId?: unknown }).sessionId === "string"
+    ? (body as { sessionId: string }).sessionId
+    : null;
+  if (!sessionId) {
+    return NextResponse.json({ error: "Missing session identifier" }, { status: 400 });
   }
 
   const { id: examId } = await params;
@@ -38,19 +54,42 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     include: { questions: { orderBy: { position: "asc" } } },
   });
 
-  if (existing?.status === "SUBMITTED") {
+  if (existing?.status === "SUBMITTED" || existing?.status === "TERMINATED") {
     return NextResponse.json({ error: "You have already submitted this exam" }, { status: 409 });
   }
 
   if (existing && existing.expiresAt > new Date()) {
-    return NextResponse.json({ attempt: serializeAttempt(existing) });
+    const otherSessionActive =
+      existing.activeSessionId &&
+      existing.activeSessionId !== sessionId &&
+      existing.activeSessionAt &&
+      Date.now() - existing.activeSessionAt.getTime() < SESSION_STALE_MS;
+
+    if (otherSessionActive) {
+      await prisma.auditLog.create({
+        data: {
+          actorType: "student",
+          actorId: student.id,
+          action: "student.duplicate_session",
+          detail: exam.name,
+        },
+      });
+      return NextResponse.json(
+        { error: "This exam is already open in another window or device." },
+        { status: 409 }
+      );
+    }
+
+    const resumed = await prisma.examAttempt.update({
+      where: { id: existing.id },
+      data: { activeSessionId: sessionId, activeSessionAt: new Date() },
+      include: { questions: { orderBy: { position: "asc" } } },
+    });
+    return NextResponse.json({ attempt: serializeAttempt(resumed) });
   }
 
   if (existing) {
-    await prisma.examAttempt.update({
-      where: { id: existing.id },
-      data: { status: "TIMED_OUT", submittedAt: new Date() },
-    });
+    await endAttempt(existing.id, "TIMED_OUT", "timeout");
   }
 
   const questionPool = await prisma.question.findMany({
@@ -72,6 +111,8 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       studentId: student.id,
       startedAt,
       expiresAt,
+      activeSessionId: sessionId,
+      activeSessionAt: startedAt,
       questions: {
         create: selectedQuestions.map((question, position) => {
           const optionEntries = question.options.map((text, index) => ({ text, index }));

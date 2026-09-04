@@ -150,13 +150,28 @@ model ExamAttempt {
   studentId    String
   exam         Exam              @relation(fields: [examId], references: [id], onDelete: Cascade)
   student      Student           @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  status       String            @default("IN_PROGRESS")
+  status       String            @default("IN_PROGRESS") // IN_PROGRESS | SUBMITTED | TIMED_OUT | TERMINATED
   startedAt    DateTime          @default(now())
   expiresAt    DateTime
   submittedAt  DateTime?
   score        Int?
   passed       Boolean?
   questions    AttemptQuestion[]
+
+  // Phase 10 — one active session per attempt. sessionId is a random value
+  // the browser tab generates and re-sends on every heartbeat; a second
+  // tab/device with a different sessionId is refused while the first one's
+  // heartbeat is still recent (see IDs and staleness window in the API).
+  activeSessionId String?
+  activeSessionAt DateTime?
+
+  // Phase 12 — admin intervention on a live attempt. pendingWarning is
+  // read-once: delivered on the next heartbeat, then cleared. endedBy and
+  // endReason record who/why when an admin terminates or force-submits,
+  // distinct from a normal student submission or a timeout.
+  pendingWarning  String?
+  endedBy         String? // "student" | "timeout" | "admin:<adminId>"
+  endReason       String?
 
   @@unique([examId, studentId])
   @@index([studentId, status])

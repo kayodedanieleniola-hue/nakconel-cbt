@@ -79,9 +79,9 @@ export default function AdminResultsPage() {
                 <tr key={result.id}>
                   <td style={cell}><strong>{result.student.fullName}</strong><br /><span style={small}>{result.student.studentId} · {result.student.email}</span></td>
                   <td style={cell}>{result.course}<br /><span style={small}>{result.exam}</span></td>
-                  <td style={cell}><strong>{result.score}%</strong><br /><span style={small}>Pass: {result.passingScore}%</span></td>
+                  <td style={cell}><strong>{result.status === "TERMINATED" ? "—" : `${result.score}%`}</strong><br /><span style={small}>Pass: {result.passingScore}%</span></td>
                   <td style={{ ...cell, color: result.passed ? "var(--success)" : "var(--danger)", fontWeight: 600 }}>
-                    {result.status === "TIMED_OUT" ? "Timed out" : result.passed ? "Passed" : "Not passed"}
+                    {result.status === "TERMINATED" ? "Terminated" : result.status === "TIMED_OUT" ? "Timed out" : result.passed ? "Passed" : "Not passed"}
                   </td>
                   <td style={cell}>{result.submittedAt ? new Date(result.submittedAt).toLocaleString() : "-"}</td>
                   <td style={cell}>

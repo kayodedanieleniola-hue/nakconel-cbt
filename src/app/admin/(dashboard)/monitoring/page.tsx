@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import LiveKitFeed from "@/components/LiveKitFeed";
+import AdminAttemptControls from "@/components/AdminAttemptControls";
 
 type Attempt = { id: string; student: { studentId: string; fullName: string; email: string }; exam: string; course: string; startedAt: string; expiresAt: string };
 
@@ -16,9 +17,43 @@ export default function MonitoringPage() {
     setLoading(false);
   }
 
-  useEffect(() => { void load(); const timer = window.setInterval(() => void load(), 15000); return () => window.clearInterval(timer); }, []);
+  useEffect(() => {
+    void load();
+    const timer = window.setInterval(() => void load(), 15000);
+    return () => window.clearInterval(timer);
+  }, []);
 
-  return <div><p style={eyebrow}>Live view</p><h1 style={{ fontSize: "1.9rem", marginBottom: "0.5rem" }}>Live monitoring</h1><p style={muted}>Active exam attempts, refreshed every 15 seconds.</p>{loading ? <p style={muted}>Loading...</p> : attempts.length === 0 ? <p style={empty}>No students are taking an exam right now.</p> : <div style={grid}>{attempts.map((attempt) => <article key={attempt.id} style={card}><div><strong>{attempt.student.fullName}</strong><p style={small}>{attempt.student.studentId} · {attempt.student.email}</p></div><p style={{ margin: "0.8rem 0 0" }}>{attempt.course} / {attempt.exam}</p><LiveKitFeed attemptId={attempt.id} /><p style={small}>Started {new Date(attempt.startedAt).toLocaleString()}<br />Expires {new Date(attempt.expiresAt).toLocaleString()}</p></article>)}</div>}</div>;
+  return (
+    <div>
+      <p style={eyebrow}>Live view</p>
+      <h1 style={{ fontSize: "1.9rem", marginBottom: "0.5rem" }}>Live monitoring</h1>
+      <p style={muted}>Active exam attempts, refreshed every 15 seconds.</p>
+      {loading ? (
+        <p style={muted}>Loading...</p>
+      ) : attempts.length === 0 ? (
+        <p style={empty}>No students are taking an exam right now.</p>
+      ) : (
+        <div style={grid}>
+          {attempts.map((attempt) => (
+            <article key={attempt.id} style={card}>
+              <div>
+                <strong>{attempt.student.fullName}</strong>
+                <p style={small}>{attempt.student.studentId} · {attempt.student.email}</p>
+              </div>
+              <p style={{ margin: "0.8rem 0 0" }}>{attempt.course} / {attempt.exam}</p>
+              <LiveKitFeed attemptId={attempt.id} />
+              <p style={small}>
+                Started {new Date(attempt.startedAt).toLocaleString()}
+                <br />
+                Expires {new Date(attempt.expiresAt).toLocaleString()}
+              </p>
+              <AdminAttemptControls attemptId={attempt.id} onEnded={() => void load()} />
+            </article>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 const eyebrow = { color: "var(--gold-600)", fontWeight: 600, fontSize: "0.9rem" } as const;

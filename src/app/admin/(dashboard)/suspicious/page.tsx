@@ -8,6 +8,9 @@ const HIGH_SEVERITY = new Set([
   "student.identity_mismatch",
   "student.presence_multiple_faces",
   "student.camera_disconnected",
+  "student.duplicate_session",
+  "student.fullscreen_exited",
+  "admin.terminate_exam",
 ]);
 
 export default function SuspiciousPage() {
@@ -63,6 +66,12 @@ const label: Record<string, string> = {
   "student.presence_multiple_faces": "Multiple faces detected during exam",
   "student.camera_blocked": "Camera/microphone permission blocked",
   "student.camera_disconnected": "Camera disconnected during exam",
+  "student.duplicate_session": "Exam opened in a second window/device",
+  "student.fullscreen_exited": "Exited full-screen during exam",
+  "student.tab_hidden": "Switched away from exam tab",
+  "admin.warn_student": "Admin sent a warning",
+  "admin.terminate_exam": "Admin terminated an exam",
+  "admin.force_submit_exam": "Admin force-submitted an exam",
 };
 const eyebrow = { color: "var(--gold-600)", fontWeight: 600, fontSize: "0.9rem" } as const;
 const muted = { color: "var(--ink-600)", fontSize: "0.9rem" } as const;

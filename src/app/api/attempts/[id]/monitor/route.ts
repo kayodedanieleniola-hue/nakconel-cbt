@@ -27,16 +27,27 @@ async function getActiveAttempt(id: string) {
   return { attempt, studentId: session.sub };
 }
 
+// Unlike getActiveAttempt, this doesn't require IN_PROGRESS — the whole
+// point of a heartbeat is to also detect and report when an admin has just
+// ended the attempt out from under a still-open tab.
+async function getAttemptAnyStatus(id: string) {
+  const session = await getSession();
+  if (!session || session.role !== "student") return null;
+
+  const attempt = await prisma.examAttempt.findFirst({ where: { id, studentId: session.sub } });
+  if (!attempt) return null;
+  return { attempt, studentId: session.sub };
+}
+
 type Body =
   | { type: "identity"; descriptor: number[]; photo?: string }
   | { type: "presence"; facesDetected: number }
-  | { type: "camera"; event: "ready" | "blocked" | "disconnected" };
+  | { type: "camera"; event: "ready" | "blocked" | "disconnected" }
+  | { type: "focus"; event: "fullscreen_exited" | "tab_hidden" }
+  | { type: "heartbeat"; sessionId: string };
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const ctx = await getActiveAttempt(id);
-  if (!ctx) return NextResponse.json({ error: "Attempt not found" }, { status: 404 });
-  const { attempt, studentId } = ctx;
 
   let body: unknown;
   try {
@@ -45,6 +56,43 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
   const b = body as Partial<Body>;
+
+  // Heartbeat uses its own lookup (doesn't require IN_PROGRESS) so it can
+  // report back when an admin has just ended the attempt.
+  if (b.type === "heartbeat") {
+    const ctx = await getAttemptAnyStatus(id);
+    if (!ctx) return NextResponse.json({ error: "Attempt not found" }, { status: 404 });
+    const { attempt } = ctx;
+    const sessionId = b.sessionId;
+    if (typeof sessionId !== "string" || !sessionId) {
+      return NextResponse.json({ error: "Missing session identifier" }, { status: 400 });
+    }
+
+    if (attempt.status !== "IN_PROGRESS") {
+      return NextResponse.json({
+        ok: true,
+        ended: true,
+        status: attempt.status,
+        endedBy: attempt.endedBy,
+        endReason: attempt.endReason,
+      });
+    }
+
+    if (attempt.activeSessionId && attempt.activeSessionId !== sessionId) {
+      return NextResponse.json({ ok: true, superseded: true });
+    }
+
+    const updated = await prisma.examAttempt.update({
+      where: { id: attempt.id },
+      data: { activeSessionAt: new Date(), pendingWarning: null },
+    });
+
+    return NextResponse.json({ ok: true, warning: attempt.pendingWarning ?? undefined, endsAt: updated.expiresAt });
+  }
+
+  const ctx = await getActiveAttempt(id);
+  if (!ctx) return NextResponse.json({ error: "Attempt not found" }, { status: 404 });
+  const { attempt, studentId } = ctx;
 
   if (b.type === "identity") {
     const descriptor = b.descriptor;
@@ -132,6 +180,21 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         },
       });
     }
+    return NextResponse.json({ ok: true });
+  }
+
+  if (b.type === "focus") {
+    if (b.event !== "fullscreen_exited" && b.event !== "tab_hidden") {
+      return NextResponse.json({ error: "Invalid focus event" }, { status: 400 });
+    }
+    await prisma.auditLog.create({
+      data: {
+        actorType: "student",
+        actorId: studentId,
+        action: b.event === "fullscreen_exited" ? "student.fullscreen_exited" : "student.tab_hidden",
+        detail: attempt.exam.name,
+      },
+    });
     return NextResponse.json({ ok: true });
   }
 

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { endAttempt } from "@/lib/attemptEnd";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const attempt = await getStudentAttempt(params);
@@ -10,7 +11,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   if (attempt.expiresAt <= new Date()) {
-    await markTimedOut(attempt.id);
+    await endAttempt(attempt.id, "TIMED_OUT", "timeout");
     return NextResponse.json({ error: "The exam time has expired" }, { status: 409 });
   }
 
@@ -46,40 +47,26 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const attempt = await getStudentAttempt(params);
   if (!attempt) return NextResponse.json({ error: "Attempt not found" }, { status: 404 });
-  if (attempt.status === "SUBMITTED" || attempt.status === "TIMED_OUT") {
+  if (attempt.status !== "IN_PROGRESS") {
     return NextResponse.json({ error: "This attempt has already ended" }, { status: 409 });
   }
 
   const timedOut = attempt.expiresAt <= new Date();
+  const outcome = await endAttempt(attempt.id, timedOut ? "TIMED_OUT" : "SUBMITTED", timedOut ? "timeout" : "student");
+  if (!outcome) return NextResponse.json({ error: "Attempt not found" }, { status: 404 });
+
   const correctAnswers = timedOut
     ? 0
     : attempt.questions.filter((question) => question.selectedIndex === question.correctIndex).length;
-  const score = Math.round((correctAnswers / attempt.questions.length) * 100);
-  const passed = score >= attempt.exam.passingScore;
-  const status = timedOut ? "TIMED_OUT" : "SUBMITTED";
-
-  const completed = await prisma.examAttempt.update({
-    where: { id: attempt.id },
-    data: { status, score, passed, submittedAt: new Date() },
-  });
-
-  await prisma.auditLog.create({
-    data: {
-      actorType: "student",
-      actorId: attempt.studentId,
-      action: timedOut ? "student.exam_timeout" : "student.submit_exam",
-      detail: attempt.exam.name,
-    },
-  });
 
   return NextResponse.json({
     result: {
-      attemptId: completed.id,
-      status: completed.status,
-      score: completed.score,
-      passed: completed.passed,
-      correctAnswers: timedOut ? 0 : correctAnswers,
-      totalQuestions: attempt.questions.length,
+      attemptId: outcome.attempt.id,
+      status: outcome.attempt.status,
+      score: outcome.attempt.score,
+      passed: outcome.attempt.passed,
+      correctAnswers,
+      totalQuestions: outcome.questionCount,
     },
   });
 }
@@ -95,12 +82,5 @@ async function getStudentAttempt(params: Promise<{ id: string }>) {
       exam: { select: { name: true, passingScore: true } },
       questions: { orderBy: { position: "asc" } },
     },
-  });
-}
-
-async function markTimedOut(id: string) {
-  await prisma.examAttempt.update({
-    where: { id },
-    data: { status: "TIMED_OUT", submittedAt: new Date(), score: 0, passed: false },
   });
 }

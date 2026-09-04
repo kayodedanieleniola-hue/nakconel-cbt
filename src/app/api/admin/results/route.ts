@@ -9,7 +9,7 @@ export async function GET() {
   if (!guard.ok) return guard.response;
 
   const attempts = await prisma.examAttempt.findMany({
-    where: { status: { in: ["SUBMITTED", "TIMED_OUT"] } },
+    where: { status: { in: ["SUBMITTED", "TIMED_OUT", "TERMINATED"] } },
     include: {
       student: { select: { studentId: true, fullName: true, email: true } },
       exam: { select: { name: true, passingScore: true, course: { select: { name: true } } } },
