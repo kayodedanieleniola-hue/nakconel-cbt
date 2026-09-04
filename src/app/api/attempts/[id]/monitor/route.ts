@@ -119,6 +119,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         data: {
           actorType: "student",
           actorId: studentId,
+        attemptId: attempt.id,
           action: "student.identity_baseline_set",
           detail: attempt.exam.name,
         },
@@ -134,6 +135,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       data: {
         actorType: "student",
         actorId: studentId,
+        attemptId: attempt.id,
         action: matched ? "student.identity_verified" : "student.identity_mismatch",
         detail: `${attempt.exam.name} — distance ${distance.toFixed(3)}`,
       },
@@ -157,6 +159,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         data: {
           actorType: "student",
           actorId: studentId,
+        attemptId: attempt.id,
           action: count === 0 ? "student.presence_no_face" : "student.presence_multiple_faces",
           detail: attempt.exam.name,
         },
@@ -175,6 +178,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         data: {
           actorType: "student",
           actorId: studentId,
+        attemptId: attempt.id,
           action: b.event === "blocked" ? "student.camera_blocked" : "student.camera_disconnected",
           detail: attempt.exam.name,
         },
@@ -191,6 +195,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       data: {
         actorType: "student",
         actorId: studentId,
+        attemptId: attempt.id,
         action: b.event === "fullscreen_exited" ? "student.fullscreen_exited" : "student.tab_hidden",
         detail: attempt.exam.name,
       },

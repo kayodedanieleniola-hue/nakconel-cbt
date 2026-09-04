@@ -64,6 +64,7 @@ export async function endAttempt(
     data: {
       actorType: endedBy.startsWith("admin:") ? "admin" : "student",
       actorId: endedBy.startsWith("admin:") ? endedBy.slice("admin:".length) : attempt.studentId,
+      attemptId,
       action:
         outcome === "TIMED_OUT"
           ? "student.exam_timeout"

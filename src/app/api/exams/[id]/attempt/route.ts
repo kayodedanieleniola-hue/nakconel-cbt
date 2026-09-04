@@ -70,6 +70,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         data: {
           actorType: "student",
           actorId: student.id,
+          attemptId: existing.id,
           action: "student.duplicate_session",
           detail: exam.name,
         },

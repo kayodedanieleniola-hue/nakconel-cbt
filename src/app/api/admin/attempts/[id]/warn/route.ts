@@ -35,6 +35,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     data: {
       actorType: "admin",
       actorId: guard.session.sub,
+      attemptId: id,
       action: "admin.warn_student",
       detail: `${attempt.student.studentId} (${attempt.student.fullName}) — ${attempt.exam.name}: "${message}"`,
     },

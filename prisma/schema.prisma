@@ -138,9 +138,14 @@ model AuditLog {
   action    String // e.g. "student.register", "student.login", "admin.login"
   detail    String?
   ip        String?
+  attemptId String? // set for exam-monitoring events, so an attempt's
+  // detail page can show exactly what was flagged during it — not stored
+  // as a relation (deliberately survives an attempt being reset/deleted,
+  // since the audit trail should outlive the row it describes)
   createdAt DateTime @default(now())
 
   @@index([actorType, actorId])
+  @@index([attemptId])
   @@map("audit_logs")
 }
 
