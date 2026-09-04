@@ -135,12 +135,59 @@ revisit this URL later — it won't create duplicates.
 - Deactivating a question (instead of deleting it) removes it from that
   count without losing the question, e.g. while it's being reviewed
 
+**Phase 6 — Exam-taking engine**
+- `/exam/[id]` — the actual student exam interface: timer, one question at a
+  time, answer selection with autosave, previous/next navigation, submit
+- Server-side timer (`expiresAt` on the attempt) — the browser clock is
+  never trusted; time remaining is always computed from the server
+- Auto-submit when time runs out; manual submit locks the attempt
+- One attempt per student per exam enforced at the database level
+  (`@@unique([examId, studentId])`) — a 409 on re-starting a completed exam
+  is the system working as designed, not a bug
+
+**Phase 7 — Scoring, bulk import, results**
+- Automatic scoring on submission — correct answers are compared
+  server-side, student browsers never receive answer keys
+- Word document (`.docx`) bulk question import, in addition to the CSV
+  bulk-upload from Phase 5
+- `/admin/results` — every submitted attempt, with an admin **Reset
+  attempt** action for legitimate retakes (technical issues, mistaken
+  early submission, etc.) — always logged to the audit trail
+
+**Phase 8 — Live monitoring & suspicious activity**
+- Live camera/microphone streaming from student to admin during an exam via
+  LiveKit, with explicit consent required before it starts
+- `/admin/monitoring` — see students currently testing, in real time
+- `/admin/suspicious` — flagged events (failed logins, exam timeouts, and
+  more from Phase 11 below) for human review — nothing here auto-fails a
+  student
+
+**Phase 11 — Identity verification & presence checks**
+- On-device face detection (self-hosted model files, nothing sent to a
+  third party) runs entirely in the student's browser
+- First exam attempt ever: captures a small reference photo + a
+  non-reversible face-recognition embedding (128 numbers, not an image) as
+  that student's enrolled baseline
+- Every attempt after that: compares the live camera face against the
+  baseline and logs a match/mismatch — a mismatch is a **review flag**,
+  never an automatic fail or block
+- Periodic checks during the exam watch only for "no face" or "more than
+  one face" in frame — logged as review-flag events, not proof of anything
+- Consent screen explains what's monitored, why, and that it's deletable —
+  admins can permanently delete a student's stored verification photo and
+  descriptor from their profile page at any time, which also re-enrolls
+  them fresh on their next attempt
+- Deliberately **not recording video** anywhere — the live feed is
+  peer-to-peer through LiveKit, not saved to disk, which keeps the
+  retention story simple: there's nothing to retain but one small photo
+
 ## What's intentionally NOT here yet
 
-The exam-taking interface, randomization in action, scoring, exam
-attempts/results, camera/identity monitoring, live monitoring, and the
-suspicious-activity center. The schema is structured so those attach
-without reworking what's here.
+Full-screen enforcement and tab/focus-switch monitoring during exams
+(spec's Phase 10), and Settings. Phases 9 (results/reporting depth) and 12
+(richer real-time monitoring UI) are also still open — what exists today
+covers their core mechanics (results exist via Phase 7, live monitoring via
+Phase 8) but not every refinement the spec describes.
 
 ## Local development (optional, if you ever use a computer)
 
