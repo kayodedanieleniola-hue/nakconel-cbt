@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { createLocalTracks, Room } from "livekit-client";
+import { createLocalTracks, Room, RoomEvent } from "livekit-client";
 
 const MODELS_URL = "/models";
 const PRESENCE_CHECK_INTERVAL_MS = 25_000;
@@ -22,21 +22,47 @@ async function reportEvent(attemptId: string, body: object) {
 export default function CameraCheck({ attemptId }: { attemptId: string }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const roomRef = useRef<Room | null>(null);
-  const [status, setStatus] = useState<"connecting" | "ready" | "blocked">("connecting");
+  const [status, setStatus] = useState<"connecting" | "reconnecting" | "ready" | "blocked">("connecting");
   const [consented, setConsented] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [verification, setVerification] = useState<"idle" | "checking" | "baseline_set" | "match" | "mismatch">("idle");
 
   useEffect(() => {
     let active = true;
+    let currentRoom: Room | null = null;
+    let reconnectAttempts = 0;
+    const MAX_RECONNECT_ATTEMPTS = 5;
+
     if (!consented) {
       setStatus("connecting");
       return () => { active = false; };
     }
-    const room = new Room();
-    roomRef.current = room;
 
-    async function connect() {
+    async function connectAndPublish() {
+      const room = new Room();
+      currentRoom = room;
+      roomRef.current = room;
+
+      // LiveKit already retries transient network drops internally, but a
+      // background-tab suspension (very common on phones — the browser
+      // pauses JS execution mid-connection) can leave the peer connection
+      // in a state its own retry can't recover from. When that happens we
+      // rebuild the connection from scratch rather than leaving the feed
+      // dead with no recovery attempt.
+      room.on(RoomEvent.Disconnected, () => {
+        if (!active) return; // Our own cleanup caused this — not a failure.
+        if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+          setStatus("blocked");
+          void reportEvent(attemptId, { type: "camera", event: "disconnected" });
+          return;
+        }
+        reconnectAttempts += 1;
+        setStatus("reconnecting");
+        window.setTimeout(() => {
+          if (active) void connectAndPublish();
+        }, 1500);
+      });
+
       try {
         const response = await fetch(`/api/livekit/token?attemptId=${encodeURIComponent(attemptId)}`);
         const data = await response.json();
@@ -46,7 +72,10 @@ export default function CameraCheck({ attemptId }: { attemptId: string }) {
         for (const track of tracks) await room.localParticipant.publishTrack(track);
         const videoTrack = tracks.find((track) => track.kind === "video");
         if (active && videoTrack && videoRef.current) videoTrack.attach(videoRef.current);
-        if (active) setStatus("ready");
+        if (active) {
+          reconnectAttempts = 0;
+          setStatus("ready");
+        }
       } catch {
         if (active) setStatus("blocked");
         void reportEvent(attemptId, { type: "camera", event: "blocked" });
@@ -54,14 +83,16 @@ export default function CameraCheck({ attemptId }: { attemptId: string }) {
       }
     }
 
-    void connect();
+    void connectAndPublish();
 
     return () => {
       active = false;
-      room.localParticipant.trackPublications.forEach((publication) => publication.track?.stop());
-      void room.disconnect();
+      currentRoom?.localParticipant.trackPublications.forEach((publication) => publication.track?.stop());
+      void currentRoom?.disconnect();
     };
   }, [attemptId, consented]);
+
+  const identityCheckedRef = useRef(false);
 
   // Identity check + periodic presence checks. Runs entirely in the
   // browser (models are self-hosted in /public/models, nothing sent to a
@@ -87,33 +118,38 @@ export default function CameraCheck({ attemptId }: { attemptId: string }) {
       }
       if (cancelled || !videoRef.current) return;
 
-      // One-time identity check shortly after the feed stabilizes.
-      setVerification("checking");
-      try {
-        const video = videoRef.current;
-        const detection = await faceapi
-          .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
-          .withFaceLandmarks()
-          .withFaceDescriptor();
-        if (detection && !cancelled) {
-          const canvas = document.createElement("canvas");
-          canvas.width = 160;
-          canvas.height = 120;
-          canvas.getContext("2d")?.drawImage(video, 0, 0, 160, 120);
-          const photo = canvas.toDataURL("image/jpeg", 0.6);
+      // One-time identity check per exam session — a reconnect (status
+      // briefly leaving and returning to "ready") must not re-trigger this,
+      // or a shaky connection would spam repeated identity checks.
+      if (!identityCheckedRef.current) {
+        identityCheckedRef.current = true;
+        setVerification("checking");
+        try {
+          const video = videoRef.current;
+          const detection = await faceapi
+            .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
+            .withFaceLandmarks()
+            .withFaceDescriptor();
+          if (detection && !cancelled) {
+            const canvas = document.createElement("canvas");
+            canvas.width = 160;
+            canvas.height = 120;
+            canvas.getContext("2d")?.drawImage(video, 0, 0, 160, 120);
+            const photo = canvas.toDataURL("image/jpeg", 0.6);
 
-          const res = await fetch(`/api/attempts/${attemptId}/monitor`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ type: "identity", descriptor: Array.from(detection.descriptor), photo }),
-          });
-          const data = await res.json().catch(() => ({}));
-          if (!cancelled) setVerification(data.status ?? "idle");
-        } else if (!cancelled) {
-          setVerification("idle");
+            const res = await fetch(`/api/attempts/${attemptId}/monitor`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ type: "identity", descriptor: Array.from(detection.descriptor), photo }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!cancelled) setVerification(data.status ?? "idle");
+          } else if (!cancelled) {
+            setVerification("idle");
+          }
+        } catch {
+          if (!cancelled) setVerification("idle");
         }
-      } catch {
-        if (!cancelled) setVerification("idle");
       }
 
       // Periodic presence checks — lightweight face count only.
@@ -145,8 +181,8 @@ export default function CameraCheck({ attemptId }: { attemptId: string }) {
     <aside style={panel} aria-label="Camera and microphone check">
       <div style={heading}>
         <strong>Camera and microphone</strong>
-        <span style={{ color: status === "ready" ? "var(--success)" : "var(--danger)" }}>
-          {status === "ready" ? "Transmitting" : status === "connecting" ? "Connecting" : "Unavailable"}
+        <span style={{ color: status === "ready" ? "var(--success)" : status === "reconnecting" ? "var(--gold-600)" : "var(--danger)" }}>
+          {status === "ready" ? "Transmitting" : status === "reconnecting" ? "Reconnecting" : status === "connecting" ? "Connecting" : "Unavailable"}
         </span>
       </div>
 
@@ -180,6 +216,8 @@ export default function CameraCheck({ attemptId }: { attemptId: string }) {
           ? verification === "mismatch"
             ? "Your camera is transmitting. The identity check flagged this session for admin review."
             : "Your camera and microphone are transmitting for this exam."
+          : status === "reconnecting"
+          ? "Connection dropped briefly — reconnecting automatically. This can happen after switching apps or tabs."
           : status === "blocked"
           ? "Camera or microphone permission was not granted. Allow both in your browser and reload the exam."
           : consented
