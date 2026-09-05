@@ -54,8 +54,23 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     include: { questions: { orderBy: { position: "asc" } } },
   });
 
+  // A row already exists and is finalized (or just now discovered to be
+  // expired) — none of these should ever fall through to creating a new
+  // attempt row, since (examId, studentId) is a unique pair in the
+  // database. Trying to create a second row for the same pair after a
+  // timeout was exactly the bug: it collided with the very row it just
+  // finalized.
   if (existing?.status === "SUBMITTED" || existing?.status === "TERMINATED") {
     return NextResponse.json({ error: "You have already submitted this exam" }, { status: 409 });
+  }
+  if (existing?.status === "TIMED_OUT") {
+    return NextResponse.json({ error: "This exam's time expired. It cannot be restarted." }, { status: 409 });
+  }
+  if (existing && existing.status === "IN_PROGRESS" && existing.expiresAt <= new Date()) {
+    // Time ran out and nothing had touched this attempt yet to record
+    // that — finalize it now, then block, same as an already-known timeout.
+    await endAttempt(existing.id, "TIMED_OUT", "timeout");
+    return NextResponse.json({ error: "This exam's time expired. It cannot be restarted." }, { status: 409 });
   }
 
   if (existing && existing.expiresAt > new Date()) {
@@ -87,10 +102,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       include: { questions: { orderBy: { position: "asc" } } },
     });
     return NextResponse.json({ attempt: serializeAttempt(resumed) });
-  }
-
-  if (existing) {
-    await endAttempt(existing.id, "TIMED_OUT", "timeout");
   }
 
   const questionPool = await prisma.question.findMany({
