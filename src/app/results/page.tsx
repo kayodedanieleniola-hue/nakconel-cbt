@@ -1,12 +1,12 @@
 import { redirect } from "next/navigation";
-import { getSession } from "@/lib/auth";
+import { getStudentSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import LogoutButton from "@/components/LogoutButton";
 
 export const dynamic = "force-dynamic";
 
 export default async function ResultsPage() {
-  const session = await getSession();
+  const session = await getStudentSession();
   if (!session || session.role !== "student") redirect("/login");
 
   const student = await prisma.student.findUnique({ where: { id: session.sub } });

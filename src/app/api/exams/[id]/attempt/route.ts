@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { getStudentSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getExamStatus } from "@/lib/examStatus";
 import { endAttempt } from "@/lib/attemptEnd";
@@ -16,7 +16,7 @@ function shuffle<T>(items: T[]) {
 const SESSION_STALE_MS = 45_000; // matches the client's ~20s heartbeat with room for one missed beat
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await getSession();
+  const session = await getStudentSession();
   if (!session || session.role !== "student") {
     return NextResponse.json({ error: "You must be logged in as a student" }, { status: 401 });
   }

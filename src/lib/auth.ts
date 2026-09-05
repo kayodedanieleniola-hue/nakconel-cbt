@@ -1,7 +1,13 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 
-const COOKIE_NAME = "nak_session";
+// Separate cookies per role — this is deliberate. Logging in as a student
+// in one tab must never silently log an admin out in another tab (or vice
+// versa), which is exactly what happened when both roles shared a single
+// "nak_session" cookie: whichever login happened most recently overwrote
+// the other one, since a browser only keeps one value per cookie name.
+const STUDENT_COOKIE = "nak_student_session";
+const ADMIN_COOKIE = "nak_admin_session";
 const SESSION_DURATION_SECONDS = 60 * 60 * 8; // 8 hours
 
 function getSecretKey() {
@@ -20,6 +26,10 @@ export type SessionPayload = {
   studentId?: string; // e.g. NAK-2026-001, only present for students
 };
 
+function cookieNameFor(role: "student" | "admin") {
+  return role === "admin" ? ADMIN_COOKIE : STUDENT_COOKIE;
+}
+
 export async function createSession(payload: SessionPayload) {
   const token = await new SignJWT({ ...payload })
     .setProtectedHeader({ alg: "HS256" })
@@ -28,7 +38,7 @@ export async function createSession(payload: SessionPayload) {
     .sign(getSecretKey());
 
   const store = await cookies();
-  store.set(COOKIE_NAME, token, {
+  store.set(cookieNameFor(payload.role), token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
@@ -37,9 +47,9 @@ export async function createSession(payload: SessionPayload) {
   });
 }
 
-export async function getSession(): Promise<SessionPayload | null> {
+async function readSession(cookieName: string): Promise<SessionPayload | null> {
   const store = await cookies();
-  const token = store.get(COOKIE_NAME)?.value;
+  const token = store.get(cookieName)?.value;
   if (!token) return null;
 
   try {
@@ -52,9 +62,30 @@ export async function getSession(): Promise<SessionPayload | null> {
   }
 }
 
-export async function destroySession() {
+export async function getStudentSession(): Promise<SessionPayload | null> {
+  const session = await readSession(STUDENT_COOKIE);
+  return session?.role === "student" ? session : null;
+}
+
+export async function getAdminSession(): Promise<SessionPayload | null> {
+  const session = await readSession(ADMIN_COOKIE);
+  return session?.role === "admin" ? session : null;
+}
+
+/**
+ * For the rare spot that genuinely doesn't care which role is logged in.
+ * Prefers a student session if both happen to exist. Most code should call
+ * getStudentSession()/getAdminSession() directly instead, since those are
+ * explicit about which cookie — and therefore which role's identity — they
+ * trust.
+ */
+export async function getSession(): Promise<SessionPayload | null> {
+  return (await getStudentSession()) ?? (await getAdminSession());
+}
+
+export async function destroySession(role: "student" | "admin") {
   const store = await cookies();
-  store.set(COOKIE_NAME, "", {
+  store.set(cookieNameFor(role), "", {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",

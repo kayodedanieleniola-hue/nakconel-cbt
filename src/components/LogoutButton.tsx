@@ -3,13 +3,23 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-export default function LogoutButton({ redirectTo = "/login" }: { redirectTo?: string }) {
+export default function LogoutButton({
+  redirectTo = "/login",
+  role = "student",
+}: {
+  redirectTo?: string;
+  role?: "student" | "admin";
+}) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
   async function handleLogout() {
     setLoading(true);
-    await fetch("/api/auth/logout", { method: "POST" });
+    await fetch("/api/auth/logout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role }),
+    });
     router.push(redirectTo);
     router.refresh();
   }

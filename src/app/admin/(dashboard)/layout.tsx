@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { getSession } from "@/lib/auth";
+import { getAdminSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import LogoutButton from "@/components/LogoutButton";
 
@@ -17,7 +17,7 @@ const NAV = [
 ];
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const session = await getSession();
+  const session = await getAdminSession();
   if (!session || session.role !== "admin") {
     redirect("/admin/login");
   }
@@ -47,7 +47,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
           <span style={{ fontSize: "0.88rem", color: "var(--gold-200)" }}>{admin.fullName}</span>
-          <LogoutButton redirectTo="/admin/login" />
+          <LogoutButton redirectTo="/admin/login" role="admin" />
         </div>
       </header>
 

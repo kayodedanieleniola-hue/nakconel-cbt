@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { getStudentSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const session = await getSession();
+  const session = await getStudentSession();
   if (!session || session.role !== "student") {
     return NextResponse.json({ student: null }, { status: 200 });
   }

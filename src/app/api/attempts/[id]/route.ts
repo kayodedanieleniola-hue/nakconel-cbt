@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { getStudentSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { endAttempt } from "@/lib/attemptEnd";
 
 async function getStudentAttempt(params: Promise<{ id: string }>) {
-  const session = await getSession();
+  const session = await getStudentSession();
   if (!session || session.role !== "student") return { ok: false as const, reason: "unauthenticated" as const };
   const { id } = await params;
 

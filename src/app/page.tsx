@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { getSession } from "@/lib/auth";
+import { getStudentSession } from "@/lib/auth";
 
 export default async function HomePage() {
-  const session = await getSession();
+  const session = await getStudentSession();
 
   return (
     <main

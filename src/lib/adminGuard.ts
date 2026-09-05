@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSession, type SessionPayload } from "@/lib/auth";
+import { getAdminSession, type SessionPayload } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
 /**
@@ -11,7 +11,7 @@ import { prisma } from "@/lib/db";
 export async function requireAdmin(): Promise<
   { ok: true; session: SessionPayload } | { ok: false; response: NextResponse }
 > {
-  const session = await getSession();
+  const session = await getAdminSession();
   if (!session || session.role !== "admin") {
     return { ok: false, response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
   }

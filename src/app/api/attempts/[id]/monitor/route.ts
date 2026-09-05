@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { getStudentSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -32,7 +32,7 @@ async function findAttempt(id: string, studentId: string) {
 // 404 was actively misleading a student whose session cookie just didn't
 // make it through a background tab reload.
 async function getActiveAttempt(id: string): Promise<Lookup> {
-  const session = await getSession();
+  const session = await getStudentSession();
   if (!session || session.role !== "student") return { ok: false, reason: "unauthenticated" };
 
   const attempt = await findAttempt(id, session.sub);
@@ -44,7 +44,7 @@ async function getActiveAttempt(id: string): Promise<Lookup> {
 // point of a heartbeat is to also detect and report when an admin has just
 // ended the attempt out from under a still-open tab.
 async function getAttemptAnyStatus(id: string): Promise<Lookup> {
-  const session = await getSession();
+  const session = await getStudentSession();
   if (!session || session.role !== "student") return { ok: false, reason: "unauthenticated" };
 
   const attempt = await findAttempt(id, session.sub);
