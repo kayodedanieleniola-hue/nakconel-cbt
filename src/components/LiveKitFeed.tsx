@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Room, RoomEvent, Track } from "livekit-client";
+import { Room, RoomEvent, Track, DisconnectReason } from "livekit-client";
 
 export default function LiveKitFeed({ attemptId }: { attemptId: string }) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -17,20 +17,29 @@ export default function LiveKitFeed({ attemptId }: { attemptId: string }) {
     async function connect() {
       const room = new Room();
       currentRoom = room;
+      let reachedReady = false;
 
       room.on(RoomEvent.TrackSubscribed, (track) => {
         if (!active) return;
         if (track.kind === Track.Kind.Video && videoRef.current) track.attach(videoRef.current);
         if (track.kind === Track.Kind.Audio && audioRef.current) track.attach(audioRef.current);
         setStatus("Connected");
+        reachedReady = true;
       });
       room.on(RoomEvent.TrackUnsubscribed, (track) => track.detach());
 
-      // Same reasoning as the student side: a dropped connection (network
-      // blip, the student's tab getting suspended, etc.) shouldn't just
-      // leave this feed frozen — rebuild it from scratch.
-      room.on(RoomEvent.Disconnected, () => {
+      // Same reasoning as the student side: only reconnect after a
+      // connection has genuinely succeeded and later dropped for real —
+      // never during the initial handshake (LiveKit's own internal retry
+      // handles that), and never for DUPLICATE_IDENTITY (e.g. this same
+      // admin viewer reconnecting too fast would otherwise collide with
+      // itself and loop forever).
+      room.on(RoomEvent.Disconnected, (reason) => {
         if (!active) return;
+        if (!reachedReady || reason === DisconnectReason.DUPLICATE_IDENTITY) {
+          setStatus("Unavailable");
+          return;
+        }
         if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
           setStatus("Connection lost — the student may no longer be in this exam");
           return;
@@ -39,7 +48,7 @@ export default function LiveKitFeed({ attemptId }: { attemptId: string }) {
         setStatus("Reconnecting...");
         window.setTimeout(() => {
           if (active) void connect();
-        }, 1500);
+        }, 3000);
       });
 
       try {
