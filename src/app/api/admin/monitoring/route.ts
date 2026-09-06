@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/adminGuard";
 import { prisma } from "@/lib/db";
+import { endAttempt } from "@/lib/attemptEnd";
 
 export const dynamic = "force-dynamic";
 
@@ -19,12 +20,18 @@ export async function GET() {
   });
 
   const active = attempts.filter((attempt) => attempt.expiresAt > now);
-  const expiredIds = attempts.filter((attempt) => attempt.expiresAt <= now).map((attempt) => attempt.id);
-  if (expiredIds.length) {
-    await prisma.examAttempt.updateMany({
-      where: { id: { in: expiredIds }, status: "IN_PROGRESS" },
-      data: { status: "TIMED_OUT", submittedAt: now, score: 0, passed: false },
-    });
+  const expired = attempts.filter((attempt) => attempt.expiresAt <= now);
+
+  // Route every timeout through the same shared helper everything else in
+  // the app uses — not a raw bulk update. That helper is what writes the
+  // audit log entry, sets endedBy correctly, and is the single place
+  // exam-ending logic lives. A bypass here previously meant: the instant an
+  // admin loaded this page (or its 15s poll fired), any exam that had run
+  // out of time got silently finalized with no record of why — which could
+  // look like "opening monitoring disconnected the student" when what
+  // actually happened was their timer running out at that same moment.
+  for (const attempt of expired) {
+    await endAttempt(attempt.id, "TIMED_OUT", "timeout");
   }
 
   return NextResponse.json({ attempts: active.map((attempt) => ({
