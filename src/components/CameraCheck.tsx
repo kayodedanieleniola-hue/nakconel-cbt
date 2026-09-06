@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { createLocalTracks, Room, RoomEvent, DisconnectReason } from "livekit-client";
+import { createLocalTracks, Room, RoomEvent } from "livekit-client";
 
 const MODELS_URL = "/models";
 const PRESENCE_CHECK_INTERVAL_MS = 25_000;
@@ -30,8 +30,6 @@ export default function CameraCheck({ attemptId }: { attemptId: string }) {
   useEffect(() => {
     let active = true;
     let currentRoom: Room | null = null;
-    let reconnectAttempts = 0;
-    const MAX_RECONNECT_ATTEMPTS = 5;
 
     if (!consented) {
       setStatus("connecting");
@@ -42,35 +40,31 @@ export default function CameraCheck({ attemptId }: { attemptId: string }) {
       const room = new Room();
       currentRoom = room;
       roomRef.current = room;
-      let reachedReady = false;
 
-      // LiveKit already retries transient network drops internally
-      // (including its own region-fallback during the initial handshake —
-      // visible in logs as "switching to region..."). Reconnecting from out
-      // here WHILE that's still happening races against it: each side's
-      // retry looks like a "new" connection with the same identity to the
-      // other, so the server kicks one as a duplicate, which retriggers
-      // this handler, which reconnects again — an infinite loop. Guarding
-      // on reachedReady means we only ever take over AFTER a connection has
-      // genuinely succeeded once and later drops for real (e.g. a
-      // background-tab suspension mid-exam) — never during the initial
-      // handshake, which is exactly what caused that loop.
-      room.on(RoomEvent.Disconnected, (reason) => {
+      // LiveKit's client already has its own robust reconnection built in —
+      // the "resuming signal connection" / "reconnecting, attempt: N" /
+      // back to "connected" sequence visible in the console on a network
+      // blip is that working correctly on its own, including automatically
+      // republishing tracks. Layering a second, custom "tear it all down
+      // and reconnect from scratch" system on top of that (an earlier
+      // version of this file did exactly that) meant two reconnection
+      // systems fighting over the same connection: our reconnect could fire
+      // while LiveKit's own retry was still mid-flight, each side looking
+      // like a "new" duplicate connection to the server, which kicked one
+      // out, which retriggered our reconnect — an infinite loop. The fix is
+      // to not compete with it at all: just reflect what the SDK is already
+      // doing in the UI, and only treat it as truly unavailable if the SDK
+      // itself gives up (Disconnected firing after its own retries fail).
+      room.on(RoomEvent.Reconnecting, () => {
+        if (active) setStatus("reconnecting");
+      });
+      room.on(RoomEvent.Reconnected, () => {
+        if (active) setStatus("ready");
+      });
+      room.on(RoomEvent.Disconnected, () => {
         if (!active) return; // Our own cleanup caused this — not a failure.
-        if (!reachedReady || reason === DisconnectReason.DUPLICATE_IDENTITY) {
-          setStatus("blocked");
-          return;
-        }
-        if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-          setStatus("blocked");
-          void reportEvent(attemptId, { type: "camera", event: "disconnected" });
-          return;
-        }
-        reconnectAttempts += 1;
-        setStatus("reconnecting");
-        window.setTimeout(() => {
-          if (active) void connectAndPublish();
-        }, 3000);
+        setStatus("blocked");
+        void reportEvent(attemptId, { type: "camera", event: "disconnected" });
       });
 
       try {
@@ -82,11 +76,7 @@ export default function CameraCheck({ attemptId }: { attemptId: string }) {
         for (const track of tracks) await room.localParticipant.publishTrack(track);
         const videoTrack = tracks.find((track) => track.kind === "video");
         if (active && videoTrack && videoRef.current) videoTrack.attach(videoRef.current);
-        if (active) {
-          reachedReady = true;
-          reconnectAttempts = 0;
-          setStatus("ready");
-        }
+        if (active) setStatus("ready");
       } catch {
         if (active) setStatus("blocked");
         void reportEvent(attemptId, { type: "camera", event: "blocked" });
