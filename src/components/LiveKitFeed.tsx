@@ -45,7 +45,16 @@ export default function LiveKitFeed({ attemptId }: { attemptId: string }) {
         if (!response.ok) throw new Error(data.error || "Unable to connect");
         await room.connect(data.url, data.token);
       } catch (error) {
-        if (active) setStatus(error instanceof Error ? error.message : "Unavailable");
+        console.error("LiveKitFeed connect failed:", error);
+        if (active) {
+          const message =
+            error instanceof Error
+              ? error.message
+              : typeof error === "string"
+              ? error
+              : `Unknown error: ${JSON.stringify(error)}`;
+          setStatus(`Unavailable — ${message}`);
+        }
       }
     }
 
