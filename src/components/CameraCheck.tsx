@@ -220,7 +220,25 @@ export default function CameraCheck({ attemptId }: { attemptId: string }) {
         </div>
       )}
 
-      {status === "ready" && <video ref={videoRef} autoPlay muted playsInline style={video} />}
+      {/* Always mounted once consented — never conditionally rendered on
+          status. It used to only render when status==="ready", but the
+          track gets attached to this element BEFORE status flips to
+          "ready" (see connectAndPublish above), so the element didn't
+          exist yet at attach time and the attach was silently skipped.
+          The status could say "Transmitting" while nothing was actually
+          attached to any video element. Keeping it always in the DOM
+          (just visually hidden until ready) means videoRef.current is
+          always available when attach() runs, on the first connect and
+          on every reconnect. */}
+      {consented && (
+        <video
+          ref={videoRef}
+          autoPlay
+          muted
+          playsInline
+          style={{ ...video, display: status === "ready" ? "block" : "none" }}
+        />
+      )}
 
       <p style={help}>
         {status === "ready"
