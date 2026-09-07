@@ -53,7 +53,7 @@ export default function LiveKitFeed({ attemptId }: { attemptId: string }) {
       });
 
       try {
-        const response = await fetch(`/api/livekit/token?attemptId=${encodeURIComponent(attemptId)}`);
+        const response = await fetch(`/api/livekit/token?attemptId=${encodeURIComponent(attemptId)}&viewer=admin`);
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || "Unable to connect");
         await room.connect(data.url, data.token);

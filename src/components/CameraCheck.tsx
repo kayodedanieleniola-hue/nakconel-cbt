@@ -70,7 +70,7 @@ export default function CameraCheck({ attemptId }: { attemptId: string }) {
       });
 
       try {
-        const response = await fetch(`/api/livekit/token?attemptId=${encodeURIComponent(attemptId)}`);
+        const response = await fetch(`/api/livekit/token?attemptId=${encodeURIComponent(attemptId)}&viewer=student`);
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || "Live video is unavailable");
         await room.connect(data.url, data.token);

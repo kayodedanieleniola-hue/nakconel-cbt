@@ -17,6 +17,10 @@ export async function GET(request: Request) {
   }
 
   const url = new URL(request.url);
+  const viewer = url.searchParams.get("viewer");
+  if (viewer !== "student" && viewer !== "admin") {
+    return NextResponse.json({ error: "viewer must be student or admin" }, { status: 400 });
+  }
   const attemptId = url.searchParams.get("attemptId") ?? "";
   if (!attemptId) return NextResponse.json({ error: "attemptId is required" }, { status: 400 });
 
@@ -26,8 +30,8 @@ export async function GET(request: Request) {
   });
   if (!attempt) return NextResponse.json({ error: "Attempt not found" }, { status: 404 });
 
-  const isStudent = !!studentSession && attempt.studentId === studentSession.sub;
-  const isAdmin = !!adminSession;
+  const isStudent = viewer === "student" && !!studentSession && attempt.studentId === studentSession.sub;
+  const isAdmin = viewer === "admin" && !!adminSession;
   if (!isStudent && !isAdmin) return NextResponse.json({ error: "Access denied" }, { status: 403 });
   if (isStudent && attempt.status !== "IN_PROGRESS") {
     return NextResponse.json({ error: "This exam attempt is no longer active" }, { status: 409 });
