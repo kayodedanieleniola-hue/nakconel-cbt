@@ -27,6 +27,8 @@ export default function CameraCheck({ attemptId }: { attemptId: string }) {
   const [showDetails, setShowDetails] = useState(false);
   const [verification, setVerification] = useState<"idle" | "checking" | "baseline_set" | "match" | "mismatch">("idle");
 
+  const [needsTapToPlay, setNeedsTapToPlay] = useState(false);
+
   useEffect(() => {
     let active = true;
     let currentRoom: Room | null = null;
@@ -75,7 +77,22 @@ export default function CameraCheck({ attemptId }: { attemptId: string }) {
         const tracks = await createLocalTracks({ video: true, audio: true });
         for (const track of tracks) await room.localParticipant.publishTrack(track);
         const videoTrack = tracks.find((track) => track.kind === "video");
-        if (active && videoTrack && videoRef.current) videoTrack.attach(videoRef.current);
+        if (active && videoTrack && videoRef.current) {
+          videoTrack.attach(videoRef.current);
+          // LiveKit's attach() already tries to auto-play, but mobile
+          // browsers frequently block that silently — the element ends up
+          // "connected" with a stream attached but no frames ever actually
+          // rendering (just its background color showing through). This
+          // explicit play() call, with a visible fallback if it's rejected,
+          // is how we detect and recover from that instead of leaving a
+          // blank box with no indication anything's wrong.
+          try {
+            await videoRef.current.play();
+            setNeedsTapToPlay(false);
+          } catch {
+            setNeedsTapToPlay(true);
+          }
+        }
         if (active) setStatus("ready");
       } catch {
         if (active) setStatus("blocked");
@@ -221,13 +238,26 @@ export default function CameraCheck({ attemptId }: { attemptId: string }) {
           always available when attach() runs, on the first connect and
           on every reconnect. */}
       {consented && (
-        <video
-          ref={videoRef}
-          autoPlay
-          muted
-          playsInline
-          style={{ ...video, display: status === "ready" ? "block" : "none" }}
-        />
+        <div style={{ position: "relative" }}>
+          <video
+            ref={videoRef}
+            autoPlay
+            muted
+            playsInline
+            style={{ ...video, display: status === "ready" ? "block" : "none" }}
+          />
+          {status === "ready" && needsTapToPlay && (
+            <button
+              type="button"
+              onClick={() => {
+                videoRef.current?.play().then(() => setNeedsTapToPlay(false)).catch(() => {});
+              }}
+              style={tapToPlayBtn}
+            >
+              Tap to view your camera
+            </button>
+          )}
+        </div>
       )}
 
       <p style={help}>
@@ -255,3 +285,15 @@ const consentBox = { marginTop: "0.6rem" } as const;
 const consentLabel = { display: "flex", alignItems: "flex-start", gap: "0.5rem", fontSize: "0.85rem" } as const;
 const linkBtn = { background: "none", border: "none", color: "var(--gold-600)", fontWeight: 600, cursor: "pointer", padding: 0, fontSize: "0.85rem", textDecoration: "underline" } as const;
 const detailsList = { fontSize: "0.8rem", color: "var(--ink-600)", margin: "0 0 0.75rem", paddingLeft: "1.1rem", display: "grid", gap: "0.3rem" } as const;
+const tapToPlayBtn = {
+  position: "absolute",
+  inset: 0,
+  marginTop: "0.7rem",
+  background: "rgba(0,0,0,0.55)",
+  color: "#fff",
+  border: "none",
+  borderRadius: 4,
+  cursor: "pointer",
+  fontSize: "0.8rem",
+  fontWeight: 600,
+} as const;

@@ -7,6 +7,7 @@ export default function LiveKitFeed({ attemptId }: { attemptId: string }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [status, setStatus] = useState("Connecting...");
+  const [needsTapToPlay, setNeedsTapToPlay] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -16,9 +17,21 @@ export default function LiveKitFeed({ attemptId }: { attemptId: string }) {
       const room = new Room();
       currentRoom = room;
 
-      room.on(RoomEvent.TrackSubscribed, (track) => {
+      room.on(RoomEvent.TrackSubscribed, async (track) => {
         if (!active) return;
-        if (track.kind === Track.Kind.Video && videoRef.current) track.attach(videoRef.current);
+        if (track.kind === Track.Kind.Video && videoRef.current) {
+          track.attach(videoRef.current);
+          // Same autoplay caveat as the student side: attach() tries to
+          // play automatically but browsers can silently block it, leaving
+          // a "connected" feed with nothing actually rendering. This makes
+          // that failure visible and recoverable with one tap.
+          try {
+            await videoRef.current.play();
+            setNeedsTapToPlay(false);
+          } catch {
+            setNeedsTapToPlay(true);
+          }
+        }
         if (track.kind === Track.Kind.Audio && audioRef.current) track.attach(audioRef.current);
         setStatus("Connected");
       });
@@ -66,9 +79,39 @@ export default function LiveKitFeed({ attemptId }: { attemptId: string }) {
     };
   }, [attemptId]);
 
-  return <div><video ref={videoRef} autoPlay playsInline style={video} /><audio ref={audioRef} autoPlay controls style={audio} /><p style={help}>{status}</p></div>;
+  return (
+    <div>
+      <div style={{ position: "relative" }}>
+        <video ref={videoRef} autoPlay playsInline style={video} />
+        {needsTapToPlay && (
+          <button
+            type="button"
+            onClick={() => {
+              videoRef.current?.play().then(() => setNeedsTapToPlay(false)).catch(() => {});
+            }}
+            style={tapToPlayBtn}
+          >
+            Tap to view feed
+          </button>
+        )}
+      </div>
+      <audio ref={audioRef} autoPlay controls style={audio} />
+      <p style={help}>{status}</p>
+    </div>
+  );
 }
 
 const video = { display: "block", width: "100%", aspectRatio: "16 / 9", objectFit: "cover", background: "var(--ink-900)", borderRadius: 4 } as const;
 const audio = { width: "100%", marginTop: "0.5rem" } as const;
 const help = { color: "var(--ink-600)", fontSize: "0.8rem" } as const;
+const tapToPlayBtn = {
+  position: "absolute",
+  inset: 0,
+  background: "rgba(0,0,0,0.55)",
+  color: "#fff",
+  border: "none",
+  borderRadius: 4,
+  cursor: "pointer",
+  fontSize: "0.85rem",
+  fontWeight: 600,
+} as const;
