@@ -17,7 +17,7 @@ export default function ClassroomVideoFeed({ classId }: { classId: string }) {
     let currentRoom: Room | null = null;
 
     async function connect() {
-      const room = new Room({ adaptiveStream: true });
+      const room = new Room({ adaptiveStream: true, dynacast: true });
       currentRoom = room;
 
       room.on(RoomEvent.TrackSubscribed, async (track) => {
@@ -35,7 +35,7 @@ export default function ClassroomVideoFeed({ classId }: { classId: string }) {
         if (track.kind === Track.Kind.Audio && audioRef.current) {
           track.attach(audioRef.current);
         }
-        setStatus("LIVE STREAMING");
+        setStatus("LIVE (ADAPTIVE SIMULCAST)");
       });
 
       room.on(RoomEvent.TrackUnsubscribed, (track) => {

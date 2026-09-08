@@ -16,11 +16,25 @@ export default function InstructorBroadcaster({
   const roomRef = useRef<Room | null>(null);
   const localTracksRef = useRef<LocalTrack[]>([]);
 
+  const [quality, setQuality] = useState<"4k" | "1080p" | "720p" | "480p">("1080p");
   const [status, setStatus] = useState("Initializing camera & microphone...");
   const [isBroadcasting, setIsBroadcasting] = useState(false);
   const [cameraOn, setCameraOn] = useState(true);
   const [micOn, setMicOn] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
+
+  const getResolutionPreset = (preset: "4k" | "1080p" | "720p" | "480p") => {
+    switch (preset) {
+      case "4k":
+        return VideoPresets.h2160.resolution;
+      case "1080p":
+        return VideoPresets.h1080.resolution;
+      case "720p":
+        return VideoPresets.h720.resolution;
+      case "480p":
+        return { width: 854, height: 480, frameRate: 30 };
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -43,10 +57,10 @@ export default function InstructorBroadcaster({
 
         await room.connect(data.url, data.token);
 
-        // Capture local camera & mic tracks
+        // Capture local camera & mic tracks with simulcast adaptive layers enabled
         const tracks = await createLocalTracks({
           audio: true,
-          video: { resolution: VideoPresets.h720.resolution },
+          video: { resolution: getResolutionPreset(quality) },
         });
 
         localTracksRef.current = tracks;
@@ -54,12 +68,14 @@ export default function InstructorBroadcaster({
         for (const track of tracks) {
           if (track.kind === "video" && localVideoRef.current) {
             track.attach(localVideoRef.current);
+            await room.localParticipant.publishTrack(track, { simulcast: true });
+          } else {
+            await room.localParticipant.publishTrack(track);
           }
-          await room.localParticipant.publishTrack(track);
         }
 
         if (active) {
-          setStatus("BROADCASTING LIVE");
+          setStatus(`BROADCASTING LIVE (${quality.toUpperCase()} · SIMULCAST ACTIVE)`);
           setIsBroadcasting(true);
         }
       } catch (err) {
@@ -83,7 +99,7 @@ export default function InstructorBroadcaster({
       roomRef.current?.removeAllListeners();
       void roomRef.current?.disconnect();
     };
-  }, [classId]);
+  }, [classId, quality]);
 
   const toggleCamera = () => {
     const videoTrack = localTracksRef.current.find((t) => t.kind === "video");
@@ -116,7 +132,7 @@ export default function InstructorBroadcaster({
       <div style={modalCard}>
         <div style={modalHeader}>
           <div>
-            <span style={liveTag}>INSTRUCTOR LIVE STUDIO</span>
+            <span style={liveTag}>INSTRUCTOR LIVE STUDIO (PHASE 8: ADAPTIVE 4K)</span>
             <h3 style={modalTitle}>{classTitle}</h3>
           </div>
           <button type="button" onClick={onClose} style={closeBtn}>
@@ -138,12 +154,29 @@ export default function InstructorBroadcaster({
 
           <div style={statusOverlay}>
             <span style={{ ...statusBadge, ...(isBroadcasting ? liveBadge : alertBadge) }}>
-              {isBroadcasting ? "● LIVE BROADCASTING" : status}
+              {isBroadcasting
+                ? `● LIVE (${quality.toUpperCase()} · ADAPTIVE SIMULCAST)`
+                : status}
             </span>
           </div>
         </div>
 
         {errorMsg && <p style={errorNotice}>{errorMsg}</p>}
+
+        {/* Resolution Quality Selector */}
+        <div style={qualitySelectorRow}>
+          <label style={qualityLabel}>Broadcast Resolution & Quality:</label>
+          <select
+            value={quality}
+            onChange={(e) => setQuality(e.target.value as "4k" | "1080p" | "720p" | "480p")}
+            style={qualitySelect}
+          >
+            <option value="4k">✨ 4K Ultra HD (3840 × 2160 @ 30fps) - Max Clarity</option>
+            <option value="1080p">📺 1080p Full HD (1920 × 1080 @ 30fps)</option>
+            <option value="720p">⚡ 720p HD (1280 × 720 @ 30fps) - Balanced</option>
+            <option value="480p">📶 480p SD (854 × 480 @ 30fps) - Low Bandwidth</option>
+          </select>
+        </div>
 
         <div style={controlsRow}>
           <button
@@ -321,4 +354,28 @@ const endBtn = {
   fontSize: "0.85rem",
   fontWeight: 600,
   cursor: "pointer",
+} as const;
+
+const qualitySelectorRow = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "0.35rem",
+} as const;
+
+const qualityLabel = {
+  fontSize: "0.8rem",
+  color: "#ffd98a",
+  fontWeight: 600,
+} as const;
+
+const qualitySelect = {
+  background: "#100707",
+  color: "#fff",
+  border: "1px solid #98661B",
+  borderRadius: 6,
+  padding: "0.55rem 0.7rem",
+  fontSize: "0.85rem",
+  fontWeight: 600,
+  cursor: "pointer",
+  outline: "none",
 } as const;
