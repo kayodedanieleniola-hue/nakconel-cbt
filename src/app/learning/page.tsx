@@ -4,6 +4,7 @@ import { getStudentSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import LogoutButton from "@/components/LogoutButton";
 import RefreshButton from "@/components/RefreshButton";
+import { getExamStatus } from "@/lib/examStatus";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,7 @@ export default async function MyCoursePage() {
         include: {
           modules: { orderBy: { position: "asc" }, include: { lessons: { orderBy: { position: "asc" }, select: { id: true, title: true } }, classes: { orderBy: { createdAt: "asc" }, select: { id: true, title: true } } } },
           classes: { orderBy: { createdAt: "asc" }, select: { id: true, title: true, moduleId: true } },
+          exams: { orderBy: { order: "asc" }, select: { id: true, name: true, published: true, startAt: true, endAt: true } },
         },
       },
     },
@@ -25,6 +27,10 @@ export default async function MyCoursePage() {
   if (!student || student.status !== "active") redirect("/login");
 
   const standaloneClasses = student.course.classes.filter((item) => !item.moduleId);
+  const now = new Date();
+  const nextExam = student.course.exams.find((exam) => ["ONGOING", "UPCOMING"].includes(getExamStatus(exam, now)));
+  const lessonCount = student.course.modules.reduce((total, module) => total + module.lessons.length, 0);
+  const classCount = student.course.classes.length;
   return (
     <main style={shell}>
       <header style={header}>
@@ -32,10 +38,23 @@ export default async function MyCoursePage() {
         <div style={actions}><Link href="/dashboard" style={link}>CBT dashboard</Link><RefreshButton /><LogoutButton /></div>
       </header>
       <section style={content}>
-        <p style={eyebrow}>My course</p>
-        <h1 style={title}>{student.course.name}</h1>
-        <p style={intro}>Welcome, {student.fullName}. This is your learning space for course modules, lessons, and classes.</p>
+        <p style={eyebrow}>Learning Center</p>
+        <h1 style={title}>Welcome back, {student.fullName.split(" ")[0]}</h1>
+        <p style={intro}>Your registered course, learning content, upcoming classes, and assessment information in one place.</p>
         <div style={identity}><div><span style={label}>Student ID</span><strong>{student.studentId}</strong></div><div><span style={label}>Registered course</span><strong>{student.course.name}</strong></div></div>
+        <section style={progressCard}>
+          <div><p style={eyebrow}>Course progress</p><h2 style={{ margin: "0.2rem 0", color: "var(--burgundy-900)" }}>0% complete</h2><p style={muted}>Progress tracking begins when lesson and class completion is introduced in a later Learning Center phase.</p></div>
+          <div style={progressTrack}><span style={progressFill} /></div>
+          <p style={progressCaption}>{student.course.modules.length} modules · {lessonCount} lessons · {classCount} classes</p>
+        </section>
+        <section style={dashboardGrid} aria-label="Learning overview">
+          <OverviewCard label="Live now" title="No live class" text="Live class scheduling is coming soon." tone="live" />
+          <OverviewCard label="Next class" title={classCount ? "Class details pending" : "No class scheduled"} text={classCount ? "Scheduling will be available in the next phase." : "Your instructor has not added a class yet."} />
+          <OverviewCard label="Upcoming classes" title={classCount ? `${classCount} class${classCount === 1 ? "" : "es"} in your course` : "Nothing upcoming"} text="Classes will appear here once they are scheduled." />
+          <OverviewCard label="Recent materials" title="No materials yet" text="Course notes and resources arrive in Phase 5." />
+          <OverviewCard label="Pending assignments" title="No assignments yet" text="Assignments will be introduced in Phase 15." />
+          <OverviewCard label="Next test / exam" title={nextExam?.name ?? "No upcoming exam"} text={nextExam?.startAt ? `Available ${new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(nextExam.startAt)}` : "Your scheduled assessment will appear here."} tone="exam" />
+        </section>
         <h2 style={heading}>Course modules</h2>
         {student.course.modules.length === 0 ? <div style={empty}>Your course structure is being prepared. Modules and lessons will appear here when your administrator adds them.</div> : <div style={moduleList}>{student.course.modules.map((module, index) => <article key={module.id} style={moduleCard}><div style={moduleNumber}>{String(index + 1).padStart(2, "0")}</div><div style={{ flex: 1 }}><h3 style={{ margin: 0, color: "var(--burgundy-900)" }}>{module.title}</h3>{module.description && <p style={muted}>{module.description}</p>}<div style={sectionRow}><span>{module.lessons.length} lesson{module.lessons.length === 1 ? "" : "s"}</span><span>{module.classes.length} class{module.classes.length === 1 ? "" : "es"}</span></div>{module.lessons.length > 0 && <ul style={items}>{module.lessons.map((lesson) => <li key={lesson.id}>{lesson.title}</li>)}</ul>}{module.classes.length > 0 && <p style={classNote}>Classes: {module.classes.map((item) => item.title).join(", ")}</p>}</div></article>)}</div>}
         <h2 style={heading}>Classes</h2>
@@ -43,6 +62,10 @@ export default async function MyCoursePage() {
       </section>
     </main>
   );
+}
+
+function OverviewCard({ label, title, text, tone }: { label: string; title: string; text: string; tone?: "live" | "exam" }) {
+  return <article style={{ ...overviewCard, borderTopColor: tone === "live" ? "var(--danger)" : tone === "exam" ? "var(--gold-600)" : "var(--line)" }}><p style={eyebrow}>{label}</p><h3 style={{ color: "var(--burgundy-900)", margin: "0.35rem 0" }}>{title}</h3><p style={muted}>{text}</p></article>;
 }
 
 const shell = { minHeight: "100dvh", background: "var(--cream-50)" } as const;
@@ -55,6 +78,12 @@ const eyebrow = { color: "var(--gold-600)", fontSize: "0.82rem", fontWeight: 600
 const title = { fontSize: "clamp(2rem, 5vw, 3rem)", color: "var(--burgundy-900)", margin: "0.35rem 0" } as const;
 const intro = { color: "var(--ink-600)", maxWidth: 650, lineHeight: 1.6 } as const;
 const identity = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: "1rem", background: "#fff", border: "1px solid var(--line)", borderRadius: 8, padding: "1.2rem", margin: "2rem 0" } as const;
+const progressCard = { background: "#fff", border: "1px solid var(--line)", borderRadius: 8, padding: "1.2rem", marginBottom: "1rem" } as const;
+const progressTrack = { height: 10, background: "#efe9e0", borderRadius: 99, overflow: "hidden", marginTop: "0.9rem" } as const;
+const progressFill = { display: "block", height: "100%", width: "0%", background: "var(--gold-600)" } as const;
+const progressCaption = { color: "var(--ink-600)", fontSize: "0.82rem", marginBottom: 0 } as const;
+const dashboardGrid = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: "0.8rem", margin: "1.25rem 0 2rem" } as const;
+const overviewCard = { background: "#fff", border: "1px solid var(--line)", borderTop: "4px solid var(--line)", borderRadius: 8, padding: "1.05rem", minHeight: 150 } as const;
 const label = { display: "block", color: "var(--ink-600)", fontSize: "0.78rem", marginBottom: "0.25rem" } as const;
 const heading = { color: "var(--burgundy-900)", fontSize: "1.35rem", margin: "2rem 0 0.8rem" } as const;
 const empty = { background: "#fff", border: "1px dashed var(--gold-400)", borderRadius: 8, padding: "1.25rem", color: "var(--ink-600)" } as const;
