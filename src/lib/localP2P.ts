@@ -8,6 +8,8 @@ export class LocalClassroomPeer {
   private bc: BroadcastChannel | null = null;
   private classId: string;
   private role: "instructor" | "student";
+  private remoteStream: MediaStream = new MediaStream();
+  private pingTimer?: NodeJS.Timeout;
 
   public onRemoteStream?: (stream: MediaStream) => void;
   public onConnectionStateChange?: (state: RTCPeerConnectionState) => void;
@@ -40,6 +42,11 @@ export class LocalClassroomPeer {
 
       if (this.role === "student") {
         this.bc.postMessage({ type: "PING_CALL", senderRole: this.role });
+        this.pingTimer = setInterval(() => {
+          if (this.bc && (!this.pc || this.pc.connectionState !== "connected")) {
+            this.bc.postMessage({ type: "PING_CALL", senderRole: this.role });
+          }
+        }, 1500);
       }
     } catch (err) {
       console.error("LocalP2P initialization error:", err);
@@ -62,11 +69,15 @@ export class LocalClassroomPeer {
     };
 
     this.pc.ontrack = (event) => {
-      if (event.streams && event.streams[0]) {
+      if (event.track) {
+        // Accumulate tracks into a unified MediaStream instance
+        const existingTracks = this.remoteStream.getTracks();
+        if (!existingTracks.some((t) => t.id === event.track.id)) {
+          this.remoteStream.addTrack(event.track);
+        }
+        this.onRemoteStream?.(this.remoteStream);
+      } else if (event.streams && event.streams[0]) {
         this.onRemoteStream?.(event.streams[0]);
-      } else if (event.track) {
-        const stream = new MediaStream([event.track]);
-        this.onRemoteStream?.(stream);
       }
     };
 
@@ -149,6 +160,10 @@ export class LocalClassroomPeer {
   }
 
   public destroy() {
+    if (this.pingTimer) {
+      clearInterval(this.pingTimer);
+      this.pingTimer = undefined;
+    }
     if (this.bc) {
       this.bc.close();
       this.bc = null;
