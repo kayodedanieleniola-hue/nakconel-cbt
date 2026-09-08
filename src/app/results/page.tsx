@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getStudentSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import LogoutButton from "@/components/LogoutButton";
+import RefreshButton from "@/components/RefreshButton";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +23,7 @@ export default async function ResultsPage() {
     <main style={{ minHeight: "100dvh", background: "var(--cream-50)" }}>
       <header style={header}>
         <a href="/dashboard" style={brand}>Nakconel Examinations</a>
-        <div style={headerActions}><a href="/dashboard" style={navLink}>Dashboard</a><LogoutButton /></div>
+        <div style={headerActions}><a href="/dashboard" style={navLink}>Dashboard</a><RefreshButton /><LogoutButton /></div>
       </header>
       <section style={content}>
         <p style={eyebrow}>Student record</p>

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getAdminSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import LogoutButton from "@/components/LogoutButton";
+import RefreshButton from "@/components/RefreshButton";
 
 const NAV = [
   { href: "/admin", label: "Overview", enabled: true },
@@ -13,7 +14,7 @@ const NAV = [
   { href: "/admin/results", label: "Results", enabled: true },
   { href: "/admin/monitoring", label: "Live Monitoring", enabled: true },
   { href: "/admin/suspicious", label: "Suspicious Activity", enabled: true },
-  { href: "/admin/settings", label: "Settings", enabled: false },
+  { href: "/admin/settings", label: "Settings", enabled: true },
 ];
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -47,6 +48,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
           <span style={{ fontSize: "0.88rem", color: "var(--gold-200)" }}>{admin.fullName}</span>
+          <RefreshButton />
           <LogoutButton redirectTo="/admin/login" role="admin" />
         </div>
       </header>

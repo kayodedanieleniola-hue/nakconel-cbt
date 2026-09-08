@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getStudentSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import LogoutButton from "@/components/LogoutButton";
+import RefreshButton from "@/components/RefreshButton";
 import { getExamStatus, STATUS_LABEL, type ExamStatus } from "@/lib/examStatus";
 
 export const dynamic = "force-dynamic";
@@ -50,6 +51,7 @@ export default async function DashboardPage() {
         </span>
         <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
           <a href="/results" style={{ color: "inherit", textDecoration: "none", fontSize: "0.9rem" }}>Results</a>
+          <RefreshButton />
           <LogoutButton />
         </div>
       </header>
