@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createLocalTracks, LocalTrack, Room, RoomEvent, VideoPresets } from "livekit-client";
+import ClassroomChat from "@/components/ClassroomChat";
 
 export default function InstructorBroadcaster({
   classId,
@@ -356,6 +357,18 @@ export default function InstructorBroadcaster({
           )}
         </div>
 
+        {/* Phase 10: Live Classroom Chat & Moderated Q&A */}
+        <div style={chatSection}>
+          <label style={qualityLabel}>Live Studio Chat & Moderated Q&A:</label>
+          <ClassroomChat
+            classId={classId}
+            room={roomRef.current}
+            isInstructor={true}
+            userId="instructor-admin"
+            userName="Instructor (Host)"
+          />
+        </div>
+
         <div style={controlsRow}>
           <button
             type="button"
@@ -668,4 +681,10 @@ const studentCardBadge = {
   borderRadius: 3,
   fontSize: "0.65rem",
   fontWeight: 600,
+} as const;
+
+const chatSection = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "0.35rem",
 } as const;

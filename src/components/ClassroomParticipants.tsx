@@ -102,14 +102,15 @@ export default function ClassroomParticipants({
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d");
     const timer = setInterval(() => {
-      if (localVideoRef.current && localVideoRef.current.readyState >= 2 && bcRef.current) {
+      const video = localVideoRef.current;
+      if (video && (video.readyState >= 1 || video.videoWidth > 0) && bcRef.current) {
         canvas.width = 320;
         canvas.height = 180;
-        ctx?.drawImage(localVideoRef.current, 0, 0, 320, 180);
+        ctx?.drawImage(video, 0, 0, 320, 180);
         const frame = canvas.toDataURL("image/jpeg", 0.5);
         bcRef.current.postMessage({ type: "STUDENT_FRAME", identity: room?.localParticipant.identity || "student-local", frame });
       }
-    }, 200);
+    }, 150);
 
     return () => clearInterval(timer);
   }, [isCameraActive, room]);
@@ -128,6 +129,16 @@ export default function ClassroomParticipants({
 
   const localTracksRef = useRef<LocalTrack[]>([]);
 
+  useEffect(() => {
+    if (isCameraActive && localVideoRef.current && localTracksRef.current.length > 0) {
+      const videoTrack = localTracksRef.current.find((t) => t.kind === "video");
+      if (videoTrack) {
+        videoTrack.attach(localVideoRef.current);
+        void localVideoRef.current.play().catch(() => {});
+      }
+    }
+  }, [isCameraActive]);
+
   const handleStartCamera = async () => {
     try {
       if (isCameraActive) {
@@ -145,9 +156,6 @@ export default function ClassroomParticipants({
         const tracks = await createLocalTracks({ video: true, audio: true });
         localTracksRef.current = tracks;
         for (const track of tracks) {
-          if (track.kind === "video" && localVideoRef.current) {
-            track.attach(localVideoRef.current);
-          }
           if (room) {
             await room.localParticipant.publishTrack(track);
           }

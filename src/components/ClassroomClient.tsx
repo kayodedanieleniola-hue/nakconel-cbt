@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, useRef, useEffect } from "react";
 import ClassroomVideoFeed from "@/components/ClassroomVideoFeed";
 import ClassroomParticipants from "@/components/ClassroomParticipants";
+import ClassroomChat from "@/components/ClassroomChat";
 import { Room } from "livekit-client";
 
 type Material = {
@@ -372,14 +373,11 @@ export default function ClassroomClient({
 
                   <hr style={divider} />
 
-                  <div style={toolCard}>
-                    <strong>💬 Live Classroom Chat</strong>
-                    <p style={toolMuted}>Interactive Q&A and text chat will unlock in Phase 11.</p>
-                  </div>
-                  <div style={toolCard}>
-                    <strong>✋ Raise Hand & Speaking</strong>
-                    <p style={toolMuted}>Student speaking permissions will activate in Phase 10.</p>
-                  </div>
+                  <ClassroomChat
+                    classId={learningClass.id}
+                    room={activeRoom}
+                    isInstructor={false}
+                  />
                 </div>
               )}
             </div>
