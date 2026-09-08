@@ -50,6 +50,7 @@ export default async function DashboardPage() {
           Nakconel Examinations
         </span>
         <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+          <a href="/learning" style={{ color: "inherit", textDecoration: "none", fontSize: "0.9rem" }}>My Course</a>
           <a href="/results" style={{ color: "inherit", textDecoration: "none", fontSize: "0.9rem" }}>Results</a>
           <RefreshButton />
           <LogoutButton />

@@ -196,3 +196,40 @@ npm install
 cp .env.example .env.local   # fill in real values
 npm run dev
 ```
+
+## Nak Learning Center roadmap
+
+The CBT system and the Learning Center share the same registered student accounts, Student IDs, and course enrolments. The Learning Center must never create a second registration system or break existing CBT functionality.
+
+### Learning Center Phase 1 — Course & Student Foundation
+
+Connect existing students to their registered course and provide **My Course**, including course modules, lessons, and classes. The database relationship is: `Student → Course → LearningModule → Lesson / LearningClass`. Students may only see the course attached to their existing account.
+
+### Planned phases
+
+1. Course and student foundation
+2. Student learning dashboard
+3. Admin course and class management
+4. Class scheduling
+5. Class materials and notes
+6. Presentation-first live classroom
+7. Real-time video and audio
+8. 4K capture with adaptive quality
+9. Participants and student-video permissions
+10. Raise hand and speaking permissions
+11. Chat and Q&A
+12. Presentation and screen sharing
+13. Attendance
+14. Class recordings
+15. Assignments
+16. Learning-progress tracking
+17. Notifications and reminders
+18. Admin live-class monitoring
+19. Admin analytics
+20. Security hardening and authorization
+21. CBT integration
+22. Responsive classroom design
+23. End-to-end testing
+24. Final UI/UX polish
+
+Brand colors for the Learning Center remain `#330808` (primary) and `#98661B` (accent). Development proceeds one tested phase at a time; smooth audio, reliability, authorization, and protection of student data take priority over unnecessary visual effects.

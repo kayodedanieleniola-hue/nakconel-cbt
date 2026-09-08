@@ -21,8 +21,61 @@ model Course {
   students  Student[]
   exams     Exam[]
   questions Question[]
+  modules   LearningModule[]
+  classes   LearningClass[]
 
   @@map("courses")
+}
+
+// Learning Center Phase 1: this extends the existing course and student
+// records; it deliberately does not introduce a second student account or
+// registration system.
+model LearningModule {
+  id          String          @id @default(cuid())
+  courseId    String
+  course      Course          @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  position    Int             @default(0)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  lessons     Lesson[]
+  classes     LearningClass[]
+
+  @@unique([courseId, position])
+  @@index([courseId])
+  @@map("learning_modules")
+}
+
+model Lesson {
+  id        String         @id @default(cuid())
+  moduleId  String
+  module    LearningModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  title     String
+  content   String?
+  position  Int            @default(0)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@unique([moduleId, position])
+  @@index([moduleId])
+  @@map("lessons")
+}
+
+model LearningClass {
+  id          String          @id @default(cuid())
+  courseId    String
+  moduleId    String?
+  course      Course          @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  module      LearningModule? @relation(fields: [moduleId], references: [id], onDelete: SetNull)
+  title       String
+  description String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([courseId])
+  @@index([moduleId])
+  @@map("learning_classes")
 }
 
 // Phase 5 scope: the Question Bank. Kept intentionally simple (single

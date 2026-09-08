@@ -26,7 +26,7 @@ async function verify(token: string | undefined) {
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  if (pathname.startsWith("/dashboard")) {
+  if (pathname.startsWith("/dashboard") || pathname.startsWith("/learning")) {
     const token = req.cookies.get("nak_student_session")?.value;
     const payload = await verify(token);
     if (!payload || payload.role !== "student") {
