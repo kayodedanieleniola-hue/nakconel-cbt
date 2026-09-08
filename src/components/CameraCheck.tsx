@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { createLocalTracks, Room, RoomEvent } from "livekit-client";
+import { createLocalTracks, Room, RoomEvent, VideoPresets } from "livekit-client";
 
 const MODELS_URL = "/models";
 const PRESENCE_CHECK_INTERVAL_MS = 25_000;
@@ -74,8 +74,13 @@ export default function CameraCheck({ attemptId }: { attemptId: string }) {
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || "Live video is unavailable");
         await room.connect(data.url, data.token);
-        const tracks = await createLocalTracks({ video: true, audio: true });
-        for (const track of tracks) await room.localParticipant.publishTrack(track);
+        // Request a real 720p capture and publish at the matching bitrate. The
+        // browser's default camera constraint is often 360p, which makes the
+        // admin preview look soft even when the connection is healthy.
+        const tracks = await createLocalTracks({ video: { resolution: VideoPresets.h720.resolution, frameRate: 24 }, audio: true });
+        for (const track of tracks) {
+          await room.localParticipant.publishTrack(track, track.kind === "video" ? { videoEncoding: VideoPresets.h720.encoding } : undefined);
+        }
         const videoTrack = tracks.find((track) => track.kind === "video");
         if (active && videoTrack && videoRef.current) {
           videoTrack.attach(videoRef.current);
