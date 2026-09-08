@@ -98,6 +98,7 @@ export default function InstructorBroadcaster({
         for (const track of tracks) {
           if (track.kind === "video" && localVideoRef.current) {
             track.attach(localVideoRef.current);
+            void localVideoRef.current.play().catch(() => {});
           }
         }
 
@@ -107,19 +108,18 @@ export default function InstructorBroadcaster({
         }
 
         // Setup local BroadcastChannel fallback stream
-        if (bc) {
-          const canvas = document.createElement("canvas");
-          const ctx = canvas.getContext("2d");
-          fallbackInterval = setInterval(() => {
-            if (localVideoRef.current && localVideoRef.current.readyState >= 2 && bc) {
-              canvas.width = 640;
-              canvas.height = 360;
-              ctx?.drawImage(localVideoRef.current, 0, 0, 640, 360);
-              const frame = canvas.toDataURL("image/jpeg", 0.6);
-              bc.postMessage({ type: "FRAME", frame, quality });
-            }
-          }, 100);
-        }
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        fallbackInterval = setInterval(() => {
+          const video = localVideoRef.current;
+          if (video && bcRef.current) {
+            canvas.width = 640;
+            canvas.height = 360;
+            ctx?.drawImage(video, 0, 0, 640, 360);
+            const frame = canvas.toDataURL("image/jpeg", 0.6);
+            bcRef.current.postMessage({ type: "FRAME", frame, quality });
+          }
+        }, 100);
 
         // Connect to LiveKit server if credentials are configured
         try {
