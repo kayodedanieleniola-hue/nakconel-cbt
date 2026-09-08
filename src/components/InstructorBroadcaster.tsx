@@ -102,6 +102,14 @@ export default function InstructorBroadcaster({
 
         localTracksRef.current = tracks;
 
+        const mediaTracks = tracks.map((t) => t.mediaStreamTrack);
+        const localStream = new MediaStream(mediaTracks);
+
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = localStream;
+          void localVideoRef.current.play().catch(() => {});
+        }
+
         for (const track of tracks) {
           if (track.kind === "video" && localVideoRef.current) {
             track.attach(localVideoRef.current);
@@ -111,8 +119,6 @@ export default function InstructorBroadcaster({
 
         // Initialize 2-Way Local WebRTC P2P Call
         try {
-          const mediaTracks = tracks.map((t) => t.mediaStreamTrack);
-          const localStream = new MediaStream(mediaTracks);
           const peer = new LocalClassroomPeer(classId, "instructor");
           p2pRef.current = peer;
           peer.addLocalStream(localStream);
@@ -148,13 +154,13 @@ export default function InstructorBroadcaster({
         fallbackInterval = setInterval(() => {
           try {
             const video = localVideoRef.current;
-            if (video && (video.readyState >= 1 || video.videoWidth > 0)) {
+            if (video && bcRef.current) {
               canvas.width = 640;
               canvas.height = 360;
               ctx?.drawImage(video, 0, 0, 640, 360);
               const frame = canvas.toDataURL("image/jpeg", 0.6);
               if (frame && frame.length > 100) {
-                bcRef.current?.postMessage({ type: "FRAME", frame, quality });
+                bcRef.current.postMessage({ type: "FRAME", frame, quality });
               }
             }
           } catch {

@@ -191,22 +191,24 @@ export default function ClassroomParticipants({
         </button>
       </div>
 
-      {/* Permission banner for students */}
-      {canPublishVideo && (
-        <div style={permissionCard}>
-          <div>
-            <strong style={permTitle}>✨ Video Permission Granted</strong>
-            <p style={permSub}>Your instructor invited you to share your camera feed.</p>
-          </div>
-          <button
-            type="button"
-            onClick={handleStartCamera}
-            style={{ ...camBtn, ...(isCameraActive ? stopCamBtn : startCamBtn) }}
-          >
-            {isCameraActive ? "📷 Stop My Camera" : "📹 Share My Camera"}
-          </button>
+      {/* Camera & Microphone controls for students */}
+      <div style={permissionCard}>
+        <div>
+          <strong style={permTitle}>{canPublishVideo ? "✨ Video Permission Granted" : "📹 Interactive 2-Way Call"}</strong>
+          <p style={permSub}>
+            {isCameraActive
+              ? "Your camera and microphone are broadcasting live to instructor."
+              : "Share your camera & microphone to speak live with instructor."}
+          </p>
         </div>
-      )}
+        <button
+          type="button"
+          onClick={handleStartCamera}
+          style={{ ...camBtn, ...(isCameraActive ? stopCamBtn : startCamBtn) }}
+        >
+          {isCameraActive ? "📷 Stop My Camera" : "📹 Share My Camera & Mic"}
+        </button>
+      </div>
 
       {/* Local camera preview stage when student is sharing video */}
       {isCameraActive && (

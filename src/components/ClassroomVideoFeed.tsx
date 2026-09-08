@@ -205,6 +205,7 @@ export default function ClassroomVideoFeed({
           ref={videoRef}
           autoPlay
           playsInline
+          muted
           style={{ ...videoElement, display: hasLiveVideo ? "block" : "none" }}
         />
 
@@ -228,11 +229,17 @@ export default function ClassroomVideoFeed({
           <button
             type="button"
             onClick={() => {
-              videoRef.current?.play().then(() => setNeedsTapToPlay(false)).catch(() => {});
+              if (audioRef.current) {
+                audioRef.current.muted = false;
+                audioRef.current.play().then(() => setNeedsTapToPlay(false)).catch(() => {});
+              }
+              if (videoRef.current) {
+                videoRef.current.play().catch(() => {});
+              }
             }}
             style={tapBtn}
           >
-            Tap to view live video
+            🔊 Tap to Enable Audio & Video
           </button>
         )}
       </div>
