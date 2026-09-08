@@ -24,10 +24,6 @@ export const adminLoginSchema = z.object({
   email: z.string().trim().toLowerCase().email("Enter a valid email address"),
   password: z.string().min(1, "Enter your password"),
 });
-export const adminProfileSchema = z.object({ fullName: z.string().trim().min(2).max(120), email: z.string().trim().toLowerCase().email() });
-export const createAdminSchema = adminProfileSchema.extend({ password: z.string().min(8).max(72) });
-export const changePasswordSchema = z.object({ currentPassword: z.string().min(1), newPassword: z.string().min(8).max(72) });
-
 export const adminProfileSchema = z.object({
   fullName: z.string().trim().min(2, "Enter your full name").max(120),
   email: z.string().trim().toLowerCase().email("Enter a valid email address"),
