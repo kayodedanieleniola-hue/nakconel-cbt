@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useState, useRef, useEffect } from "react";
 import ClassroomVideoFeed from "@/components/ClassroomVideoFeed";
+import ClassroomParticipants from "@/components/ClassroomParticipants";
+import { Room } from "livekit-client";
 
 type Material = {
   id: string;
@@ -39,6 +41,9 @@ export default function ClassroomClient({
   const [activeTab, setActiveTab] = useState<"materials" | "agenda" | "tools">("materials");
   const [zoom, setZoom] = useState(1.0);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [activeRoom, setActiveRoom] = useState<Room | null>(null);
+  const [canPublishVideo, setCanPublishVideo] = useState(false);
+  const [showPermissionModal, setShowPermissionModal] = useState(false);
 
   const stageRef = useRef<HTMLDivElement>(null);
 
@@ -238,7 +243,14 @@ export default function ClassroomClient({
               <span style={sideTag}>INSTRUCTOR FEED</span>
               <span style={activeDot}>● LIVE STREAM</span>
             </div>
-            <ClassroomVideoFeed classId={learningClass.id} />
+            <ClassroomVideoFeed
+              classId={learningClass.id}
+              onRoomReady={setActiveRoom}
+              onVideoPermissionChanged={(permitted) => {
+                setCanPublishVideo(permitted);
+                if (permitted) setShowPermissionModal(true);
+              }}
+            />
           </section>
 
           {/* Workspace Tabs & Content */}
@@ -348,9 +360,17 @@ export default function ClassroomClient({
                 </div>
               )}
 
-              {/* TAB 3: TOOLS */}
+              {/* TAB 3: PARTICIPANTS & TOOLS */}
               {activeTab === "tools" && (
                 <div style={toolsContainer}>
+                  <ClassroomParticipants
+                    room={activeRoom}
+                    canPublishVideo={canPublishVideo}
+                    onToggleStudentCamera={() => {}}
+                  />
+
+                  <hr style={divider} />
+
                   <div style={toolCard}>
                     <strong>💬 Live Classroom Chat</strong>
                     <p style={toolMuted}>Interactive Q&A and text chat will unlock in Phase 11.</p>
@@ -359,16 +379,44 @@ export default function ClassroomClient({
                     <strong>✋ Raise Hand & Speaking</strong>
                     <p style={toolMuted}>Student speaking permissions will activate in Phase 10.</p>
                   </div>
-                  <div style={toolCard}>
-                    <strong>👥 Attendance & Participants</strong>
-                    <p style={toolMuted}>Roster tracking will be enabled in Phase 13.</p>
-                  </div>
                 </div>
               )}
             </div>
           </section>
         </aside>
       </section>
+
+      {/* Permission Invitation Toast Modal */}
+      {showPermissionModal && canPublishVideo && (
+        <div style={toastOverlay}>
+          <div style={toastCard}>
+            <span style={{ fontSize: "1.8rem" }}>✨</span>
+            <strong style={toastTitle}>Video Sharing Invited!</strong>
+            <p style={toastText}>
+              Your instructor has granted you permission to share your camera in class.
+            </p>
+            <div style={toastActions}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPermissionModal(false);
+                  setActiveTab("tools");
+                }}
+                style={acceptToastBtn}
+              >
+                📹 Open Camera Roster
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowPermissionModal(false)}
+                style={dismissToastBtn}
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
@@ -881,5 +929,63 @@ const toolMuted = {
   fontSize: "0.78rem",
   color: "#8c766b",
   margin: "0.25rem 0 0",
+} as const;
+
+const toastOverlay = {
+  position: "fixed",
+  bottom: "1.5rem",
+  right: "1.5rem",
+  zIndex: 9999,
+} as const;
+
+const toastCard = {
+  background: "#331614",
+  border: "1px solid #98661B",
+  borderRadius: 8,
+  padding: "1rem 1.2rem",
+  color: "#f3eee7",
+  boxShadow: "0 10px 30px rgba(0,0,0,0.5)",
+  maxWidth: 340,
+  display: "flex",
+  flexDirection: "column",
+  gap: "0.4rem",
+} as const;
+
+const toastTitle = {
+  color: "#ffd98a",
+  fontSize: "0.95rem",
+} as const;
+
+const toastText = {
+  fontSize: "0.82rem",
+  color: "#c2aba0",
+  margin: "0 0 0.5rem",
+  lineHeight: 1.4,
+} as const;
+
+const toastActions = {
+  display: "flex",
+  gap: "0.5rem",
+} as const;
+
+const acceptToastBtn = {
+  background: "#98661B",
+  color: "#fff",
+  border: "none",
+  borderRadius: 4,
+  padding: "0.4rem 0.75rem",
+  fontSize: "0.78rem",
+  fontWeight: 700,
+  cursor: "pointer",
+} as const;
+
+const dismissToastBtn = {
+  background: "transparent",
+  color: "#a38b80",
+  border: "1px solid #3b2220",
+  borderRadius: 4,
+  padding: "0.4rem 0.65rem",
+  fontSize: "0.78rem",
+  cursor: "pointer",
 } as const;
 

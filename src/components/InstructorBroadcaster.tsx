@@ -36,6 +36,9 @@ export default function InstructorBroadcaster({
     }
   };
 
+  const [remoteParticipants, setRemoteParticipants] = useState<{ identity: string; name: string; canVideo: boolean }[]>([]);
+  const [permittedStudents, setPermittedStudents] = useState<Record<string, boolean>>({});
+
   useEffect(() => {
     let active = true;
 
@@ -47,6 +50,22 @@ export default function InstructorBroadcaster({
 
         const room = new Room();
         roomRef.current = room;
+
+        const updateRoster = () => {
+          if (!active) return;
+          const list: { identity: string; name: string; canVideo: boolean }[] = [];
+          for (const rp of Array.from(room.remoteParticipants.values())) {
+            list.push({
+              identity: rp.identity,
+              name: rp.name || rp.identity,
+              canVideo: !!permittedStudents[rp.identity],
+            });
+          }
+          setRemoteParticipants(list);
+        };
+
+        room.on(RoomEvent.ParticipantConnected, updateRoster);
+        room.on(RoomEvent.ParticipantDisconnected, updateRoster);
 
         room.on(RoomEvent.Disconnected, () => {
           if (active) {
@@ -100,6 +119,21 @@ export default function InstructorBroadcaster({
       void roomRef.current?.disconnect();
     };
   }, [classId, quality]);
+
+  const toggleVideoPermission = async (targetIdentity: string) => {
+    const nextState = !permittedStudents[targetIdentity];
+    setPermittedStudents((prev) => ({ ...prev, [targetIdentity]: nextState }));
+
+    if (roomRef.current) {
+      const payload = new TextEncoder().encode(
+        JSON.stringify({
+          type: nextState ? "GRANT_VIDEO" : "REVOKE_VIDEO",
+          targetIdentity,
+        })
+      );
+      await roomRef.current.localParticipant.publishData(payload, { reliable: true });
+    }
+  };
 
   const toggleCamera = () => {
     const videoTrack = localTracksRef.current.find((t) => t.kind === "video");
@@ -176,6 +210,35 @@ export default function InstructorBroadcaster({
             <option value="720p">⚡ 720p HD (1280 × 720 @ 30fps) - Balanced</option>
             <option value="480p">📶 480p SD (854 × 480 @ 30fps) - Low Bandwidth</option>
           </select>
+        </div>
+
+        {/* Phase 9: Student Video Permissions Manager */}
+        <div style={permSection}>
+          <label style={qualityLabel}>Connected Students & Video Permissions ({remoteParticipants.length}):</label>
+          {remoteParticipants.length === 0 ? (
+            <p style={permEmptyText}>No students currently connected to live classroom.</p>
+          ) : (
+            <div style={permList}>
+              {remoteParticipants.map((p) => {
+                const isPermitted = permittedStudents[p.identity];
+                return (
+                  <div key={p.identity} style={permRow}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                      <span>🎓</span>
+                      <strong style={{ fontSize: "0.85rem", color: "#fff" }}>{p.name}</strong>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => toggleVideoPermission(p.identity)}
+                      style={{ ...permBtn, ...(isPermitted ? permRevokeBtn : permGrantBtn) }}
+                    >
+                      {isPermitted ? "🚫 Revoke Video Permission" : "📹 Grant Video Permission"}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         <div style={controlsRow}>
@@ -378,4 +441,56 @@ const qualitySelect = {
   fontWeight: 600,
   cursor: "pointer",
   outline: "none",
+} as const;
+
+const permSection = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "0.4rem",
+  background: "#180c0b",
+  border: "1px solid #3b2220",
+  borderRadius: 6,
+  padding: "0.75rem",
+} as const;
+
+const permEmptyText = {
+  fontSize: "0.8rem",
+  color: "#8c766b",
+  margin: 0,
+  fontStyle: "italic",
+} as const;
+
+const permList = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "0.4rem",
+} as const;
+
+const permRow = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  background: "#241211",
+  padding: "0.4rem 0.6rem",
+  borderRadius: 4,
+} as const;
+
+const permBtn = {
+  borderRadius: 4,
+  padding: "0.3rem 0.55rem",
+  fontSize: "0.75rem",
+  fontWeight: 600,
+  cursor: "pointer",
+  border: "none",
+} as const;
+
+const permGrantBtn = {
+  background: "#98661B",
+  color: "#fff",
+} as const;
+
+const permRevokeBtn = {
+  background: "#4d1010",
+  color: "#ff4d4d",
+  border: "1px solid #ff4d4d",
 } as const;

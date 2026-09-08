@@ -3,7 +3,15 @@
 import { useEffect, useRef, useState } from "react";
 import { Room, RoomEvent, Track } from "livekit-client";
 
-export default function ClassroomVideoFeed({ classId }: { classId: string }) {
+export default function ClassroomVideoFeed({
+  classId,
+  onRoomReady,
+  onVideoPermissionChanged,
+}: {
+  classId: string;
+  onRoomReady?: (room: Room) => void;
+  onVideoPermissionChanged?: (canPublish: boolean) => void;
+}) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
 
@@ -38,6 +46,20 @@ export default function ClassroomVideoFeed({ classId }: { classId: string }) {
         setStatus("LIVE (ADAPTIVE SIMULCAST)");
       });
 
+      room.on(RoomEvent.DataReceived, (payload) => {
+        try {
+          const str = new TextDecoder().decode(payload);
+          const msg = JSON.parse(str);
+          if (msg.type === "GRANT_VIDEO" && msg.targetIdentity === room.localParticipant.identity) {
+            onVideoPermissionChanged?.(true);
+          } else if (msg.type === "REVOKE_VIDEO" && msg.targetIdentity === room.localParticipant.identity) {
+            onVideoPermissionChanged?.(false);
+          }
+        } catch {
+          // payload was not json
+        }
+      });
+
       room.on(RoomEvent.TrackUnsubscribed, (track) => {
         track.detach();
         if (track.kind === Track.Kind.Video) {
@@ -66,6 +88,7 @@ export default function ClassroomVideoFeed({ classId }: { classId: string }) {
         if (!response.ok) throw new Error(data.error || "Unable to connect");
 
         await room.connect(data.url, data.token);
+        if (active) onRoomReady?.(room);
       } catch (error) {
         if (active) {
           const message = error instanceof Error ? error.message : "Live feed unavailable";
