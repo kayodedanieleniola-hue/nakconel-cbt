@@ -201,6 +201,7 @@ export default function InstructorBroadcaster({
     }
 
     if (roomRef.current) {
+      
       const payload = new TextEncoder().encode(
         JSON.stringify({
           type: nextState ? "GRANT_VIDEO" : "REVOKE_VIDEO",
