@@ -5,20 +5,22 @@ import { prisma } from "@/lib/db";
 import LogoutButton from "@/components/LogoutButton";
 import RefreshButton from "@/components/RefreshButton";
 import { getExamStatus } from "@/lib/examStatus";
+import { syncLearningClassStatuses } from "@/lib/learningSchedule";
 
 export const dynamic = "force-dynamic";
 
 export default async function MyCoursePage() {
   const session = await getStudentSession();
   if (!session) redirect("/login");
+  await syncLearningClassStatuses();
 
   const student = await prisma.student.findUnique({
     where: { id: session.sub },
     include: {
       course: {
         include: {
-          modules: { orderBy: { position: "asc" }, include: { lessons: { orderBy: { position: "asc" }, select: { id: true, title: true } }, classes: { orderBy: { createdAt: "asc" }, select: { id: true, title: true } } } },
-          classes: { orderBy: { createdAt: "asc" }, select: { id: true, title: true, moduleId: true } },
+          modules: { orderBy: { position: "asc" }, include: { lessons: { orderBy: { position: "asc" }, select: { id: true, title: true } }, classes: { orderBy: { startsAt: "asc" }, select: { id: true, title: true, startsAt: true, endsAt: true, status: true } } } },
+          classes: { orderBy: { startsAt: "asc" }, select: { id: true, title: true, moduleId: true, startsAt: true, endsAt: true, status: true } },
           exams: { orderBy: { order: "asc" }, select: { id: true, name: true, published: true, startAt: true, endAt: true } },
         },
       },
@@ -30,7 +32,11 @@ export default async function MyCoursePage() {
   const now = new Date();
   const nextExam = student.course.exams.find((exam) => ["ONGOING", "UPCOMING"].includes(getExamStatus(exam, now)));
   const lessonCount = student.course.modules.reduce((total, module) => total + module.lessons.length, 0);
-  const classCount = student.course.classes.length;
+  const allClasses = [...student.course.classes, ...student.course.modules.flatMap((module) => module.classes)];
+  const classCount = allClasses.length;
+  const liveClass = allClasses.find((item) => item.status === "LIVE");
+  const nextClass = allClasses.filter((item) => item.status === "SCHEDULED" && item.startsAt && item.startsAt > now).sort((a, b) => a.startsAt!.valueOf() - b.startsAt!.valueOf())[0];
+  const upcomingCount = allClasses.filter((item) => item.status === "SCHEDULED" && item.startsAt && item.startsAt > now).length;
   return (
     <main style={shell}>
       <header style={header}>
@@ -48,9 +54,9 @@ export default async function MyCoursePage() {
           <p style={progressCaption}>{student.course.modules.length} modules · {lessonCount} lessons · {classCount} classes</p>
         </section>
         <section style={dashboardGrid} aria-label="Learning overview">
-          <OverviewCard label="Live now" title="No live class" text="Live class scheduling is coming soon." tone="live" />
-          <OverviewCard label="Next class" title={classCount ? "Class details pending" : "No class scheduled"} text={classCount ? "Scheduling will be available in the next phase." : "Your instructor has not added a class yet."} />
-          <OverviewCard label="Upcoming classes" title={classCount ? `${classCount} class${classCount === 1 ? "" : "es"} in your course` : "Nothing upcoming"} text="Classes will appear here once they are scheduled." />
+          <OverviewCard label="Live now" title={liveClass?.title ?? "No live class"} text={liveClass ? "Your class is live now. Classroom joining arrives in Phase 6." : "There is no live class at the moment."} tone="live" />
+          <OverviewCard label="Next class" title={nextClass?.title ?? "No class scheduled"} text={nextClass?.startsAt ? formatDate(nextClass.startsAt) : "Your instructor has not scheduled a class yet."} />
+          <OverviewCard label="Upcoming classes" title={upcomingCount ? `${upcomingCount} upcoming class${upcomingCount === 1 ? "" : "es"}` : "Nothing upcoming"} text="Only classes for your registered course are shown." />
           <OverviewCard label="Recent materials" title="No materials yet" text="Course notes and resources arrive in Phase 5." />
           <OverviewCard label="Pending assignments" title="No assignments yet" text="Assignments will be introduced in Phase 15." />
           <OverviewCard label="Next test / exam" title={nextExam?.name ?? "No upcoming exam"} text={nextExam?.startAt ? `Available ${new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(nextExam.startAt)}` : "Your scheduled assessment will appear here."} tone="exam" />
@@ -58,7 +64,7 @@ export default async function MyCoursePage() {
         <h2 style={heading}>Course modules</h2>
         {student.course.modules.length === 0 ? <div style={empty}>Your course structure is being prepared. Modules and lessons will appear here when your administrator adds them.</div> : <div style={moduleList}>{student.course.modules.map((module, index) => <article key={module.id} style={moduleCard}><div style={moduleNumber}>{String(index + 1).padStart(2, "0")}</div><div style={{ flex: 1 }}><h3 style={{ margin: 0, color: "var(--burgundy-900)" }}>{module.title}</h3>{module.description && <p style={muted}>{module.description}</p>}<div style={sectionRow}><span>{module.lessons.length} lesson{module.lessons.length === 1 ? "" : "s"}</span><span>{module.classes.length} class{module.classes.length === 1 ? "" : "es"}</span></div>{module.lessons.length > 0 && <ul style={items}>{module.lessons.map((lesson) => <li key={lesson.id}>{lesson.title}</li>)}</ul>}{module.classes.length > 0 && <p style={classNote}>Classes: {module.classes.map((item) => item.title).join(", ")}</p>}</div></article>)}</div>}
         <h2 style={heading}>Classes</h2>
-        {student.course.classes.length === 0 ? <div style={empty}>No classes have been added to this course yet.</div> : <div style={classGrid}>{standaloneClasses.map((item) => <article key={item.id} style={classCard}><p style={eyebrow}>Course class</p><h3 style={{ margin: "0.2rem 0", color: "var(--burgundy-900)" }}>{item.title}</h3><p style={muted}>Class scheduling and joining will be added in the next Learning Center phases.</p></article>)}{student.course.modules.flatMap((module) => module.classes.map((item) => <article key={item.id} style={classCard}><p style={eyebrow}>{module.title}</p><h3 style={{ margin: "0.2rem 0", color: "var(--burgundy-900)" }}>{item.title}</h3><p style={muted}>Class foundation created.</p></article>))}</div>}
+        {allClasses.length === 0 ? <div style={empty}>No classes have been added to this course yet.</div> : <div style={classGrid}>{standaloneClasses.map((item) => <ClassCard key={item.id} item={item} label="Course class" />)}{student.course.modules.flatMap((module) => module.classes.map((item) => <ClassCard key={item.id} item={item} label={module.title} />))}</div>}
       </section>
     </main>
   );
@@ -67,6 +73,8 @@ export default async function MyCoursePage() {
 function OverviewCard({ label, title, text, tone }: { label: string; title: string; text: string; tone?: "live" | "exam" }) {
   return <article style={{ ...overviewCard, borderTopColor: tone === "live" ? "var(--danger)" : tone === "exam" ? "var(--gold-600)" : "var(--line)" }}><p style={eyebrow}>{label}</p><h3 style={{ color: "var(--burgundy-900)", margin: "0.35rem 0" }}>{title}</h3><p style={muted}>{text}</p></article>;
 }
+function ClassCard({ item, label }: { item: { title: string; startsAt: Date | null; endsAt: Date | null; status: string }; label: string }) { return <article style={classCard}><p style={eyebrow}>{label}</p><h3 style={{ margin: "0.2rem 0", color: "var(--burgundy-900)" }}>{item.title}</h3><span style={{ ...statusBadge, ...(item.status === "LIVE" ? liveBadge : {}) }}>{item.status === "LIVE" ? "● LIVE" : item.status}</span><p style={muted}>{item.startsAt ? `${formatDate(item.startsAt)}${item.endsAt ? ` – ${new Intl.DateTimeFormat("en", { timeStyle: "short" }).format(item.endsAt)}` : ""}` : "Schedule not set yet."}</p></article>; }
+function formatDate(date: Date) { return new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(date); }
 
 const shell = { minHeight: "100dvh", background: "var(--cream-50)" } as const;
 const header = { background: "var(--burgundy-900)", color: "var(--cream-50)", padding: "1.1rem 6vw", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "1rem", flexWrap: "wrap" } as const;
@@ -96,3 +104,5 @@ const items = { margin: "0.7rem 0 0", paddingLeft: "1.15rem", color: "var(--ink-
 const classNote = { color: "var(--ink-600)", fontSize: "0.85rem", marginBottom: 0 } as const;
 const classGrid = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "0.8rem" } as const;
 const classCard = { background: "#fff", border: "1px solid var(--line)", borderRadius: 8, padding: "1.1rem" } as const;
+const statusBadge = { display: "inline-block", background: "#efe9e0", color: "var(--burgundy-900)", borderRadius: 99, padding: "0.2rem 0.55rem", fontSize: "0.72rem", fontWeight: 700 } as const;
+const liveBadge = { background: "#f2e3e0", color: "var(--danger)" } as const;

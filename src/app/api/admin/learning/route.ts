@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/adminGuard";
+import { syncLearningClassStatuses } from "@/lib/learningSchedule";
 
 export const dynamic = "force-dynamic";
 const STATUSES = new Set(["DRAFT", "SCHEDULED", "LIVE", "COMPLETED", "CANCELLED"]);
@@ -8,6 +9,7 @@ const STATUSES = new Set(["DRAFT", "SCHEDULED", "LIVE", "COMPLETED", "CANCELLED"
 export async function GET() {
   const guard = await requireAdmin();
   if (!guard.ok) return guard.response;
+  await syncLearningClassStatuses();
   const courses = await prisma.course.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, modules: { orderBy: { position: "asc" }, select: { id: true, title: true, description: true, position: true, classes: { orderBy: { startsAt: "asc" }, select: { id: true, title: true, instructor: true, description: true, startsAt: true, endsAt: true, status: true } } } }, classes: { where: { moduleId: null }, orderBy: { startsAt: "asc" }, select: { id: true, title: true, instructor: true, description: true, startsAt: true, endsAt: true, status: true } } } });
   return NextResponse.json({ courses });
 }
