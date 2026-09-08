@@ -74,12 +74,12 @@ export default function CameraCheck({ attemptId }: { attemptId: string }) {
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || "Live video is unavailable");
         await room.connect(data.url, data.token);
-        // Request a real 720p capture and publish at the matching bitrate. The
-        // browser's default camera constraint is often 360p, which makes the
-        // admin preview look soft even when the connection is healthy.
-        const tracks = await createLocalTracks({ video: { resolution: VideoPresets.h720.resolution, frameRate: 24 }, audio: true });
+        // Request 4K when the camera and connection support it. Browsers and
+        // LiveKit will negotiate a lower layer when 4K is unavailable or the
+        // available network cannot sustain it.
+        const tracks = await createLocalTracks({ video: { resolution: VideoPresets.h2160.resolution, frameRate: 20 }, audio: true });
         for (const track of tracks) {
-          await room.localParticipant.publishTrack(track, track.kind === "video" ? { videoEncoding: VideoPresets.h720.encoding } : undefined);
+          await room.localParticipant.publishTrack(track, track.kind === "video" ? { videoEncoding: VideoPresets.h2160.encoding } : undefined);
         }
         const videoTrack = tracks.find((track) => track.kind === "video");
         if (active && videoTrack && videoRef.current) {
