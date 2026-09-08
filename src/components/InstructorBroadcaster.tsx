@@ -38,6 +38,10 @@ export default function InstructorBroadcaster({
 
   const [remoteParticipants, setRemoteParticipants] = useState<{ identity: string; name: string; canVideo: boolean }[]>([]);
   const [permittedStudents, setPermittedStudents] = useState<Record<string, boolean>>({});
+  const [raisedHands, setRaisedHands] = useState<Record<string, string>>({}); // identity -> name
+  const [studentFrames, setStudentFrames] = useState<Record<string, string>>({}); // identity -> base64 frame
+
+  const bcRef = useRef<BroadcastChannel | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -46,6 +50,30 @@ export default function InstructorBroadcaster({
 
     try {
       bc = new BroadcastChannel(`nak-classroom-${classId}`);
+      bcRef.current = bc;
+
+      bc.onmessage = (event) => {
+        if (!active) return;
+        const data = event.data;
+        if (!data) return;
+
+        if (data.type === "STUDENT_JOIN" && data.identity) {
+          setRemoteParticipants((prev) => {
+            if (prev.some((p) => p.identity === data.identity)) return prev;
+            return [...prev, { identity: data.identity, name: data.name || data.identity, canVideo: !!permittedStudents[data.identity] }];
+          });
+        } else if (data.type === "RAISE_HAND" && data.identity) {
+          setRaisedHands((prev) => ({ ...prev, [data.identity]: data.name || data.identity }));
+        } else if (data.type === "LOWER_HAND" && data.identity) {
+          setRaisedHands((prev) => {
+            const next = { ...prev };
+            delete next[data.identity];
+            return next;
+          });
+        } else if (data.type === "STUDENT_FRAME" && data.identity && data.frame) {
+          setStudentFrames((prev) => ({ ...prev, [data.identity]: data.frame }));
+        }
+      };
     } catch {
       // BroadcastChannel unsupported
     }
@@ -155,6 +183,22 @@ export default function InstructorBroadcaster({
     const nextState = !permittedStudents[targetIdentity];
     setPermittedStudents((prev) => ({ ...prev, [targetIdentity]: nextState }));
 
+    // Lower student hand if permission is granted
+    if (nextState) {
+      setRaisedHands((prev) => {
+        const next = { ...prev };
+        delete next[targetIdentity];
+        return next;
+      });
+    }
+
+    if (bcRef.current) {
+      bcRef.current.postMessage({
+        type: nextState ? "GRANT_VIDEO" : "REVOKE_VIDEO",
+        targetIdentity,
+      });
+    }
+
     if (roomRef.current) {
       const payload = new TextEncoder().encode(
         JSON.stringify({
@@ -197,13 +241,38 @@ export default function InstructorBroadcaster({
       <div style={modalCard}>
         <div style={modalHeader}>
           <div>
-            <span style={liveTag}>INSTRUCTOR LIVE STUDIO (PHASE 8: ADAPTIVE 4K)</span>
+            <span style={liveTag}>INSTRUCTOR LIVE STUDIO (PHASE 8: ADAPTIVE 4K & LIVE MONITOR)</span>
             <h3 style={modalTitle}>{classTitle}</h3>
           </div>
           <button type="button" onClick={onClose} style={closeBtn}>
             ✕ Close
           </button>
         </div>
+
+        {/* Hand Raise Live Notifications */}
+        {Object.keys(raisedHands).length > 0 && (
+          <div style={handRaiseBanner}>
+            <span style={{ fontSize: "1.2rem" }}>✋</span>
+            <div style={{ flex: 1 }}>
+              <strong style={{ color: "#ffd98a", fontSize: "0.85rem" }}>
+                Question / Hand Raised ({Object.keys(raisedHands).length})
+              </strong>
+              <p style={{ margin: "0.15rem 0 0", fontSize: "0.78rem", color: "#f3eee7" }}>
+                {Object.values(raisedHands).join(", ")} raised their hand to ask a question!
+              </p>
+            </div>
+            {Object.keys(raisedHands).map((identity) => (
+              <button
+                key={identity}
+                type="button"
+                onClick={() => toggleVideoPermission(identity)}
+                style={grantHandBtn}
+              >
+                📹 Grant Video & Speaking
+              </button>
+            ))}
+          </div>
+        )}
 
         <div style={previewStage}>
           <video ref={localVideoRef} autoPlay playsInline muted style={previewVideo} />
@@ -227,6 +296,21 @@ export default function InstructorBroadcaster({
         </div>
 
         {errorMsg && <p style={errorNotice}>{errorMsg}</p>}
+
+        {/* Live Student Monitor Grid (like CBT Exam Live Monitor) */}
+        {Object.keys(studentFrames).length > 0 && (
+          <div style={studentGridSection}>
+            <label style={qualityLabel}>Live Student Video Grid ({Object.keys(studentFrames).length} Active):</label>
+            <div style={studentGrid}>
+              {Object.entries(studentFrames).map(([id, frame]) => (
+                <div key={id} style={studentCard}>
+                  <img src={frame} alt="Student Feed" style={studentVideoFrame} />
+                  <span style={studentCardBadge}>🎓 {id.replace("student-", "")}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Resolution Quality Selector */}
         <div style={qualitySelectorRow}>
@@ -524,4 +608,64 @@ const permRevokeBtn = {
   background: "#4d1010",
   color: "#ff4d4d",
   border: "1px solid #ff4d4d",
+} as const;
+
+const handRaiseBanner = {
+  background: "#3d1f05",
+  border: "1px solid #98661B",
+  borderRadius: 6,
+  padding: "0.6rem 0.8rem",
+  display: "flex",
+  alignItems: "center",
+  gap: "0.6rem",
+} as const;
+
+const grantHandBtn = {
+  background: "#98661B",
+  color: "#fff",
+  border: "none",
+  borderRadius: 4,
+  padding: "0.35rem 0.65rem",
+  fontSize: "0.78rem",
+  fontWeight: 700,
+  cursor: "pointer",
+} as const;
+
+const studentGridSection = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "0.4rem",
+} as const;
+
+const studentGrid = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))",
+  gap: "0.5rem",
+} as const;
+
+const studentCard = {
+  position: "relative",
+  background: "#100707",
+  border: "1px solid #98661B",
+  borderRadius: 6,
+  aspectRatio: "16 / 9",
+  overflow: "hidden",
+} as const;
+
+const studentVideoFrame = {
+  width: "100%",
+  height: "100%",
+  objectFit: "cover",
+} as const;
+
+const studentCardBadge = {
+  position: "absolute",
+  bottom: "0.2rem",
+  left: "0.2rem",
+  background: "rgba(0,0,0,0.75)",
+  color: "#ffd98a",
+  padding: "0.1rem 0.3rem",
+  borderRadius: 3,
+  fontSize: "0.65rem",
+  fontWeight: 600,
 } as const;

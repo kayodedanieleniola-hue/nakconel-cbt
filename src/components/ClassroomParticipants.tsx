@@ -13,18 +13,37 @@ type ParticipantInfo = {
 };
 
 export default function ClassroomParticipants({
+  classId,
   room,
   canPublishVideo,
   onToggleStudentCamera,
 }: {
+  classId?: string;
   room: Room | null;
   canPublishVideo: boolean;
   onToggleStudentCamera: (active: boolean) => void;
 }) {
   const [participants, setParticipants] = useState<ParticipantInfo[]>([]);
   const [isCameraActive, setIsCameraActive] = useState(false);
+  const [hasRaisedHand, setHasRaisedHand] = useState(false);
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const localTrackRef = useRef<LocalTrack | null>(null);
+  const bcRef = useRef<BroadcastChannel | null>(null);
+
+  useEffect(() => {
+    if (classId) {
+      try {
+        const bc = new BroadcastChannel(`nak-classroom-${classId}`);
+        bcRef.current = bc;
+        bc.postMessage({ type: "STUDENT_JOIN", identity: "student-local", name: "Student" });
+        return () => {
+          bc.close();
+        };
+      } catch {
+        // BroadcastChannel unsupported
+      }
+    }
+  }, [classId]);
 
   useEffect(() => {
     if (!room) return;
@@ -78,15 +97,45 @@ export default function ClassroomParticipants({
     };
   }, [room]);
 
-  const handleStartCamera = async () => {
-    if (!room || !canPublishVideo) return;
+  // Frame broadcasting interval for student local camera mode
+  useEffect(() => {
+    if (!isCameraActive || !bcRef.current) return;
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    const timer = setInterval(() => {
+      if (localVideoRef.current && localVideoRef.current.readyState >= 2 && bcRef.current) {
+        canvas.width = 320;
+        canvas.height = 180;
+        ctx?.drawImage(localVideoRef.current, 0, 0, 320, 180);
+        const frame = canvas.toDataURL("image/jpeg", 0.5);
+        bcRef.current.postMessage({ type: "STUDENT_FRAME", identity: room?.localParticipant.identity || "student-local", frame });
+      }
+    }, 200);
 
+    return () => clearInterval(timer);
+  }, [isCameraActive, room]);
+
+  const handleToggleRaiseHand = () => {
+    const nextState = !hasRaisedHand;
+    setHasRaisedHand(nextState);
+    if (bcRef.current) {
+      bcRef.current.postMessage({
+        type: nextState ? "RAISE_HAND" : "LOWER_HAND",
+        identity: room?.localParticipant.identity || "student-local",
+        name: room?.localParticipant.name || "Student",
+      });
+    }
+  };
+
+  const handleStartCamera = async () => {
     try {
       if (isCameraActive) {
         if (localTrackRef.current) {
           localTrackRef.current.stop();
           localTrackRef.current.detach();
-          await room.localParticipant.unpublishTrack(localTrackRef.current);
+          if (room) {
+            await room.localParticipant.unpublishTrack(localTrackRef.current);
+          }
           localTrackRef.current = null;
         }
         setIsCameraActive(false);
@@ -99,7 +148,9 @@ export default function ClassroomParticipants({
           if (localVideoRef.current) {
             videoTrack.attach(localVideoRef.current);
           }
-          await room.localParticipant.publishTrack(videoTrack);
+          if (room) {
+            await room.localParticipant.publishTrack(videoTrack);
+          }
           setIsCameraActive(true);
           onToggleStudentCamera(true);
         }
@@ -112,7 +163,14 @@ export default function ClassroomParticipants({
   return (
     <div style={container}>
       <div style={rosterHeader}>
-        <span style={countTag}>ACTIVE PARTICIPANTS ({participants.length})</span>
+        <span style={countTag}>ACTIVE PARTICIPANTS ({participants.length || 1})</span>
+        <button
+          type="button"
+          onClick={handleToggleRaiseHand}
+          style={{ ...raiseHandBtn, ...(hasRaisedHand ? activeRaiseBtn : {}) }}
+        >
+          {hasRaisedHand ? "✋ Hand Raised" : "✋ Raise Hand"}
+        </button>
       </div>
 
       {/* Permission banner for students */}
@@ -315,4 +373,20 @@ const studentRole = {
 const statusText = {
   fontSize: "0.72rem",
   color: "#8c766b",
+} as const;
+
+const raiseHandBtn = {
+  background: "#331614",
+  border: "1px solid #98661B",
+  color: "#ffd98a",
+  borderRadius: 4,
+  padding: "0.2rem 0.5rem",
+  fontSize: "0.72rem",
+  fontWeight: 700,
+  cursor: "pointer",
+} as const;
+
+const activeRaiseBtn = {
+  background: "#98661B",
+  color: "#fff",
 } as const;

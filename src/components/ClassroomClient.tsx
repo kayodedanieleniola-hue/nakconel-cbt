@@ -364,6 +364,7 @@ export default function ClassroomClient({
               {activeTab === "tools" && (
                 <div style={toolsContainer}>
                   <ClassroomParticipants
+                    classId={learningClass.id}
                     room={activeRoom}
                     canPublishVideo={canPublishVideo}
                     onToggleStudentCamera={() => {}}

@@ -21,6 +21,14 @@ export default function ClassroomVideoFeed({
   const [hasLiveVideo, setHasLiveVideo] = useState(false);
   const [fallbackFrame, setFallbackFrame] = useState<string | null>(null);
 
+  const onRoomReadyRef = useRef(onRoomReady);
+  const onVideoPermissionChangedRef = useRef(onVideoPermissionChanged);
+
+  useEffect(() => {
+    onRoomReadyRef.current = onRoomReady;
+    onVideoPermissionChangedRef.current = onVideoPermissionChanged;
+  });
+
   useEffect(() => {
     let active = true;
     let currentRoom: Room | null = null;
@@ -32,18 +40,14 @@ export default function ClassroomVideoFeed({
         if (!active) return;
         if (event.data?.type === "FRAME" && event.data.frame) {
           setFallbackFrame(event.data.frame);
-          if (!hasLiveVideo) {
-            setStatus(`LIVE (${(event.data.quality || "LOCAL").toUpperCase()})`);
-          }
+          setStatus(`LIVE (${(event.data.quality || "LOCAL").toUpperCase()})`);
         } else if (event.data?.type === "STOP") {
           setFallbackFrame(null);
-          if (!hasLiveVideo) {
-            setStatus("Instructor stream offline");
-          }
+          setStatus("Instructor stream offline");
         } else if (event.data?.type === "GRANT_VIDEO") {
-          onVideoPermissionChanged?.(true);
+          onVideoPermissionChangedRef.current?.(true);
         } else if (event.data?.type === "REVOKE_VIDEO") {
-          onVideoPermissionChanged?.(false);
+          onVideoPermissionChangedRef.current?.(false);
         }
       };
     } catch {
@@ -77,9 +81,9 @@ export default function ClassroomVideoFeed({
           const str = new TextDecoder().decode(payload);
           const msg = JSON.parse(str);
           if (msg.type === "GRANT_VIDEO" && msg.targetIdentity === room.localParticipant.identity) {
-            onVideoPermissionChanged?.(true);
+            onVideoPermissionChangedRef.current?.(true);
           } else if (msg.type === "REVOKE_VIDEO" && msg.targetIdentity === room.localParticipant.identity) {
-            onVideoPermissionChanged?.(false);
+            onVideoPermissionChangedRef.current?.(false);
           }
         } catch {
           // payload was not json
@@ -114,13 +118,17 @@ export default function ClassroomVideoFeed({
         if (!response.ok) throw new Error(data.error || "Unable to connect");
 
         await room.connect(data.url, data.token);
-        if (active) onRoomReady?.(room);
+        if (active) onRoomReadyRef.current?.(room);
       } catch (error) {
         if (active) {
           const message = error instanceof Error ? error.message : "Live feed unavailable";
-          if (!fallbackFrame) {
-            setStatus(message.includes("503") || message.includes("not configured") ? "Live video ready (local mode)" : `Offline · ${message}`);
-          }
+          setStatus((prev) =>
+            prev.startsWith("LIVE")
+              ? prev
+              : message.includes("503") || message.includes("not configured")
+              ? "Live video ready (local mode)"
+              : `Offline · ${message}`
+          );
         }
       }
     }
@@ -133,7 +141,7 @@ export default function ClassroomVideoFeed({
       currentRoom?.removeAllListeners();
       void currentRoom?.disconnect();
     };
-  }, [classId, hasLiveVideo, fallbackFrame, onRoomReady, onVideoPermissionChanged]);
+  }, [classId]);
 
   const toggleMute = () => {
     if (audioRef.current) {
