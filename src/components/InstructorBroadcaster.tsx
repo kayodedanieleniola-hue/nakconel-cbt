@@ -129,6 +129,17 @@ export default function InstructorBroadcaster({
         if (active) {
           setStatus("BROADCASTING LIVE");
           setIsBroadcasting(true);
+          // Sync LIVE status with backend DB
+          void fetch("/api/admin/learning", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              type: "class",
+              id: classId,
+              title: classTitle,
+              status: "LIVE",
+            }),
+          }).catch(() => {});
         }
 
         // Setup local BroadcastChannel fallback stream
@@ -435,7 +446,28 @@ export default function InstructorBroadcaster({
             📊 Launch Live Poll
           </button>
 
-          <button type="button" onClick={onClose} style={endBtn}>
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                await fetch("/api/admin/learning", {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    type: "class",
+                    id: classId,
+                    title: classTitle,
+                    status: "COMPLETED",
+                    recordingUrl: "/sample-replay.mp4",
+                  }),
+                });
+              } catch {
+                // DB sync error
+              }
+              onClose();
+            }}
+            style={endBtn}
+          >
             ⏹️ End Broadcast
           </button>
         </div>

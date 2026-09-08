@@ -55,6 +55,17 @@ export default function ClassroomClient({
   const previewable =
     selected?.mimeType.startsWith("image/") || selected?.mimeType === "application/pdf";
 
+  // Log student class attendance in backend DB
+  useEffect(() => {
+    if (learningClass.id) {
+      void fetch("/api/learning/attendance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ classId: learningClass.id }),
+      }).catch(() => {});
+    }
+  }, [learningClass.id]);
+
   // Fullscreen change listener
   useEffect(() => {
     function handleFsChange() {
