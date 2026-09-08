@@ -208,7 +208,7 @@ export default function ClassroomVideoFeed({
 
       <div style={statusBar}>
         <span style={{ ...statusBadge, ...(isStreamActive ? liveBadge : offlineBadge) }}>
-          {isStreamActive ? "● LIVE" : "STATUS"} {status}
+          {isStreamActive ? `● LIVE · ${status}` : status}
         </span>
 
         {hasLiveVideo && (

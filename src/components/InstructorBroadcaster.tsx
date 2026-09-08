@@ -111,13 +111,19 @@ export default function InstructorBroadcaster({
         const canvas = document.createElement("canvas");
         const ctx = canvas.getContext("2d");
         fallbackInterval = setInterval(() => {
-          const video = localVideoRef.current;
-          if (video && bcRef.current) {
-            canvas.width = 640;
-            canvas.height = 360;
-            ctx?.drawImage(video, 0, 0, 640, 360);
-            const frame = canvas.toDataURL("image/jpeg", 0.6);
-            bcRef.current.postMessage({ type: "FRAME", frame, quality });
+          try {
+            const video = localVideoRef.current;
+            if (video && (video.readyState >= 1 || video.videoWidth > 0)) {
+              canvas.width = 640;
+              canvas.height = 360;
+              ctx?.drawImage(video, 0, 0, 640, 360);
+              const frame = canvas.toDataURL("image/jpeg", 0.6);
+              if (frame && frame.length > 100) {
+                bcRef.current?.postMessage({ type: "FRAME", frame, quality });
+              }
+            }
+          } catch {
+            // Frame capture retry
           }
         }, 100);
 
