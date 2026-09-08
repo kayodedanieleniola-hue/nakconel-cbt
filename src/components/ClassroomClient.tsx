@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState, useRef, useEffect } from "react";
+import ClassroomVideoFeed from "@/components/ClassroomVideoFeed";
 
 type Material = {
   id: string;
@@ -231,19 +232,13 @@ export default function ClassroomClient({
 
         {/* Right Workspace Dock / Sidebar */}
         <aside style={sideDock}>
-          {/* Instructor Video Feed Placeholder (Phase 7 Target) */}
+          {/* Instructor Live Video & Audio Feed */}
           <section style={instructorPanel}>
             <div style={instructorHeader}>
               <span style={sideTag}>INSTRUCTOR FEED</span>
-              <span style={activeDot}>● CONNECTED</span>
+              <span style={activeDot}>● LIVE STREAM</span>
             </div>
-            <div style={videoStage}>
-              <div style={videoAvatar}>👨‍🏫</div>
-              <p style={instructorName}>
-                {learningClass.instructor ? learningClass.instructor : "Instructor"}
-              </p>
-              <span style={phaseNotice}>Video & Audio stream connects in Phase 7</span>
-            </div>
+            <ClassroomVideoFeed classId={learningClass.id} />
           </section>
 
           {/* Workspace Tabs & Content */}
