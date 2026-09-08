@@ -76,6 +76,7 @@ model LearningClass {
   startsAt    DateTime?
   endsAt      DateTime?
   status      String          @default("DRAFT") // DRAFT | SCHEDULED | LIVE | COMPLETED | CANCELLED
+  activeMaterialId String?
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
   materials   LearningMaterial[]

@@ -55,7 +55,7 @@ export default async function MyCoursePage() {
           <p style={progressCaption}>{student.course.modules.length} modules · {lessonCount} lessons · {classCount} classes</p>
         </section>
         <section style={dashboardGrid} aria-label="Learning overview">
-          <OverviewCard label="Live now" title={liveClass?.title ?? "No live class"} text={liveClass ? "Your class is live now. Classroom joining arrives in Phase 6." : "There is no live class at the moment."} tone="live" />
+          <OverviewCard label="Live now" title={liveClass?.title ?? "No live class"} text={liveClass ? "Your class is live now. Select Join live classroom below." : "There is no live class at the moment."} tone="live" />
           <OverviewCard label="Next class" title={nextClass?.title ?? "No class scheduled"} text={nextClass?.startsAt ? formatDate(nextClass.startsAt) : "Your instructor has not scheduled a class yet."} />
           <OverviewCard label="Upcoming classes" title={upcomingCount ? `${upcomingCount} upcoming class${upcomingCount === 1 ? "" : "es"}` : "Nothing upcoming"} text="Only classes for your registered course are shown." />
           <OverviewCard label="Recent materials" title={student.course.materials[0]?.title ?? "No materials yet"} text={student.course.materials.length ? `${student.course.materials.length} course material${student.course.materials.length === 1 ? "" : "s"} available.` : "Your instructor has not uploaded materials yet."} />
@@ -76,7 +76,7 @@ export default async function MyCoursePage() {
 function OverviewCard({ label, title, text, tone }: { label: string; title: string; text: string; tone?: "live" | "exam" }) {
   return <article style={{ ...overviewCard, borderTopColor: tone === "live" ? "var(--danger)" : tone === "exam" ? "var(--gold-600)" : "var(--line)" }}><p style={eyebrow}>{label}</p><h3 style={{ color: "var(--burgundy-900)", margin: "0.35rem 0" }}>{title}</h3><p style={muted}>{text}</p></article>;
 }
-function ClassCard({ item, label }: { item: { title: string; startsAt: Date | null; endsAt: Date | null; status: string }; label: string }) { return <article style={classCard}><p style={eyebrow}>{label}</p><h3 style={{ margin: "0.2rem 0", color: "var(--burgundy-900)" }}>{item.title}</h3><span style={{ ...statusBadge, ...(item.status === "LIVE" ? liveBadge : {}) }}>{item.status === "LIVE" ? "● LIVE" : item.status}</span><p style={muted}>{item.startsAt ? `${formatDate(item.startsAt)}${item.endsAt ? ` – ${new Intl.DateTimeFormat("en", { timeStyle: "short" }).format(item.endsAt)}` : ""}` : "Schedule not set yet."}</p></article>; }
+function ClassCard({ item, label }: { item: { id: string; title: string; startsAt: Date | null; endsAt: Date | null; status: string }; label: string }) { return <article style={classCard}><p style={eyebrow}>{label}</p><h3 style={{ margin: "0.2rem 0", color: "var(--burgundy-900)" }}>{item.title}</h3><span style={{ ...statusBadge, ...(item.status === "LIVE" ? liveBadge : {}) }}>{item.status === "LIVE" ? "● LIVE" : item.status}</span><p style={muted}>{item.startsAt ? `${formatDate(item.startsAt)}${item.endsAt ? ` – ${new Intl.DateTimeFormat("en", { timeStyle: "short" }).format(item.endsAt)}` : ""}` : "Schedule not set yet."}</p>{item.status === "LIVE" && <Link href={`/learning/class/${item.id}`} style={joinButton}>Join live classroom</Link>}</article>; }
 function formatDate(date: Date) { return new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(date); }
 
 const shell = { minHeight: "100dvh", background: "var(--cream-50)" } as const;
@@ -110,3 +110,4 @@ const classCard = { background: "#fff", border: "1px solid var(--line)", borderR
 const statusBadge = { display: "inline-block", background: "#efe9e0", color: "var(--burgundy-900)", borderRadius: 99, padding: "0.2rem 0.55rem", fontSize: "0.72rem", fontWeight: 700 } as const;
 const liveBadge = { background: "#f2e3e0", color: "var(--danger)" } as const;
 const download = { display: "inline-block", background: "var(--burgundy-900)", color: "#fff", borderRadius: 4, padding: "0.5rem 0.7rem", fontSize: "0.82rem", fontWeight: 600, textDecoration: "none" } as const;
+const joinButton = { ...download, background: "var(--gold-600)", marginTop: "0.25rem" } as const;

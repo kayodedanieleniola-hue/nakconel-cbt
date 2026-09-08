@@ -10,7 +10,7 @@ export async function GET() {
   const guard = await requireAdmin();
   if (!guard.ok) return guard.response;
   await syncLearningClassStatuses();
-  const courses = await prisma.course.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, materials: { orderBy: { createdAt: "desc" }, select: { id: true, title: true, fileName: true, mimeType: true, sizeBytes: true, moduleId: true, classId: true } }, modules: { orderBy: { position: "asc" }, select: { id: true, title: true, description: true, position: true, classes: { orderBy: { startsAt: "asc" }, select: { id: true, title: true, instructor: true, description: true, startsAt: true, endsAt: true, status: true } } } }, classes: { where: { moduleId: null }, orderBy: { startsAt: "asc" }, select: { id: true, title: true, instructor: true, description: true, startsAt: true, endsAt: true, status: true } } } });
+  const courses = await prisma.course.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, materials: { orderBy: { createdAt: "desc" }, select: { id: true, title: true, fileName: true, mimeType: true, sizeBytes: true, moduleId: true, classId: true } }, modules: { orderBy: { position: "asc" }, select: { id: true, title: true, description: true, position: true, classes: { orderBy: { startsAt: "asc" }, select: { id: true, title: true, instructor: true, description: true, startsAt: true, endsAt: true, status: true, activeMaterialId: true } } } }, classes: { where: { moduleId: null }, orderBy: { startsAt: "asc" }, select: { id: true, title: true, instructor: true, description: true, startsAt: true, endsAt: true, status: true, activeMaterialId: true } } } });
   return NextResponse.json({ courses });
 }
 
@@ -31,11 +31,12 @@ export async function POST(request: Request) {
     const moduleId = typeof body.moduleId === "string" && body.moduleId ? body.moduleId : null;
     const title = typeof body.title === "string" ? body.title.trim() : "";
     const status = typeof body.status === "string" ? body.status : "DRAFT";
+    const activeMaterialId = typeof body.activeMaterialId === "string" && body.activeMaterialId ? body.activeMaterialId : null;
     if (!courseId || title.length < 2 || !STATUSES.has(status)) return NextResponse.json({ error: "Choose a course, enter a title, and select a valid status" }, { status: 400 });
     if (moduleId && !(await prisma.learningModule.findFirst({ where: { id: moduleId, courseId } }))) return NextResponse.json({ error: "That module does not belong to the selected course" }, { status: 400 });
     const startsAt = parseDate(body.startsAt); const endsAt = parseDate(body.endsAt);
     if (startsAt && endsAt && endsAt <= startsAt) return NextResponse.json({ error: "End time must be after start time" }, { status: 400 });
-    const learningClass = await prisma.learningClass.create({ data: { courseId, moduleId, title, instructor: text(body.instructor), description: text(body.description), startsAt, endsAt, status } });
+    const learningClass = await prisma.learningClass.create({ data: { courseId, moduleId, title, instructor: text(body.instructor), description: text(body.description), startsAt, endsAt, status, activeMaterialId } });
     return NextResponse.json({ learningClass }, { status: 201 });
   }
   return NextResponse.json({ error: "Unknown Learning Center item" }, { status: 400 });
@@ -47,7 +48,7 @@ export async function PATCH(request: Request) {
   const id = typeof body?.id === "string" ? body.id : "";
   if (!id || (body?.type !== "module" && body?.type !== "class")) return NextResponse.json({ error: "Invalid update request" }, { status: 400 });
   if (body.type === "module") { const title = typeof body.title === "string" ? body.title.trim() : ""; if (title.length < 2) return NextResponse.json({ error: "Enter a module title" }, { status: 400 }); const module = await prisma.learningModule.update({ where: { id }, data: { title, description: text(body.description) } }); return NextResponse.json({ module }); }
-  const title = typeof body.title === "string" ? body.title.trim() : ""; const status = typeof body.status === "string" ? body.status : ""; if (title.length < 2 || !STATUSES.has(status)) return NextResponse.json({ error: "Enter a title and valid status" }, { status: 400 }); const startsAt = parseDate(body.startsAt); const endsAt = parseDate(body.endsAt); if (startsAt && endsAt && endsAt <= startsAt) return NextResponse.json({ error: "End time must be after start time" }, { status: 400 }); const learningClass = await prisma.learningClass.update({ where: { id }, data: { title, instructor: text(body.instructor), description: text(body.description), startsAt, endsAt, status } }); return NextResponse.json({ learningClass });
+  const title = typeof body.title === "string" ? body.title.trim() : ""; const status = typeof body.status === "string" ? body.status : ""; if (title.length < 2 || !STATUSES.has(status)) return NextResponse.json({ error: "Enter a title and valid status" }, { status: 400 }); const startsAt = parseDate(body.startsAt); const endsAt = parseDate(body.endsAt); if (startsAt && endsAt && endsAt <= startsAt) return NextResponse.json({ error: "End time must be after start time" }, { status: 400 }); const activeMaterialId = typeof body.activeMaterialId === "string" && body.activeMaterialId ? body.activeMaterialId : null; const learningClass = await prisma.learningClass.update({ where: { id }, data: { title, instructor: text(body.instructor), description: text(body.description), startsAt, endsAt, status, activeMaterialId } }); return NextResponse.json({ learningClass });
 }
 
 export async function DELETE(request: Request) {
