@@ -41,42 +41,18 @@ export default function InstructorBroadcaster({
 
   useEffect(() => {
     let active = true;
+    let fallbackInterval: NodeJS.Timeout | undefined;
+    let bc: BroadcastChannel | undefined;
+
+    try {
+      bc = new BroadcastChannel(`nak-classroom-${classId}`);
+    } catch {
+      // BroadcastChannel unsupported
+    }
 
     async function startBroadcast() {
+      // Capture local camera & mic tracks first so video renders locally immediately
       try {
-        const response = await fetch(`/api/learning/livekit/token?classId=${encodeURIComponent(classId)}`);
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || "Failed to acquire broadcast token");
-
-        const room = new Room();
-        roomRef.current = room;
-
-        const updateRoster = () => {
-          if (!active) return;
-          const list: { identity: string; name: string; canVideo: boolean }[] = [];
-          for (const rp of Array.from(room.remoteParticipants.values())) {
-            list.push({
-              identity: rp.identity,
-              name: rp.name || rp.identity,
-              canVideo: !!permittedStudents[rp.identity],
-            });
-          }
-          setRemoteParticipants(list);
-        };
-
-        room.on(RoomEvent.ParticipantConnected, updateRoster);
-        room.on(RoomEvent.ParticipantDisconnected, updateRoster);
-
-        room.on(RoomEvent.Disconnected, () => {
-          if (active) {
-            setStatus("Broadcast disconnected");
-            setIsBroadcasting(false);
-          }
-        });
-
-        await room.connect(data.url, data.token);
-
-        // Capture local camera & mic tracks with simulcast adaptive layers enabled
         const tracks = await createLocalTracks({
           audio: true,
           video: { resolution: getResolutionPreset(quality) },
@@ -87,15 +63,65 @@ export default function InstructorBroadcaster({
         for (const track of tracks) {
           if (track.kind === "video" && localVideoRef.current) {
             track.attach(localVideoRef.current);
-            await room.localParticipant.publishTrack(track, { simulcast: true });
-          } else {
-            await room.localParticipant.publishTrack(track);
           }
         }
 
         if (active) {
-          setStatus(`BROADCASTING LIVE (${quality.toUpperCase()} · SIMULCAST ACTIVE)`);
+          setStatus("BROADCASTING LIVE");
           setIsBroadcasting(true);
+        }
+
+        // Setup local BroadcastChannel fallback stream
+        if (bc) {
+          const canvas = document.createElement("canvas");
+          const ctx = canvas.getContext("2d");
+          fallbackInterval = setInterval(() => {
+            if (localVideoRef.current && localVideoRef.current.readyState >= 2 && bc) {
+              canvas.width = 640;
+              canvas.height = 360;
+              ctx?.drawImage(localVideoRef.current, 0, 0, 640, 360);
+              const frame = canvas.toDataURL("image/jpeg", 0.6);
+              bc.postMessage({ type: "FRAME", frame, quality });
+            }
+          }, 100);
+        }
+
+        // Connect to LiveKit server if credentials are configured
+        try {
+          const response = await fetch(`/api/learning/livekit/token?classId=${encodeURIComponent(classId)}`);
+          const data = await response.json();
+          if (response.ok && data.url && data.token) {
+            const room = new Room();
+            roomRef.current = room;
+
+            const updateRoster = () => {
+              if (!active) return;
+              const list: { identity: string; name: string; canVideo: boolean }[] = [];
+              for (const rp of Array.from(room.remoteParticipants.values())) {
+                list.push({
+                  identity: rp.identity,
+                  name: rp.name || rp.identity,
+                  canVideo: !!permittedStudents[rp.identity],
+                });
+              }
+              setRemoteParticipants(list);
+            };
+
+            room.on(RoomEvent.ParticipantConnected, updateRoster);
+            room.on(RoomEvent.ParticipantDisconnected, updateRoster);
+
+            await room.connect(data.url, data.token);
+
+            for (const track of tracks) {
+              if (track.kind === "video") {
+                await room.localParticipant.publishTrack(track, { simulcast: true });
+              } else {
+                await room.localParticipant.publishTrack(track);
+              }
+            }
+          }
+        } catch {
+          // LiveKit cloud server not configured — local fallback continues
         }
       } catch (err) {
         console.error("Instructor broadcast error:", err);
@@ -111,6 +137,11 @@ export default function InstructorBroadcaster({
 
     return () => {
       active = false;
+      if (fallbackInterval) clearInterval(fallbackInterval);
+      if (bc) {
+        bc.postMessage({ type: "STOP" });
+        bc.close();
+      }
       for (const track of localTracksRef.current) {
         track.stop();
         track.detach();

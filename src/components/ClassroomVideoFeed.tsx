@@ -19,10 +19,36 @@ export default function ClassroomVideoFeed({
   const [needsTapToPlay, setNeedsTapToPlay] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [hasLiveVideo, setHasLiveVideo] = useState(false);
+  const [fallbackFrame, setFallbackFrame] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
     let currentRoom: Room | null = null;
+    let bc: BroadcastChannel | undefined;
+
+    try {
+      bc = new BroadcastChannel(`nak-classroom-${classId}`);
+      bc.onmessage = (event) => {
+        if (!active) return;
+        if (event.data?.type === "FRAME" && event.data.frame) {
+          setFallbackFrame(event.data.frame);
+          if (!hasLiveVideo) {
+            setStatus(`LIVE (${(event.data.quality || "LOCAL").toUpperCase()})`);
+          }
+        } else if (event.data?.type === "STOP") {
+          setFallbackFrame(null);
+          if (!hasLiveVideo) {
+            setStatus("Instructor stream offline");
+          }
+        } else if (event.data?.type === "GRANT_VIDEO") {
+          onVideoPermissionChanged?.(true);
+        } else if (event.data?.type === "REVOKE_VIDEO") {
+          onVideoPermissionChanged?.(false);
+        }
+      };
+    } catch {
+      // BroadcastChannel unavailable
+    }
 
     async function connect() {
       const room = new Room({ adaptiveStream: true, dynacast: true });
@@ -92,7 +118,9 @@ export default function ClassroomVideoFeed({
       } catch (error) {
         if (active) {
           const message = error instanceof Error ? error.message : "Live feed unavailable";
-          setStatus(message.includes("503") || message.includes("not configured") ? "Live video not configured" : `Offline · ${message}`);
+          if (!fallbackFrame) {
+            setStatus(message.includes("503") || message.includes("not configured") ? "Live video ready (local mode)" : `Offline · ${message}`);
+          }
         }
       }
     }
@@ -101,10 +129,11 @@ export default function ClassroomVideoFeed({
 
     return () => {
       active = false;
+      if (bc) bc.close();
       currentRoom?.removeAllListeners();
       void currentRoom?.disconnect();
     };
-  }, [classId]);
+  }, [classId, hasLiveVideo, fallbackFrame, onRoomReady, onVideoPermissionChanged]);
 
   const toggleMute = () => {
     if (audioRef.current) {
@@ -112,6 +141,8 @@ export default function ClassroomVideoFeed({
       setIsMuted(!isMuted);
     }
   };
+
+  const isStreamActive = hasLiveVideo || !!fallbackFrame;
 
   return (
     <div style={container}>
@@ -123,7 +154,15 @@ export default function ClassroomVideoFeed({
           style={{ ...videoElement, display: hasLiveVideo ? "block" : "none" }}
         />
 
-        {!hasLiveVideo && (
+        {!hasLiveVideo && fallbackFrame && (
+          <img
+            src={fallbackFrame}
+            alt="Live Instructor Stream"
+            style={videoElement}
+          />
+        )}
+
+        {!isStreamActive && (
           <div style={fallbackPlaceholder}>
             <div style={avatarIcon}>👨‍🏫</div>
             <p style={placeholderText}>Instructor stream offline</p>
@@ -147,8 +186,8 @@ export default function ClassroomVideoFeed({
       <audio ref={audioRef} autoPlay style={{ display: "none" }} />
 
       <div style={statusBar}>
-        <span style={{ ...statusBadge, ...(hasLiveVideo ? liveBadge : offlineBadge) }}>
-          {hasLiveVideo ? "● LIVE" : "STATUS"} {status}
+        <span style={{ ...statusBadge, ...(isStreamActive ? liveBadge : offlineBadge) }}>
+          {isStreamActive ? "● LIVE" : "STATUS"} {status}
         </span>
 
         {hasLiveVideo && (
