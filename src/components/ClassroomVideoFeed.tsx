@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Room, RoomEvent, Track } from "livekit-client";
+import { LocalClassroomPeer } from "@/lib/localP2P";
 
 export default function ClassroomVideoFeed({
   classId,
@@ -14,6 +15,7 @@ export default function ClassroomVideoFeed({
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const p2pRef = useRef<LocalClassroomPeer | null>(null);
 
   const [status, setStatus] = useState("Connecting...");
   const [needsTapToPlay, setNeedsTapToPlay] = useState(false);
@@ -33,6 +35,35 @@ export default function ClassroomVideoFeed({
     let active = true;
     let currentRoom: Room | null = null;
     let bc: BroadcastChannel | undefined;
+
+    // Listen for local student microphone/camera stream events
+    const handleStudentStream = (evt: Event) => {
+      const customEvt = evt as CustomEvent<{ stream: MediaStream }>;
+      if (customEvt.detail?.stream && p2pRef.current) {
+        p2pRef.current.addLocalStream(customEvt.detail.stream);
+      }
+    };
+    window.addEventListener("nak-student-media-stream", handleStudentStream);
+
+    // Initialize 2-Way Local WebRTC P2P Call for student
+    try {
+      const peer = new LocalClassroomPeer(classId, "student");
+      p2pRef.current = peer;
+      peer.onRemoteStream = (remoteStream) => {
+        if (!active) return;
+        if (audioRef.current) {
+          audioRef.current.srcObject = remoteStream;
+          void audioRef.current.play().catch(() => {});
+        }
+        if (videoRef.current && remoteStream.getVideoTracks().length > 0) {
+          videoRef.current.srcObject = remoteStream;
+          setHasLiveVideo(true);
+          void videoRef.current.play().catch(() => {});
+        }
+      };
+    } catch {
+      // P2P fallback
+    }
 
     try {
       bc = new BroadcastChannel(`nak-classroom-${classId}`);
@@ -150,7 +181,9 @@ export default function ClassroomVideoFeed({
 
     return () => {
       active = false;
+      window.removeEventListener("nak-student-media-stream", handleStudentStream);
       if (bc) bc.close();
+      if (p2pRef.current) p2pRef.current.destroy();
       currentRoom?.removeAllListeners();
       void currentRoom?.disconnect();
     };

@@ -155,6 +155,16 @@ export default function ClassroomParticipants({
       } else {
         const tracks = await createLocalTracks({ video: true, audio: true });
         localTracksRef.current = tracks;
+
+        // Dispatch local stream for 2-way WebRTC P2P audio/video call
+        try {
+          const mediaTracks = tracks.map((t) => t.mediaStreamTrack);
+          const stream = new MediaStream(mediaTracks);
+          window.dispatchEvent(new CustomEvent("nak-student-media-stream", { detail: { stream } }));
+        } catch {
+          // P2P dispatch fallback
+        }
+
         for (const track of tracks) {
           if (room) {
             await room.localParticipant.publishTrack(track);

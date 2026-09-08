@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createLocalTracks, LocalTrack, Room, RoomEvent, VideoPresets } from "livekit-client";
 import ClassroomChat from "@/components/ClassroomChat";
+import { LocalClassroomPeer } from "@/lib/localP2P";
 
 export default function InstructorBroadcaster({
   classId,
@@ -14,8 +15,10 @@ export default function InstructorBroadcaster({
   onClose: () => void;
 }) {
   const localVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteAudioRef = useRef<HTMLAudioElement>(null);
   const roomRef = useRef<Room | null>(null);
   const localTracksRef = useRef<LocalTrack[]>([]);
+  const p2pRef = useRef<LocalClassroomPeer | null>(null);
 
   const [quality, setQuality] = useState<"4k" | "1080p" | "720p" | "480p">("1080p");
   const [status, setStatus] = useState("Initializing camera & microphone...");
@@ -102,6 +105,23 @@ export default function InstructorBroadcaster({
           }
         }
 
+        // Initialize 2-Way Local WebRTC P2P Call
+        try {
+          const mediaTracks = tracks.map((t) => t.mediaStreamTrack);
+          const localStream = new MediaStream(mediaTracks);
+          const peer = new LocalClassroomPeer(classId, "instructor");
+          p2pRef.current = peer;
+          peer.addLocalStream(localStream);
+          peer.onRemoteStream = (remoteStream) => {
+            if (remoteAudioRef.current) {
+              remoteAudioRef.current.srcObject = remoteStream;
+              void remoteAudioRef.current.play().catch(() => {});
+            }
+          };
+        } catch {
+          // P2P initialization fallback
+        }
+
         if (active) {
           setStatus("BROADCASTING LIVE");
           setIsBroadcasting(true);
@@ -180,6 +200,7 @@ export default function InstructorBroadcaster({
       active = false;
       if (fallbackInterval) clearInterval(fallbackInterval);
       if (pingInterval) clearInterval(pingInterval);
+      if (p2pRef.current) p2pRef.current.destroy();
       if (bc) {
         bc.postMessage({ type: "STOP" });
         bc.close();
@@ -263,6 +284,8 @@ export default function InstructorBroadcaster({
             ✕ Close
           </button>
         </div>
+
+        <audio ref={remoteAudioRef} autoPlay style={{ display: "none" }} />
 
         {/* Hand Raise Live Notifications */}
         {Object.keys(raisedHands).length > 0 && (
