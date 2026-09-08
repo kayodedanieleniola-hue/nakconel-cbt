@@ -14,7 +14,10 @@ export default function LiveKitFeed({ attemptId }: { attemptId: string }) {
     let currentRoom: Room | null = null;
 
     async function connect() {
-      const room = new Room();
+      // Monitoring cards are compact, but adaptive streaming chooses a low
+      // layer from the rendered card size. Subscribe to the best available
+      // layer so the admin receives the clearer exam-review feed.
+      const room = new Room({ adaptiveStream: false });
       currentRoom = room;
 
       room.on(RoomEvent.TrackSubscribed, async (track) => {
