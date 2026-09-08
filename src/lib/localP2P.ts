@@ -62,7 +62,7 @@ export class LocalClassroomPeer {
       if (event.candidate && this.bc) {
         this.bc.postMessage({
           type: "ICE_CANDIDATE",
-          candidate: event.candidate,
+          candidate: event.candidate.toJSON(),
           senderRole: this.role,
         });
       }
@@ -117,7 +117,7 @@ export class LocalClassroomPeer {
       await this.pc.setLocalDescription(offer);
       this.bc.postMessage({
         type: "OFFER",
-        sdp: offer,
+        sdp: { type: offer.type, sdp: offer.sdp },
         senderRole: this.role,
       });
     } catch (err) {
@@ -133,7 +133,7 @@ export class LocalClassroomPeer {
       await this.pc.setLocalDescription(answer);
       this.bc.postMessage({
         type: "ANSWER",
-        sdp: answer,
+        sdp: { type: answer.type, sdp: answer.sdp },
         senderRole: this.role,
       });
     } catch (err) {
