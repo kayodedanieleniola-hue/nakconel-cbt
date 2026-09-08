@@ -23,6 +23,7 @@ model Course {
   questions Question[]
   modules   LearningModule[]
   classes   LearningClass[]
+  materials LearningMaterial[]
 
   @@map("courses")
 }
@@ -41,6 +42,7 @@ model LearningModule {
   updatedAt   DateTime        @updatedAt
   lessons     Lesson[]
   classes     LearningClass[]
+  materials   LearningMaterial[]
 
   @@unique([courseId, position])
   @@index([courseId])
@@ -76,11 +78,35 @@ model LearningClass {
   status      String          @default("DRAFT") // DRAFT | SCHEDULED | LIVE | COMPLETED | CANCELLED
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
+  materials   LearningMaterial[]
 
   @@index([courseId])
   @@index([moduleId])
   @@index([courseId, startsAt])
   @@map("learning_classes")
+}
+
+// Phase 5: educational resources are stored with their course ownership so
+// authorization can always be verified before a student downloads a file.
+model LearningMaterial {
+  id          String          @id @default(cuid())
+  courseId    String
+  moduleId    String?
+  classId     String?
+  course      Course          @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  module      LearningModule? @relation(fields: [moduleId], references: [id], onDelete: SetNull)
+  learningClass LearningClass? @relation(fields: [classId], references: [id], onDelete: SetNull)
+  title       String
+  fileName    String
+  mimeType    String
+  sizeBytes   Int
+  data        Bytes
+  createdAt   DateTime        @default(now())
+
+  @@index([courseId])
+  @@index([moduleId])
+  @@index([classId])
+  @@map("learning_materials")
 }
 
 // Phase 5 scope: the Question Bank. Kept intentionally simple (single

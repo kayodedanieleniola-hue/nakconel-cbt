@@ -1,0 +1,14 @@
+import { NextResponse } from "next/server";
+import { getStudentSession } from "@/lib/auth";
+import { prisma } from "@/lib/db";
+
+export const dynamic = "force-dynamic";
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const session = await getStudentSession();
+  if (!session) return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+  const { id } = await params;
+  const material = await prisma.learningMaterial.findFirst({ where: { id, course: { students: { some: { id: session.sub, status: "active" } } } }, select: { fileName: true, mimeType: true, data: true } });
+  if (!material) return NextResponse.json({ error: "Material not found" }, { status: 404 });
+  const body = material.data.buffer.slice(material.data.byteOffset, material.data.byteOffset + material.data.byteLength) as ArrayBuffer;
+  return new NextResponse(body, { headers: { "Content-Type": material.mimeType, "Content-Disposition": `attachment; filename="${material.fileName.replace(/[\\\"]/g, "_")}"`, "Cache-Control": "private, no-store" } });
+}

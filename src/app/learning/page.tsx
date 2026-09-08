@@ -21,6 +21,7 @@ export default async function MyCoursePage() {
         include: {
           modules: { orderBy: { position: "asc" }, include: { lessons: { orderBy: { position: "asc" }, select: { id: true, title: true } }, classes: { orderBy: { startsAt: "asc" }, select: { id: true, title: true, startsAt: true, endsAt: true, status: true } } } },
           classes: { orderBy: { startsAt: "asc" }, select: { id: true, title: true, moduleId: true, startsAt: true, endsAt: true, status: true } },
+          materials: { orderBy: { createdAt: "desc" }, select: { id: true, title: true, fileName: true, sizeBytes: true } },
           exams: { orderBy: { order: "asc" }, select: { id: true, name: true, published: true, startAt: true, endAt: true } },
         },
       },
@@ -57,7 +58,7 @@ export default async function MyCoursePage() {
           <OverviewCard label="Live now" title={liveClass?.title ?? "No live class"} text={liveClass ? "Your class is live now. Classroom joining arrives in Phase 6." : "There is no live class at the moment."} tone="live" />
           <OverviewCard label="Next class" title={nextClass?.title ?? "No class scheduled"} text={nextClass?.startsAt ? formatDate(nextClass.startsAt) : "Your instructor has not scheduled a class yet."} />
           <OverviewCard label="Upcoming classes" title={upcomingCount ? `${upcomingCount} upcoming class${upcomingCount === 1 ? "" : "es"}` : "Nothing upcoming"} text="Only classes for your registered course are shown." />
-          <OverviewCard label="Recent materials" title="No materials yet" text="Course notes and resources arrive in Phase 5." />
+          <OverviewCard label="Recent materials" title={student.course.materials[0]?.title ?? "No materials yet"} text={student.course.materials.length ? `${student.course.materials.length} course material${student.course.materials.length === 1 ? "" : "s"} available.` : "Your instructor has not uploaded materials yet."} />
           <OverviewCard label="Pending assignments" title="No assignments yet" text="Assignments will be introduced in Phase 15." />
           <OverviewCard label="Next test / exam" title={nextExam?.name ?? "No upcoming exam"} text={nextExam?.startAt ? `Available ${new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(nextExam.startAt)}` : "Your scheduled assessment will appear here."} tone="exam" />
         </section>
@@ -65,6 +66,8 @@ export default async function MyCoursePage() {
         {student.course.modules.length === 0 ? <div style={empty}>Your course structure is being prepared. Modules and lessons will appear here when your administrator adds them.</div> : <div style={moduleList}>{student.course.modules.map((module, index) => <article key={module.id} style={moduleCard}><div style={moduleNumber}>{String(index + 1).padStart(2, "0")}</div><div style={{ flex: 1 }}><h3 style={{ margin: 0, color: "var(--burgundy-900)" }}>{module.title}</h3>{module.description && <p style={muted}>{module.description}</p>}<div style={sectionRow}><span>{module.lessons.length} lesson{module.lessons.length === 1 ? "" : "s"}</span><span>{module.classes.length} class{module.classes.length === 1 ? "" : "es"}</span></div>{module.lessons.length > 0 && <ul style={items}>{module.lessons.map((lesson) => <li key={lesson.id}>{lesson.title}</li>)}</ul>}{module.classes.length > 0 && <p style={classNote}>Classes: {module.classes.map((item) => item.title).join(", ")}</p>}</div></article>)}</div>}
         <h2 style={heading}>Classes</h2>
         {allClasses.length === 0 ? <div style={empty}>No classes have been added to this course yet.</div> : <div style={classGrid}>{standaloneClasses.map((item) => <ClassCard key={item.id} item={item} label="Course class" />)}{student.course.modules.flatMap((module) => module.classes.map((item) => <ClassCard key={item.id} item={item} label={module.title} />))}</div>}
+        <h2 style={heading}>Materials</h2>
+        {student.course.materials.length === 0 ? <div style={empty}>No learning materials have been shared with this course yet.</div> : <div style={classGrid}>{student.course.materials.map((material) => <article key={material.id} style={classCard}><p style={eyebrow}>Course material</p><h3 style={{ margin: "0.2rem 0", color: "var(--burgundy-900)" }}>{material.title}</h3><p style={muted}>{material.fileName} · {Math.ceil(material.sizeBytes / 1024)} KB</p><a href={`/api/learning/materials/${material.id}`} style={download}>Download material</a></article>)}</div>}
       </section>
     </main>
   );
@@ -106,3 +109,4 @@ const classGrid = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minm
 const classCard = { background: "#fff", border: "1px solid var(--line)", borderRadius: 8, padding: "1.1rem" } as const;
 const statusBadge = { display: "inline-block", background: "#efe9e0", color: "var(--burgundy-900)", borderRadius: 99, padding: "0.2rem 0.55rem", fontSize: "0.72rem", fontWeight: 700 } as const;
 const liveBadge = { background: "#f2e3e0", color: "var(--danger)" } as const;
+const download = { display: "inline-block", background: "var(--burgundy-900)", color: "#fff", borderRadius: 4, padding: "0.5rem 0.7rem", fontSize: "0.82rem", fontWeight: 600, textDecoration: "none" } as const;
