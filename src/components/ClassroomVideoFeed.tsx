@@ -36,9 +36,22 @@ export default function ClassroomVideoFeed({
 
     try {
       bc = new BroadcastChannel(`nak-classroom-${classId}`);
+      
+      const sendStudentJoin = () => {
+        bc?.postMessage({
+          type: "STUDENT_JOIN",
+          identity: "student-enrolled",
+          name: "Enrolled Student",
+        });
+      };
+
+      sendStudentJoin();
+
       bc.onmessage = (event) => {
         if (!active) return;
-        if (event.data?.type === "FRAME" && event.data.frame) {
+        if (event.data?.type === "INSTRUCTOR_PING") {
+          sendStudentJoin();
+        } else if (event.data?.type === "FRAME" && event.data.frame) {
           setFallbackFrame(event.data.frame);
           setStatus(`LIVE (${(event.data.quality || "LOCAL").toUpperCase()})`);
         } else if (event.data?.type === "STOP") {

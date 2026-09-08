@@ -47,11 +47,17 @@ export default function InstructorBroadcaster({
   useEffect(() => {
     let active = true;
     let fallbackInterval: NodeJS.Timeout | undefined;
+    let pingInterval: NodeJS.Timeout | undefined;
     let bc: BroadcastChannel | undefined;
 
     try {
       bc = new BroadcastChannel(`nak-classroom-${classId}`);
       bcRef.current = bc;
+      bc.postMessage({ type: "INSTRUCTOR_PING" });
+
+      pingInterval = setInterval(() => {
+        if (bc) bc.postMessage({ type: "INSTRUCTOR_PING" });
+      }, 3000);
 
       bc.onmessage = (event) => {
         if (!active) return;
@@ -167,6 +173,7 @@ export default function InstructorBroadcaster({
     return () => {
       active = false;
       if (fallbackInterval) clearInterval(fallbackInterval);
+      if (pingInterval) clearInterval(pingInterval);
       if (bc) {
         bc.postMessage({ type: "STOP" });
         bc.close();
