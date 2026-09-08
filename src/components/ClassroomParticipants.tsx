@@ -27,7 +27,6 @@ export default function ClassroomParticipants({
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [hasRaisedHand, setHasRaisedHand] = useState(false);
   const localVideoRef = useRef<HTMLVideoElement>(null);
-  const localTrackRef = useRef<LocalTrack | null>(null);
   const bcRef = useRef<BroadcastChannel | null>(null);
 
   useEffect(() => {
@@ -127,36 +126,37 @@ export default function ClassroomParticipants({
     }
   };
 
+  const localTracksRef = useRef<LocalTrack[]>([]);
+
   const handleStartCamera = async () => {
     try {
       if (isCameraActive) {
-        if (localTrackRef.current) {
-          localTrackRef.current.stop();
-          localTrackRef.current.detach();
+        for (const track of localTracksRef.current) {
+          track.stop();
+          track.detach();
           if (room) {
-            await room.localParticipant.unpublishTrack(localTrackRef.current);
+            await room.localParticipant.unpublishTrack(track);
           }
-          localTrackRef.current = null;
         }
+        localTracksRef.current = [];
         setIsCameraActive(false);
         onToggleStudentCamera(false);
       } else {
-        const tracks = await createLocalTracks({ video: true, audio: false });
-        const videoTrack = tracks.find((t) => t.kind === "video");
-        if (videoTrack) {
-          localTrackRef.current = videoTrack;
-          if (localVideoRef.current) {
-            videoTrack.attach(localVideoRef.current);
+        const tracks = await createLocalTracks({ video: true, audio: true });
+        localTracksRef.current = tracks;
+        for (const track of tracks) {
+          if (track.kind === "video" && localVideoRef.current) {
+            track.attach(localVideoRef.current);
           }
           if (room) {
-            await room.localParticipant.publishTrack(videoTrack);
+            await room.localParticipant.publishTrack(track);
           }
-          setIsCameraActive(true);
-          onToggleStudentCamera(true);
         }
+        setIsCameraActive(true);
+        onToggleStudentCamera(true);
       }
     } catch (err) {
-      console.error("Student camera publish error:", err);
+      console.error("Student camera & mic broadcast error:", err);
     }
   };
 
