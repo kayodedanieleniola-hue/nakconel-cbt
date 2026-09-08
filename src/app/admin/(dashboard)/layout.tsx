@@ -9,6 +9,7 @@ const NAV = [
   { href: "/admin", label: "Overview", enabled: true },
   { href: "/admin/students", label: "Students", enabled: true },
   { href: "/admin/courses", label: "Courses", enabled: true },
+  { href: "/admin/learning", label: "Learning Center", enabled: true },
   { href: "/admin/exams", label: "Exams", enabled: true },
   { href: "/admin/questions", label: "Question Bank", enabled: true },
   { href: "/admin/results", label: "Results", enabled: true },
