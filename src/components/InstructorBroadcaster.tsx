@@ -45,6 +45,10 @@ export default function InstructorBroadcaster({
   const [raisedHands, setRaisedHands] = useState<Record<string, string>>({}); // identity -> name
   const [studentFrames, setStudentFrames] = useState<Record<string, string>>({}); // identity -> base64 frame
 
+  const [showPollModal, setShowPollModal] = useState(false);
+  const [pollQuestion, setPollQuestion] = useState("");
+  const [pollOptionsStr, setPollOptionsStr] = useState("Yes, No, Needs Clarification");
+
   const bcRef = useRef<BroadcastChannel | null>(null);
 
   useEffect(() => {
@@ -423,14 +427,139 @@ export default function InstructorBroadcaster({
             {micOn ? "🎙️ Microphone ON" : "🎙️ Microphone Muted"}
           </button>
 
+          <button
+            type="button"
+            onClick={() => setShowPollModal(true)}
+            style={{ ...ctrlBtn, background: "#98661B", color: "#fff" }}
+          >
+            📊 Launch Live Poll
+          </button>
+
           <button type="button" onClick={onClose} style={endBtn}>
             ⏹️ End Broadcast
           </button>
         </div>
+
+        {/* Live Poll Creation Modal */}
+        {showPollModal && (
+          <div style={pollOverlay}>
+            <div style={pollCard}>
+              <h4 style={{ margin: "0 0 0.5rem", color: "#ffd98a", fontSize: "1.1rem" }}>📊 Launch In-Class Live Poll</h4>
+              <p style={{ margin: "0 0 0.8rem", fontSize: "0.8rem", color: "#b08585" }}>
+                Ask enrolled students a question in real-time during your live lecture.
+              </p>
+              <input
+                type="text"
+                value={pollQuestion}
+                onChange={(e) => setPollQuestion(e.target.value)}
+                placeholder="e.g., Do you understand the concept covered so far?"
+                style={pollInput}
+              />
+              <label style={{ display: "block", fontSize: "0.75rem", color: "#ffd98a", margin: "0.6rem 0 0.2rem" }}>
+                Answer Options (comma-separated):
+              </label>
+              <input
+                type="text"
+                value={pollOptionsStr}
+                onChange={(e) => setPollOptionsStr(e.target.value)}
+                placeholder="Yes, No, Partially"
+                style={pollInput}
+              />
+
+              <div style={{ display: "flex", gap: "0.5rem", marginTop: "1rem", justifyContent: "flex-end" }}>
+                <button type="button" onClick={() => setShowPollModal(false)} style={pollCancelBtn}>
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const options = pollOptionsStr.split(",").map((s) => s.trim()).filter(Boolean);
+                    if (!pollQuestion.trim() || options.length < 2) return;
+                    try {
+                      const res = await fetch("/api/learning/polls", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          action: "CREATE_POLL",
+                          classId,
+                          question: pollQuestion.trim(),
+                          options,
+                        }),
+                      });
+                      const data = await res.json();
+                      if (data.poll && bcRef.current) {
+                        bcRef.current.postMessage({ type: "LIVE_POLL", poll: data.poll });
+                      }
+                      setShowPollModal(false);
+                      setPollQuestion("");
+                    } catch {
+                      // Poll launch error
+                    }
+                  }}
+                  style={pollSubmitBtn}
+                >
+                  🚀 Broadcast Poll Live
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 }
+
+const pollOverlay = {
+  position: "fixed",
+  inset: 0,
+  background: "rgba(0,0,0,0.85)",
+  zIndex: 10000,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: "1rem",
+} as const;
+
+const pollCard = {
+  background: "#220c0c",
+  border: "1px solid #98661B",
+  borderRadius: 10,
+  padding: "1.25rem",
+  width: "420px",
+  maxWidth: "100%",
+  color: "#fff",
+} as const;
+
+const pollInput = {
+  width: "100%",
+  background: "#120505",
+  border: "1px solid #4d1c1c",
+  borderRadius: 6,
+  padding: "0.55rem 0.75rem",
+  color: "#fff",
+  fontSize: "0.85rem",
+} as const;
+
+const pollCancelBtn = {
+  background: "#331010",
+  color: "#ff9999",
+  border: "none",
+  borderRadius: 6,
+  padding: "0.45rem 0.85rem",
+  fontSize: "0.82rem",
+  cursor: "pointer",
+} as const;
+
+const pollSubmitBtn = {
+  background: "linear-gradient(135deg, #98661B, #d4af37)",
+  color: "#1a0808",
+  border: "none",
+  borderRadius: 6,
+  padding: "0.45rem 0.95rem",
+  fontSize: "0.82rem",
+  fontWeight: 800,
+  cursor: "pointer",
+} as const;
 
 const overlay = {
   position: "fixed",

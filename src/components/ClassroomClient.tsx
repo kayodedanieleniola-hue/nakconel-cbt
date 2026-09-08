@@ -5,6 +5,7 @@ import { useState, useRef, useEffect } from "react";
 import ClassroomVideoFeed from "@/components/ClassroomVideoFeed";
 import ClassroomParticipants from "@/components/ClassroomParticipants";
 import ClassroomChat from "@/components/ClassroomChat";
+import ClassroomPollOverlay from "@/components/ClassroomPollOverlay";
 import { Room } from "livekit-client";
 
 type Material = {
@@ -252,6 +253,7 @@ export default function ClassroomClient({
                 if (permitted) setShowPermissionModal(true);
               }}
             />
+            <ClassroomPollOverlay classId={learningClass.id} />
           </section>
 
           {/* Workspace Tabs & Content */}

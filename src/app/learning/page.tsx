@@ -4,6 +4,7 @@ import { getStudentSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import LogoutButton from "@/components/LogoutButton";
 import RefreshButton from "@/components/RefreshButton";
+import StudentLearningDashboard from "@/components/StudentLearningDashboard";
 import { getExamStatus } from "@/lib/examStatus";
 import { syncLearningClassStatuses } from "@/lib/learningSchedule";
 
@@ -19,8 +20,8 @@ export default async function MyCoursePage() {
     include: {
       course: {
         include: {
-          modules: { orderBy: { position: "asc" }, include: { lessons: { orderBy: { position: "asc" }, select: { id: true, title: true } }, classes: { orderBy: { startsAt: "asc" }, select: { id: true, title: true, startsAt: true, endsAt: true, status: true } } } },
-          classes: { orderBy: { startsAt: "asc" }, select: { id: true, title: true, moduleId: true, startsAt: true, endsAt: true, status: true } },
+          modules: { orderBy: { position: "asc" }, include: { lessons: { orderBy: { position: "asc" }, select: { id: true, title: true } }, classes: { orderBy: { startsAt: "asc" }, select: { id: true, title: true, startsAt: true, endsAt: true, status: true, recordingUrl: true } } } },
+          classes: { orderBy: { startsAt: "asc" }, select: { id: true, title: true, moduleId: true, startsAt: true, endsAt: true, status: true, recordingUrl: true } },
           materials: { orderBy: { createdAt: "desc" }, select: { id: true, title: true, fileName: true, sizeBytes: true } },
           exams: { orderBy: { order: "asc" }, select: { id: true, name: true, published: true, startAt: true, endAt: true } },
         },
@@ -28,6 +29,24 @@ export default async function MyCoursePage() {
     },
   });
   if (!student || student.status !== "active") redirect("/login");
+
+  // Fetch student progress metrics (attendances & passed exam attempts)
+  const attendances = await prisma.classAttendance.findMany({
+    where: { studentId: student.studentId },
+  });
+
+  const attempts = await prisma.examAttempt.findMany({
+    where: { studentId: student.id, passed: true },
+  });
+
+  const certificate = await prisma.courseCertificate.findUnique({
+    where: {
+      studentId_courseId: {
+        studentId: student.studentId,
+        courseId: student.course.id,
+      },
+    },
+  });
 
   const standaloneClasses = student.course.classes.filter((item) => !item.moduleId);
   const now = new Date();
@@ -38,6 +57,16 @@ export default async function MyCoursePage() {
   const liveClass = allClasses.find((item) => item.status === "LIVE");
   const nextClass = allClasses.filter((item) => item.status === "SCHEDULED" && item.startsAt && item.startsAt > now).sort((a, b) => a.startsAt!.valueOf() - b.startsAt!.valueOf())[0];
   const upcomingCount = allClasses.filter((item) => item.status === "SCHEDULED" && item.startsAt && item.startsAt > now).length;
+
+  const totalClassesCount = classCount || 1;
+  const totalExamsCount = student.course.exams.length || 1;
+  const attendedCount = attendances.length;
+  const passedExamsCount = attempts.length;
+
+  const progressPercent = Math.min(
+    100,
+    Math.round(((attendedCount / totalClassesCount) * 0.5 + (passedExamsCount / totalExamsCount) * 0.5) * 100) || 100
+  );
   return (
     <main style={shell}>
       <header style={header}>
@@ -49,11 +78,37 @@ export default async function MyCoursePage() {
         <h1 style={title}>Welcome back, {student.fullName.split(" ")[0]}</h1>
         <p style={intro}>Your registered course, learning content, upcoming classes, and assessment information in one place.</p>
         <div style={identity}><div><span style={label}>Student ID</span><strong>{student.studentId}</strong></div><div><span style={label}>Registered course</span><strong>{student.course.name}</strong></div></div>
-        <section style={progressCard}>
-          <div><p style={eyebrow}>Course progress</p><h2 style={{ margin: "0.2rem 0", color: "var(--burgundy-900)" }}>0% complete</h2><p style={muted}>Progress tracking begins when lesson and class completion is introduced in a later Learning Center phase.</p></div>
-          <div style={progressTrack}><span style={progressFill} /></div>
-          <p style={progressCaption}>{student.course.modules.length} modules · {lessonCount} lessons · {classCount} classes</p>
-        </section>
+        <StudentLearningDashboard
+          studentName={student.fullName}
+          studentId={student.studentId}
+          courseName={student.course.name}
+          progressPercent={progressPercent}
+          attendedCount={attendedCount}
+          totalClasses={totalClassesCount}
+          passedExamsCount={passedExamsCount}
+          totalExams={totalExamsCount}
+          allClasses={allClasses.map((c) => ({
+            id: c.id,
+            title: c.title,
+            startsAt: c.startsAt ? c.startsAt.toISOString() : null,
+            endsAt: c.endsAt ? c.endsAt.toISOString() : null,
+            status: c.status,
+            recordingUrl: c.recordingUrl,
+          }))}
+          materials={student.course.materials}
+          certificate={
+            certificate
+              ? {
+                  code: certificate.code,
+                  issuedAt: certificate.issuedAt.toISOString(),
+                  grade: certificate.grade,
+                  studentName: student.fullName,
+                  studentId: student.studentId,
+                  courseName: student.course.name,
+                }
+              : null
+          }
+        />
         <section style={dashboardGrid} aria-label="Learning overview">
           <OverviewCard label="Live now" title={liveClass?.title ?? "No live class"} text={liveClass ? "Your class is live now. Select Join live classroom below." : "There is no live class at the moment."} tone="live" />
           <OverviewCard label="Next class" title={nextClass?.title ?? "No class scheduled"} text={nextClass?.startsAt ? formatDate(nextClass.startsAt) : "Your instructor has not scheduled a class yet."} />

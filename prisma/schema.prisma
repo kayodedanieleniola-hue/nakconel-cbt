@@ -28,9 +28,6 @@ model Course {
   @@map("courses")
 }
 
-// Learning Center Phase 1: this extends the existing course and student
-// records; it deliberately does not introduce a second student account or
-// registration system.
 model LearningModule {
   id          String          @id @default(cuid())
   courseId    String
@@ -77,9 +74,13 @@ model LearningClass {
   endsAt      DateTime?
   status      String          @default("DRAFT") // DRAFT | SCHEDULED | LIVE | COMPLETED | CANCELLED
   activeMaterialId String?
+  recordingUrl     String?
+  recordingDuration Int?        @default(0)
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
   materials   LearningMaterial[]
+  polls       ClassPoll[]
+  attendance  ClassAttendance[]
 
   @@index([courseId])
   @@index([moduleId])
@@ -87,8 +88,6 @@ model LearningClass {
   @@map("learning_classes")
 }
 
-// Phase 5: educational resources are stored with their course ownership so
-// authorization can always be verified before a student downloads a file.
 model LearningMaterial {
   id          String          @id @default(cuid())
   courseId    String
@@ -110,9 +109,6 @@ model LearningMaterial {
   @@map("learning_materials")
 }
 
-// Phase 5 scope: the Question Bank. Kept intentionally simple (single
-// correct answer, per-course, no categories/tags yet) — the exam engine
-// (Phase 6) only needs a pool of active questions per course to draw from.
 model Question {
   id           String   @id @default(cuid())
   courseId     String
@@ -131,10 +127,6 @@ model Question {
   @@map("questions")
 }
 
-// Phase 2 scope: the exam's schedule/config and the status shown on the
-// student dashboard. Question bank, attempts, and scoring are later phases —
-// this model is deliberately built so those can attach to it without
-// reshaping what's here.
 model Exam {
   id             String    @id @default(cuid())
   courseId       String
@@ -177,14 +169,6 @@ model Student {
   updatedAt    DateTime @updatedAt
   attempts     ExamAttempt[]
 
-  // Phase 11 — identity verification. Captured from the student's first
-  // consented exam-camera session (an "approved live capture" per the
-  // spec), not at registration — nothing here until they actually sit an
-  // exam. Descriptor is a face-recognition embedding (128 floats, JSON
-  // encoded), used only to compare against future attempts; it is not a
-  // photo and cannot be reversed into one. Both fields are deletable by an
-  // admin at any time (see the student detail page) per the spec's
-  // retention/deletion requirement.
   verificationPhoto      String? // small base64 JPEG data URL
   verificationDescriptor String? // JSON-encoded Float32Array
   verificationCapturedAt DateTime?
@@ -193,8 +177,6 @@ model Student {
   @@map("students")
 }
 
-// Guarantees unique, gapless-per-year, race-safe Student ID generation.
-// One row per registration year; count is incremented inside a DB transaction.
 model StudentIdCounter {
   year  Int @id
   count Int @default(0)
@@ -214,8 +196,6 @@ model Admin {
   @@map("admins")
 }
 
-// Audit log — started in Phase 1 for auth events, extended in later phases
-// to cover exam activity per the platform spec.
 model AuditLog {
   id        String   @id @default(cuid())
   actorType String // student | admin | system
@@ -223,10 +203,7 @@ model AuditLog {
   action    String // e.g. "student.register", "student.login", "admin.login"
   detail    String?
   ip        String?
-  attemptId String? // set for exam-monitoring events, so an attempt's
-  // detail page can show exactly what was flagged during it — not stored
-  // as a relation (deliberately survives an attempt being reset/deleted,
-  // since the audit trail should outlive the row it describes)
+  attemptId String?
   createdAt DateTime @default(now())
 
   @@index([actorType, actorId])
@@ -248,17 +225,9 @@ model ExamAttempt {
   passed       Boolean?
   questions    AttemptQuestion[]
 
-  // Phase 10 — one active session per attempt. sessionId is a random value
-  // the browser tab generates and re-sends on every heartbeat; a second
-  // tab/device with a different sessionId is refused while the first one's
-  // heartbeat is still recent (see IDs and staleness window in the API).
   activeSessionId String?
   activeSessionAt DateTime?
 
-  // Phase 12 — admin intervention on a live attempt. pendingWarning is
-  // read-once: delivered on the next heartbeat, then cleared. endedBy and
-  // endReason record who/why when an admin terminates or force-submits,
-  // distinct from a normal student submission or a timeout.
   pendingWarning  String?
   endedBy         String? // "student" | "timeout" | "admin:<adminId>"
   endReason       String?
@@ -284,4 +253,58 @@ model AttemptQuestion {
   @@unique([attemptId, position])
   @@index([questionId])
   @@map("attempt_questions")
+}
+
+// Learning Center Phase 11 Models — Live Polls, Attendance & Certificates
+model ClassPoll {
+  id          String            @id @default(cuid())
+  classId     String
+  learningClass LearningClass   @relation(fields: [classId], references: [id], onDelete: Cascade)
+  question    String
+  options     String[]
+  active      Boolean           @default(true)
+  createdAt   DateTime          @default(now())
+  answers     ClassPollAnswer[]
+
+  @@index([classId])
+  @@map("class_polls")
+}
+
+model ClassPollAnswer {
+  id          String    @id @default(cuid())
+  pollId      String
+  poll        ClassPoll @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  studentId   String
+  optionIndex Int
+  createdAt   DateTime  @default(now())
+
+  @@unique([pollId, studentId])
+  @@index([pollId])
+  @@map("class_poll_answers")
+}
+
+model ClassAttendance {
+  id            String        @id @default(cuid())
+  classId       String
+  studentId     String
+  learningClass LearningClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+  joinedAt      DateTime      @default(now())
+
+  @@unique([classId, studentId])
+  @@index([classId])
+  @@index([studentId])
+  @@map("class_attendances")
+}
+
+model CourseCertificate {
+  id         String   @id @default(cuid())
+  studentId  String
+  courseId   String
+  code       String   @unique // e.g. CERT-NAK-2026-XXXX
+  issuedAt   DateTime @default(now())
+  grade      String   @default("EXCELLENCE")
+
+  @@unique([studentId, courseId])
+  @@index([studentId])
+  @@map("course_certificates")
 }
