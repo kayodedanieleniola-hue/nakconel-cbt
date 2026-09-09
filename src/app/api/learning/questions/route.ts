@@ -1,11 +1,11 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { getStudentSession, getAdminSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
 // GET /api/learning/questions?classId=...
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const classId = searchParams.get("classId");
 
@@ -27,7 +27,7 @@ export async function GET(request: Request) {
 }
 
 // POST /api/learning/questions (Student submits question or instructor marks answered)
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   const studentSession = await getStudentSession();
   const adminSession = await getAdminSession();
 

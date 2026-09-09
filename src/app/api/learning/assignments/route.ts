@@ -1,11 +1,11 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { getStudentSession, getAdminSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
 // GET /api/learning/assignments?courseId=...&classId=...
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const courseId = searchParams.get("courseId");
   const classId = searchParams.get("classId");
@@ -81,7 +81,7 @@ export async function GET(request: Request) {
 }
 
 // POST /api/learning/assignments (Admin/Instructor create assignment)
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   const adminSession = await getAdminSession();
   if (!adminSession) {
     return NextResponse.json({ error: "Administrator authorization required" }, { status: 403 });

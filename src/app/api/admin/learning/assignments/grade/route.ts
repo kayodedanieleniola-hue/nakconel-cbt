@@ -1,10 +1,10 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { getAdminSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
-export async function PATCH(request: Request) {
+export async function PATCH(request: NextRequest) {
   const adminSession = await getAdminSession();
   if (!adminSession) {
     return NextResponse.json({ error: "Administrator login required" }, { status: 403 });
