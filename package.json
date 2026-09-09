@@ -12,7 +12,6 @@
   },
   "dependencies": {
     "@next/swc-wasm-nodejs": "16.3.4",
-    "@next/swc-win32-x64-msvc": "^16.3.4",
     "@prisma/client": "^5.20.0",
     "@vladmandic/face-api": "^1.7.15",
     "bcryptjs": "^2.4.3",
@@ -25,6 +24,9 @@
     "react-dom": "^19.2.8",
     "write-excel-file": "^4.1.1",
     "zod": "^3.23.8"
+  },
+  "optionalDependencies": {
+    "@next/swc-win32-x64-msvc": "16.3.4"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
