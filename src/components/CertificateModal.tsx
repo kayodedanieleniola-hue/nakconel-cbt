@@ -24,13 +24,13 @@ export default function CertificateModal({
     <div style={overlay}>
       <div style={container}>
         <div style={headerActions} className="no-print">
-          <span style={verifyTag}>✓ VERIFIED NAKCONEL ACADEMIC CERTIFICATE</span>
+          <span style={verifyTag}>VERIFIED NAKCONEL ACADEMIC CERTIFICATE</span>
           <div style={btnGroup}>
             <button type="button" onClick={handlePrint} style={printBtn}>
-              🖨 Print / Save PDF
+              Print / Save PDF
             </button>
             <button type="button" onClick={onClose} style={closeBtn}>
-              ✕ Close
+              Close
             </button>
           </div>
         </div>
@@ -41,7 +41,7 @@ export default function CertificateModal({
             <div style={innerBorder}>
               {/* Top Watermark Header */}
               <div style={topHeader}>
-                <div style={logoBadge}>🏆 NAKCONEL LEARNING PORTAL</div>
+                <div style={logoBadge}>NAKCONEL LEARNING PORTAL</div>
                 <span style={certIdCode}>CERTIFICATE ID: {data.code}</span>
               </div>
 
@@ -77,8 +77,8 @@ export default function CertificateModal({
 
                 <div style={goldSeal}>
                   <div style={sealInner}>
-                    <span style={{ fontSize: "1.4rem" }}>🏅</span>
-                    <span style={sealText}>OFFICIAL SEAL</span>
+                    <span style={{ fontSize: "1rem", fontWeight: 700, letterSpacing: "0.1em" }}>SEAL</span>
+                    <span style={sealText}>OFFICIAL CERTIFIED</span>
                   </div>
                 </div>
 

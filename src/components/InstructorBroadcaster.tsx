@@ -298,11 +298,11 @@ export default function InstructorBroadcaster({
       <div style={modalCard}>
         <div style={modalHeader}>
           <div>
-            <span style={liveTag}>INSTRUCTOR LIVE STUDIO (PHASE 8: ADAPTIVE 4K & LIVE MONITOR)</span>
+            <span style={liveTag}>INSTRUCTOR LIVE STUDIO (ADAPTIVE 4K & LIVE MONITOR)</span>
             <h3 style={modalTitle}>{classTitle}</h3>
           </div>
           <button type="button" onClick={onClose} style={closeBtn}>
-            ✕ Close
+            Close
           </button>
         </div>
 
@@ -311,7 +311,6 @@ export default function InstructorBroadcaster({
         {/* Hand Raise Live Notifications */}
         {Object.keys(raisedHands).length > 0 && (
           <div style={handRaiseBanner}>
-            <span style={{ fontSize: "1.2rem" }}>✋</span>
             <div style={{ flex: 1 }}>
               <strong style={{ color: "#ffd98a", fontSize: "0.85rem" }}>
                 Question / Hand Raised ({Object.keys(raisedHands).length})
@@ -327,7 +326,7 @@ export default function InstructorBroadcaster({
                 onClick={() => toggleVideoPermission(identity)}
                 style={grantHandBtn}
               >
-                📹 Grant Video & Speaking
+                Grant Video & Speaking
               </button>
             ))}
           </div>
@@ -338,7 +337,6 @@ export default function InstructorBroadcaster({
 
           {!cameraOn && (
             <div style={cameraOffOverlay}>
-              <span style={{ fontSize: "2rem" }}>📷</span>
               <p style={{ margin: "0.4rem 0 0", fontSize: "0.85rem", color: "#a38b80" }}>
                 Camera is turned OFF
               </p>
@@ -356,7 +354,7 @@ export default function InstructorBroadcaster({
 
         {errorMsg && <p style={errorNotice}>{errorMsg}</p>}
 
-        {/* Live Student Monitor Grid (like CBT Exam Live Monitor) */}
+        {/* Live Student Monitor Grid */}
         {Object.keys(studentFrames).length > 0 && (
           <div style={studentGridSection}>
             <label style={qualityLabel}>Live Student Video Grid ({Object.keys(studentFrames).length} Active):</label>
@@ -364,7 +362,7 @@ export default function InstructorBroadcaster({
               {Object.entries(studentFrames).map(([id, frame]) => (
                 <div key={id} style={studentCard}>
                   <img src={frame} alt="Student Feed" style={studentVideoFrame} />
-                  <span style={studentCardBadge}>🎓 {id.replace("student-", "")}</span>
+                  <span style={studentCardBadge}>{id.replace("student-", "")}</span>
                 </div>
               ))}
             </div>
@@ -379,14 +377,14 @@ export default function InstructorBroadcaster({
             onChange={(e) => setQuality(e.target.value as "4k" | "1080p" | "720p" | "480p")}
             style={qualitySelect}
           >
-            <option value="4k">✨ 4K Ultra HD (3840 × 2160 @ 30fps) - Max Clarity</option>
-            <option value="1080p">📺 1080p Full HD (1920 × 1080 @ 30fps)</option>
-            <option value="720p">⚡ 720p HD (1280 × 720 @ 30fps) - Balanced</option>
-            <option value="480p">📶 480p SD (854 × 480 @ 30fps) - Low Bandwidth</option>
+            <option value="4k">4K Ultra HD (3840 × 2160 @ 30fps) - Max Clarity</option>
+            <option value="1080p">1080p Full HD (1920 × 1080 @ 30fps)</option>
+            <option value="720p">720p HD (1280 × 720 @ 30fps) - Balanced</option>
+            <option value="480p">480p SD (854 × 480 @ 30fps) - Low Bandwidth</option>
           </select>
         </div>
 
-        {/* Phase 9: Student Video Permissions Manager */}
+        {/* Student Video Permissions Manager */}
         <div style={permSection}>
           <label style={qualityLabel}>Connected Students & Video Permissions ({remoteParticipants.length}):</label>
           {remoteParticipants.length === 0 ? (
@@ -398,7 +396,6 @@ export default function InstructorBroadcaster({
                 return (
                   <div key={p.identity} style={permRow}>
                     <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                      <span>🎓</span>
                       <strong style={{ fontSize: "0.85rem", color: "#fff" }}>{p.name}</strong>
                     </div>
                     <button
@@ -406,7 +403,7 @@ export default function InstructorBroadcaster({
                       onClick={() => toggleVideoPermission(p.identity)}
                       style={{ ...permBtn, ...(isPermitted ? permRevokeBtn : permGrantBtn) }}
                     >
-                      {isPermitted ? "🚫 Revoke Video Permission" : "📹 Grant Video Permission"}
+                      {isPermitted ? "Revoke Video Permission" : "Grant Video Permission"}
                     </button>
                   </div>
                 );
@@ -415,7 +412,7 @@ export default function InstructorBroadcaster({
           )}
         </div>
 
-        {/* Phase 10: Live Classroom Chat & Moderated Q&A */}
+        {/* Live Classroom Chat & Moderated Q&A */}
         <div style={chatSection}>
           <label style={qualityLabel}>Live Studio Chat & Moderated Q&A:</label>
           <ClassroomChat
@@ -433,7 +430,7 @@ export default function InstructorBroadcaster({
             onClick={toggleCamera}
             style={{ ...ctrlBtn, ...(cameraOn ? activeCtrlBtn : mutedCtrlBtn) }}
           >
-            {cameraOn ? "📷 Camera ON" : "📷 Camera OFF"}
+            {cameraOn ? "Camera ON" : "Camera OFF"}
           </button>
 
           <button
@@ -441,7 +438,7 @@ export default function InstructorBroadcaster({
             onClick={toggleMic}
             style={{ ...ctrlBtn, ...(micOn ? activeCtrlBtn : mutedCtrlBtn) }}
           >
-            {micOn ? "🎙️ Microphone ON" : "🎙️ Microphone Muted"}
+            {micOn ? "Microphone ON" : "Microphone Muted"}
           </button>
 
           <button
@@ -449,7 +446,7 @@ export default function InstructorBroadcaster({
             onClick={() => setShowPollModal(true)}
             style={{ ...ctrlBtn, background: "#98661B", color: "#fff" }}
           >
-            📊 Launch Live Poll
+            Launch Live Poll
           </button>
 
           <button
@@ -474,7 +471,7 @@ export default function InstructorBroadcaster({
             }}
             style={endBtn}
           >
-            ⏹️ End Broadcast
+            End Broadcast
           </button>
         </div>
 
@@ -482,7 +479,7 @@ export default function InstructorBroadcaster({
         {showPollModal && (
           <div style={pollOverlay}>
             <div style={pollCard}>
-              <h4 style={{ margin: "0 0 0.5rem", color: "#ffd98a", fontSize: "1.1rem" }}>📊 Launch In-Class Live Poll</h4>
+              <h4 style={{ margin: "0 0 0.5rem", color: "#ffd98a", fontSize: "1.1rem" }}>Launch In-Class Live Poll</h4>
               <p style={{ margin: "0 0 0.8rem", fontSize: "0.8rem", color: "#b08585" }}>
                 Ask enrolled students a question in real-time during your live lecture.
               </p>
@@ -536,7 +533,7 @@ export default function InstructorBroadcaster({
                   }}
                   style={pollSubmitBtn}
                 >
-                  🚀 Broadcast Poll Live
+                  Broadcast Poll Live
                 </button>
               </div>
             </div>

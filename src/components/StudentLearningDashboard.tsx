@@ -78,7 +78,7 @@ export default function StudentLearningDashboard({
             onClick={() => setShowCertModal(true)}
             style={certBtn}
           >
-            🎓 View / Download Certificate
+            View / Download Certificate
           </button>
         </div>
 
@@ -99,7 +99,7 @@ export default function StudentLearningDashboard({
             .filter((c) => c.status === "COMPLETED" || c.recordingUrl)
             .map((item) => (
               <article key={item.id} style={replayCard}>
-                <span style={replayBadge}>📼 CLASS REPLAY</span>
+                <span style={replayBadge}>CLASS REPLAY</span>
                 <h3 style={replayTitle}>{item.title}</h3>
                 <p style={muted}>Class session ended · Recorded broadcast replay available</p>
                 <button
@@ -107,7 +107,7 @@ export default function StudentLearningDashboard({
                   onClick={() => setSelectedReplay(item)}
                   style={watchReplayBtn}
                 >
-                  ▶ Watch Class Replay
+                  Watch Class Replay
                 </button>
               </article>
             ))}

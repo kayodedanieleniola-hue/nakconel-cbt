@@ -195,10 +195,10 @@ export default function LearningManagementPage() {
 
       {courses.length === 0 ? (
         <div style={emptyCard}>
-          <strong style={{ color: "#5c1d1d" }}>⚠️ No Active Courses Found</strong>
+          <strong style={{ color: "#5c1d1d" }}>No Active Courses Found</strong>
           <p style={{ margin: "0.4rem 0" }}>You must create at least one course before adding modules and classes.</p>
           <Link href="/admin/courses" style={button}>
-            Go to Course Management →
+            Go to Course Management
           </Link>
         </div>
       ) : (
@@ -585,7 +585,7 @@ function ClassCard({
                 onBroadcast({ id: item.id, title: item.title });
               }}
             >
-              {item.status === "LIVE" ? "📹 Studio (LIVE)" : "📹 Start Broadcast"}
+              {item.status === "LIVE" ? "Studio (LIVE)" : "Start Broadcast"}
             </button>
             <button style={outline} onClick={() => setEditing(true)}>
               Edit

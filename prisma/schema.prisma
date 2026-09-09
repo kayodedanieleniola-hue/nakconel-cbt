@@ -24,6 +24,7 @@ model Course {
   modules   LearningModule[]
   classes   LearningClass[]
   materials LearningMaterial[]
+  assignments Assignment[]
 
   @@map("courses")
 }
@@ -40,6 +41,7 @@ model LearningModule {
   lessons     Lesson[]
   classes     LearningClass[]
   materials   LearningMaterial[]
+  assignments Assignment[]
 
   @@unique([courseId, position])
   @@index([courseId])
@@ -81,6 +83,8 @@ model LearningClass {
   materials   LearningMaterial[]
   polls       ClassPoll[]
   attendance  ClassAttendance[]
+  assignments Assignment[]
+  questions   ClassQuestion[]
 
   @@index([courseId])
   @@index([moduleId])
@@ -168,6 +172,7 @@ model Student {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   attempts     ExamAttempt[]
+  assignmentSubmissions AssignmentSubmission[]
 
   verificationPhoto      String? // small base64 JPEG data URL
   verificationDescriptor String? // JSON-encoded Float32Array
@@ -308,3 +313,65 @@ model CourseCertificate {
   @@index([studentId])
   @@map("course_certificates")
 }
+
+model Assignment {
+  id           String   @id @default(cuid())
+  title        String
+  description  String?
+  instructions String?
+  courseId     String
+  moduleId     String?
+  classId      String?
+  dueDate      DateTime?
+  maxScore     Int      @default(100)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  course        Course          @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  module        LearningModule? @relation(fields: [moduleId], references: [id], onDelete: SetNull)
+  learningClass LearningClass?  @relation(fields: [classId], references: [id], onDelete: SetNull)
+  submissions   AssignmentSubmission[]
+
+  @@index([courseId])
+  @@index([classId])
+  @@map("assignments")
+}
+
+model AssignmentSubmission {
+  id             String     @id @default(cuid())
+  assignmentId   String
+  studentId      String
+  fileName       String?
+  mimeType       String?
+  sizeBytes      Int?
+  fileData       Bytes?
+  textSubmission String?
+  submittedAt    DateTime   @default(now())
+  score          Int?
+  feedback       String?
+  status         String     @default("SUBMITTED") // SUBMITTED | GRADED
+
+  assignment Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  student    Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([assignmentId, studentId])
+  @@index([studentId])
+  @@map("assignment_submissions")
+}
+
+model ClassQuestion {
+  id          String        @id @default(cuid())
+  classId     String
+  studentId   String
+  studentName String
+  question    String
+  answer      String?
+  answered    Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+
+  learningClass LearningClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  @@index([classId])
+  @@map("class_questions")
+}
+

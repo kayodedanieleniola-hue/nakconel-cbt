@@ -50,12 +50,12 @@ export default function ClassroomReplayPlayer({
       <div style={modalCard}>
         <div style={modalHeader}>
           <div>
-            <span style={archiveTag}>📼 ARCHIVED REPLAY SESSION</span>
+            <span style={archiveTag}>ARCHIVED REPLAY SESSION</span>
             <h3 style={modalTitle}>{classTitle}</h3>
             {instructorName && <p style={instructorSub}>Instructor: {instructorName}</p>}
           </div>
           <button type="button" onClick={onClose} style={closeBtn}>
-            ✕ Close Replay
+            Close Replay
           </button>
         </div>
 
@@ -74,7 +74,7 @@ export default function ClassroomReplayPlayer({
 
             <div style={controlsRow}>
               <button type="button" onClick={togglePlay} style={playBtn}>
-                {isPlaying ? "⏸ Pause" : "▶ Play"}
+                {isPlaying ? "Pause" : "Play"}
               </button>
 
               <div style={speedSelector}>
@@ -99,7 +99,7 @@ export default function ClassroomReplayPlayer({
 
           {/* Materials Sidebar */}
           <div style={materialsSidebar}>
-            <h4 style={materialsHeader}>📁 Class Materials ({materials.length})</h4>
+            <h4 style={materialsHeader}>Class Materials ({materials.length})</h4>
             {materials.length === 0 ? (
               <p style={emptyMaterials}>No files attached to this class session.</p>
             ) : (
@@ -115,7 +115,7 @@ export default function ClassroomReplayPlayer({
                       <strong style={materialTitle}>{item.title}</strong>
                       <span style={materialMeta}>{item.fileName} ({Math.ceil(item.sizeBytes / 1024)} KB)</span>
                     </div>
-                    <span style={downloadIcon}>⬇ Download</span>
+                    <span style={downloadIcon}>Download</span>
                   </a>
                 ))}
               </div>

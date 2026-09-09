@@ -219,7 +219,7 @@ export default function ClassroomVideoFeed({
 
         {!isStreamActive && (
           <div style={fallbackPlaceholder}>
-            <div style={avatarIcon}>👨‍🏫</div>
+            <div style={avatarIcon}>INSTRUCTOR</div>
             <p style={placeholderText}>Instructor stream offline</p>
             <span style={placeholderSub}>Waiting for live broadcast to start</span>
           </div>
@@ -239,7 +239,7 @@ export default function ClassroomVideoFeed({
             }}
             style={tapBtn}
           >
-            🔊 Tap to Enable Audio & Video
+            Tap to Enable Audio & Video
           </button>
         )}
       </div>
@@ -253,7 +253,7 @@ export default function ClassroomVideoFeed({
 
         {hasLiveVideo && (
           <button type="button" onClick={toggleMute} style={muteBtn}>
-            {isMuted ? "🔇 Unmute Audio" : "🔊 Mute Audio"}
+            {isMuted ? "Unmute Audio" : "Mute Audio"}
           </button>
         )}
       </div>

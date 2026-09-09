@@ -93,11 +93,11 @@ export default function ClassroomPollOverlay({
     <div style={cardContainer}>
       <div style={cardHeader}>
         <div>
-          <span style={liveBadge}>📊 LIVE IN-CLASS POLL</span>
+          <span style={liveBadge}>LIVE IN-CLASS POLL</span>
           <h4 style={questionTitle}>{poll.question}</h4>
         </div>
         <button type="button" onClick={() => setIsDismissed(true)} style={dismissBtn}>
-          ✕
+          Close
         </button>
       </div>
 
@@ -139,7 +139,7 @@ export default function ClassroomPollOverlay({
 
       <div style={cardFooter}>
         <span style={voteCountText}>{total} total vote{total === 1 ? "" : "s"}</span>
-        {selectedOption !== null && <span style={votedTag}>✓ Vote Submitted</span>}
+        {selectedOption !== null && <span style={votedTag}>Vote Submitted</span>}
       </div>
     </div>
   );

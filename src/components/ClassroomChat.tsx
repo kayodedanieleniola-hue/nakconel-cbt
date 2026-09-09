@@ -212,14 +212,14 @@ export default function ClassroomChat({
           onClick={() => setActiveTab("chat")}
           style={{ ...tabBtn, ...(activeTab === "chat" ? activeTabBtn : {}) }}
         >
-          💬 Chat ({messages.length})
+          Chat ({messages.length})
         </button>
         <button
           type="button"
           onClick={() => setActiveTab("qa")}
           style={{ ...tabBtn, ...(activeTab === "qa" ? activeTabBtn : {}) }}
         >
-          ❓ Q&A ({questions.filter((q) => !q.isAnswered).length})
+          Q&A ({questions.filter((q) => !q.isAnswered).length})
         </button>
       </div>
 
@@ -227,14 +227,14 @@ export default function ClassroomChat({
       {pinnedAnnouncement && (
         <div style={pinnedBanner}>
           <div style={pinnedHeader}>
-            <span style={pinnedTag}>📌 INSTRUCTOR ANNOUNCEMENT</span>
+            <span style={pinnedTag}>INSTRUCTOR ANNOUNCEMENT</span>
             {isInstructor && (
               <button
                 type="button"
                 onClick={() => broadcastSignal({ type: "PIN_ANNOUNCEMENT", text: null })}
                 style={clearPinBtn}
               >
-                ✕ Clear
+                Clear
               </button>
             )}
           </div>
@@ -250,7 +250,7 @@ export default function ClassroomChat({
             onClick={() => setShowPinInput(!showPinInput)}
             style={pinToggleBtn}
           >
-            {showPinInput ? "✕ Cancel Pin" : "📌 Pin New Announcement"}
+            {showPinInput ? "Cancel Pin" : "Pin New Announcement"}
           </button>
 
           {showPinInput && (
@@ -296,7 +296,7 @@ export default function ClassroomChat({
                       style={deleteMsgBtn}
                       title="Delete message"
                     >
-                      🗑️
+                      Delete
                     </button>
                   )}
                 </div>
@@ -337,7 +337,7 @@ export default function ClassroomChat({
                     <div style={qaHeader}>
                       <div>
                         <strong style={qaAuthor}>{q.authorName}</strong>
-                        {q.isAnswered && <span style={answeredBadge}>✓ ANSWERED LIVE</span>}
+                        {q.isAnswered && <span style={answeredBadge}>ANSWERED LIVE</span>}
                       </div>
                       <button
                         type="button"
@@ -345,7 +345,7 @@ export default function ClassroomChat({
                         disabled={q.upvotedBy.includes(userId)}
                         style={{ ...upvoteBtn, ...(q.upvotedBy.includes(userId) ? activeUpvoteBtn : {}) }}
                       >
-                        👍 {q.upvotes}
+                        Upvotes: {q.upvotes}
                       </button>
                     </div>
 
@@ -357,7 +357,7 @@ export default function ClassroomChat({
                         onClick={() => handleMarkAnswered(q.id)}
                         style={markAnsweredBtn}
                       >
-                        ✓ Mark Answered Live
+                        Mark Answered Live
                       </button>
                     )}
                   </div>

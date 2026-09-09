@@ -118,7 +118,7 @@ export default function ResultDetailPage({ params }: { params: Promise<{ id: str
                           fontWeight: isCorrect || isSelected ? 700 : 400,
                         }}
                       >
-                        {option} {isCorrect && "✓ correct"} {isSelected && !isCorrect && "✗ selected"}
+                        {option} {isCorrect && "(correct)"} {isSelected && !isCorrect && "(selected)"}
                       </span>
                     );
                   })}

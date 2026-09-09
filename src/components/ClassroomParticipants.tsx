@@ -187,14 +187,14 @@ export default function ClassroomParticipants({
           onClick={handleToggleRaiseHand}
           style={{ ...raiseHandBtn, ...(hasRaisedHand ? activeRaiseBtn : {}) }}
         >
-          {hasRaisedHand ? "✋ Hand Raised" : "✋ Raise Hand"}
+          {hasRaisedHand ? "Hand Raised" : "Raise Hand"}
         </button>
       </div>
 
       {/* Camera & Microphone controls for students */}
       <div style={permissionCard}>
         <div>
-          <strong style={permTitle}>{canPublishVideo ? "✨ Video Permission Granted" : "📹 Interactive 2-Way Call"}</strong>
+          <strong style={permTitle}>{canPublishVideo ? "Video Permission Granted" : "Interactive 2-Way Call"}</strong>
           <p style={permSub}>
             {isCameraActive
               ? "Your camera and microphone are broadcasting live to instructor."
@@ -206,7 +206,7 @@ export default function ClassroomParticipants({
           onClick={handleStartCamera}
           style={{ ...camBtn, ...(isCameraActive ? stopCamBtn : startCamBtn) }}
         >
-          {isCameraActive ? "📷 Stop My Camera" : "📹 Share My Camera & Mic"}
+          {isCameraActive ? "Stop My Camera" : "Share My Camera & Mic"}
         </button>
       </div>
 
@@ -223,7 +223,7 @@ export default function ClassroomParticipants({
         {participants.map((p) => (
           <div key={p.identity} style={participantRow}>
             <div style={infoGroup}>
-              <span style={avatarBadge}>{p.isInstructor ? "👨‍🏫" : "🎓"}</span>
+              <span style={avatarBadge}>{p.isInstructor ? "INS" : "STU"}</span>
               <div>
                 <strong style={pName}>
                   {p.name} {p.isLocal ? "(You)" : ""}
@@ -233,7 +233,7 @@ export default function ClassroomParticipants({
                     {p.isInstructor ? "Instructor" : "Student"}
                   </span>
                   <span style={statusText}>
-                    {p.hasVideo ? "📹 Video On" : "📷 Camera Off"}
+                    {p.hasVideo ? "Video On" : "Camera Off"}
                   </span>
                 </div>
               </div>

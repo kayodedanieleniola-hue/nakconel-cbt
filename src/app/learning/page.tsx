@@ -48,6 +48,16 @@ export default async function MyCoursePage() {
     },
   });
 
+  const assignments = await prisma.assignment.findMany({
+    where: { courseId: student.course.id },
+    include: {
+      submissions: {
+        where: { studentId: student.id },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
   const standaloneClasses = student.course.classes.filter((item) => !item.moduleId);
   const now = new Date();
   const nextExam = student.course.exams.find((exam) => ["ONGOING", "UPCOMING"].includes(getExamStatus(exam, now)));
@@ -114,7 +124,11 @@ export default async function MyCoursePage() {
           <OverviewCard label="Next class" title={nextClass?.title ?? "No class scheduled"} text={nextClass?.startsAt ? formatDate(nextClass.startsAt) : "Your instructor has not scheduled a class yet."} />
           <OverviewCard label="Upcoming classes" title={upcomingCount ? `${upcomingCount} upcoming class${upcomingCount === 1 ? "" : "es"}` : "Nothing upcoming"} text="Only classes for your registered course are shown." />
           <OverviewCard label="Recent materials" title={student.course.materials[0]?.title ?? "No materials yet"} text={student.course.materials.length ? `${student.course.materials.length} course material${student.course.materials.length === 1 ? "" : "s"} available.` : "Your instructor has not uploaded materials yet."} />
-          <OverviewCard label="Pending assignments" title="No assignments yet" text="Assignments will be introduced in Phase 15." />
+          <OverviewCard
+            label="Assignments"
+            title={assignments.length ? `${assignments.length} course assignment${assignments.length === 1 ? "" : "s"}` : "No assignments yet"}
+            text={assignments.filter((a) => a.submissions.length === 0).length ? `${assignments.filter((a) => a.submissions.length === 0).length} pending submission(s).` : "All assignments submitted."}
+          />
           <OverviewCard label="Next test / exam" title={nextExam?.name ?? "No upcoming exam"} text={nextExam?.startAt ? `Available ${new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(nextExam.startAt)}` : "Your scheduled assessment will appear here."} tone="exam" />
         </section>
         <h2 style={heading}>Course modules</h2>
