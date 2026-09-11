@@ -209,11 +209,15 @@ export default function ClassroomClient({
             {/* Instructor PiP — floats over the stage, top-right corner */}
             <div style={pipWrap}>
               <span style={pipLabel}>Instructor</span>
+              {/* We clip ClassroomVideoFeed to only show the instructor video.
+                  overflow:hidden + aspectRatio height cuts off status bar,
+                  self-preview and mic meter that render below the video. */}
               <div style={pipFeed}>
                 <ClassroomVideoFeed
                   classId={learningClass.id}
                   onRoomReady={setActiveRoom}
                   onPresentationState={handlePresentationState}
+                  pipMode
                 />
               </div>
               <ClassroomPollOverlay classId={learningClass.id} />
@@ -458,20 +462,26 @@ const pipWrap: React.CSSProperties = {
   width: "clamp(100px, 28vw, 180px)",
   display: "flex",
   flexDirection: "column",
-  gap: "0.3rem",
+  gap: "0",
   zIndex: 10,
+  borderRadius: 6,
+  overflow: "hidden",
+  boxShadow: "0 2px 12px rgba(0,0,0,0.6)",
+  border: "1.5px solid #98661B",
 };
 const pipLabel: React.CSSProperties = {
-  background: "rgba(51,8,8,0.85)",
-  color: "#98661B",
-  fontSize: "0.6rem", fontWeight: 700, letterSpacing: "0.05em",
-  padding: "0.15rem 0.35rem", borderRadius: "3px 3px 0 0",
+  background: "rgba(51,8,8,0.92)",
+  color: "#ffd98a",
+  fontSize: "0.58rem", fontWeight: 700, letterSpacing: "0.05em",
+  padding: "0.15rem 0.4rem",
   textAlign: "center",
+  borderBottom: "1px solid #98661B",
 };
 const pipFeed: React.CSSProperties = {
+  // In pipMode ClassroomVideoFeed renders: container > videoStage (16/9) > audio (hidden)
+  // The container has no gap in pipMode so this just sizes to the video.
   background: "#100707",
-  border: "1px solid #98661B",
-  borderRadius: "0 0 4px 4px",
+  aspectRatio: "16/9",
   overflow: "hidden",
 };
 

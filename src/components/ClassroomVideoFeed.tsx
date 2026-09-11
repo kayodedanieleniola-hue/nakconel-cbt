@@ -103,10 +103,13 @@ export default function ClassroomVideoFeed({
   classId,
   onRoomReady,
   onPresentationState,
+  pipMode = false,
 }: {
   classId: string;
   onRoomReady?: (room: Room) => void;
   onPresentationState?: (state: PresentationState) => void;
+  /** pip mode: render only the instructor video, no self-preview or controls */
+  pipMode?: boolean;
 }) {
   const roomRef          = useRef<Room | null>(null);
   const activeRef        = useRef(true);
@@ -352,7 +355,7 @@ export default function ClassroomVideoFeed({
   };
 
   return (
-    <div style={container}>
+    <div style={{ ...container, gap: pipMode ? 0 : "0.5rem" }}>
       {/* Instructor feed */}
       <div style={videoStage}>
         <video
@@ -391,8 +394,23 @@ export default function ClassroomVideoFeed({
         style={{ position: "absolute", width: 0, height: 0, opacity: 0, pointerEvents: "none" }}
       />
 
-      {/* Status + mute */}
-      <div style={statusRow}>
+      {/* In pip mode: render ONLY the video + audio above — nothing else */}
+      {pipMode && needsTap && (
+        <button
+          type="button"
+          onClick={() => {
+            void instructorAudRef.current?.play().then(() => setNeedsTap(false)).catch(() => {});
+            void instructorVidRef.current?.play().catch(() => {});
+          }}
+          style={{ ...tapBtn, fontSize: "0.72rem" }}
+        >
+          Tap for audio
+        </button>
+      )}
+      {pipMode ? null : (
+        <>
+          {/* Status + mute */}
+          <div style={statusRow}>
         <span style={{ ...statusBadge, ...(isStreamActive ? liveBadgeStyle : offlineBadge) }}>
           {status}
         </span>
@@ -443,6 +461,8 @@ export default function ClassroomVideoFeed({
 
       {cameraError && (
         <p style={camErrNote}>{cameraError}</p>
+      )}
+        </>
       )}
     </div>
   );

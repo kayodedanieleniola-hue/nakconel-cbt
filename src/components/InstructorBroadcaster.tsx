@@ -296,6 +296,37 @@ export default function InstructorBroadcaster({
           if (!t) return prev;
           return { ...prev, [identity]: { ...t, hasAudio: true } };
         });
+      } else {
+        // Audio element not in DOM yet — retry after paint (same as video)
+        console.warn(`[Instructor] audio ref not ready for ${identity} — will retry`);
+        requestAnimationFrame(() => {
+          const el2 = tileAudioRefs.current.get(identity);
+          if (el2) {
+            track.attach(el2);
+            void el2.play().catch(() => {});
+            console.log(`[Instructor] audio track attached (retry) for ${identity}`);
+            setStudentTiles((prev) => {
+              const t = prev[identity];
+              if (!t) return prev;
+              return { ...prev, [identity]: { ...t, hasAudio: true } };
+            });
+          } else {
+            // Final fallback: wait 300ms for React to commit the DOM
+            setTimeout(() => {
+              const el3 = tileAudioRefs.current.get(identity);
+              if (el3) {
+                track.attach(el3);
+                void el3.play().catch(() => {});
+                console.log(`[Instructor] audio track attached (timeout) for ${identity}`);
+                setStudentTiles((prev) => {
+                  const t = prev[identity];
+                  if (!t) return prev;
+                  return { ...prev, [identity]: { ...t, hasAudio: true } };
+                });
+              }
+            }, 300);
+          }
+        });
       }
     }
   }, []);
