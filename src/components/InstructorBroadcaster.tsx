@@ -137,17 +137,32 @@ function StudentVideoTile({
   tile,
   onVideoRef,
   onAudioRef,
+  rootVideoRefs,
 }: {
   tile: StudentTile;
   onVideoRef: (el: HTMLVideoElement | null) => void;
   onAudioRef: (el: HTMLAudioElement | null) => void;
+  rootVideoRefs: React.MutableRefObject<Map<string, HTMLVideoElement>>;
 }) {
+  // When the tile video element mounts and the root already has a stream,
+  // mirror it so the visual tile shows the live video immediately.
+  const tileVideoCallbackRef = (el: HTMLVideoElement | null) => {
+    onVideoRef(el);
+    if (el) {
+      const rootEl = rootVideoRefs.current.get(tile.identity);
+      if (rootEl && rootEl.srcObject) {
+        el.srcObject = rootEl.srcObject;
+        void el.play().catch(() => {});
+      }
+    }
+  };
+
   return (
     <div style={tileCard}>
       <div style={tileVideoWrap}>
         {/* Video element is ALWAYS in the DOM; hidden via CSS when no track */}
         <video
-          ref={onVideoRef}
+          ref={tileVideoCallbackRef}
           autoPlay
           playsInline
           muted
@@ -207,12 +222,14 @@ export default function InstructorBroadcaster({
   const tileVideoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
   const tileAudioRefs = useRef<Map<string, HTMLAudioElement>>(new Map());
 
-  // ALWAYS-ON audio elements rendered at the root (outside the tab system).
-  // Student tiles are only mounted when the "students" tab is active, so
-  // any <audio> inside a tile is unmounted when viewing other tabs — meaning
-  // audio track attachment fails. These root-level elements are ALWAYS in
-  // the DOM so the instructor hears students regardless of which tab is open.
+  // ALWAYS-ON audio and video elements at the root (outside the tab system).
+  // Student tiles only mount when "students" tab is active. If the instructor
+  // is on Presentation or Chat tab, the tile <video>/<audio> elements don't
+  // exist in the DOM — track attachment silently fails.
+  // These root-level elements are ALWAYS mounted so tracks attach regardless
+  // of which tab the instructor is viewing.
   const rootAudioRefs = useRef<Map<string, HTMLAudioElement>>(new Map());
+  const rootVideoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
 
   // Callback ref for instructor self-preview — same pattern as student side.
   // Attaches the captured video track the instant the <video> element mounts.
@@ -266,44 +283,34 @@ export default function InstructorBroadcaster({
   // ── Attach / detach a track to a tile element imperatively ────────────────
   const attachTrack = useCallback((track: RemoteTrack, identity: string) => {
     if (track.kind === Track.Kind.Video) {
-      const el = tileVideoRefs.current.get(identity);
-      if (el) {
+      // Always attach to the root video element (always in DOM).
+      // Also attach to the tile element if it's currently mounted.
+      const attachTo = (el: HTMLVideoElement) => {
         track.attach(el);
         void el.play().catch(() => {});
-        console.log(`[Instructor] video track attached to tile for ${identity}`);
+        console.log(`[Instructor] video attached for ${identity}`);
         setStudentTiles((prev) => {
           const t = prev[identity];
           if (!t) return prev;
           return { ...prev, [identity]: { ...t, hasVideo: true } };
         });
+      };
+
+      const rootEl = rootVideoRefs.current.get(identity);
+      if (rootEl) {
+        attachTo(rootEl);
+        // Also mirror to tile if visible
+        const tileEl = tileVideoRefs.current.get(identity);
+        if (tileEl && tileEl !== rootEl) { track.attach(tileEl); void tileEl.play().catch(() => {}); }
       } else {
-        console.warn(`[Instructor] video ref not ready for ${identity} — will retry`);
+        // Root element not yet mounted — retry
         requestAnimationFrame(() => {
-          const el2 = tileVideoRefs.current.get(identity);
-          if (el2) {
-            track.attach(el2);
-            void el2.play().catch(() => {});
-            setStudentTiles((prev) => {
-              const t = prev[identity];
-              if (!t) return prev;
-              return { ...prev, [identity]: { ...t, hasVideo: true } };
-            });
-          } else {
-            // Final fallback — wait for React to fully commit tile DOM
-            setTimeout(() => {
-              const el3 = tileVideoRefs.current.get(identity);
-              if (el3) {
-                track.attach(el3);
-                void el3.play().catch(() => {});
-                console.log(`[Instructor] video track attached (timeout) for ${identity}`);
-                setStudentTiles((prev) => {
-                  const t = prev[identity];
-                  if (!t) return prev;
-                  return { ...prev, [identity]: { ...t, hasVideo: true } };
-                });
-              }
-            }, 400);
-          }
+          const el2 = rootVideoRefs.current.get(identity);
+          if (el2) { attachTo(el2); return; }
+          setTimeout(() => {
+            const el3 = rootVideoRefs.current.get(identity);
+            if (el3) attachTo(el3);
+          }, 400);
         });
       }
     } else if (track.kind === Track.Kind.Audio) {
@@ -466,9 +473,24 @@ export default function InstructorBroadcaster({
       });
 
       room.on(RoomEvent.Reconnecting, () => console.log("[Instructor] reconnecting…"));
-      room.on(RoomEvent.Reconnected,  () => {
-        console.log("[Instructor] reconnected");
-        if (activeRef.current) setConnectionStatus("live");
+      room.on(RoomEvent.Reconnected, () => {
+        console.log("[Instructor] reconnected — re-attaching all subscribed tracks");
+        if (!activeRef.current) return;
+        setConnectionStatus("live");
+        // After reconnect LiveKit re-fires TrackSubscribed for all active tracks.
+        // But we also manually re-attach anything already subscribed right now
+        // in case the events arrive before React has committed the tile DOM.
+        setTimeout(() => {
+          for (const [identity, rp] of Array.from(room.remoteParticipants.entries())) {
+            if (identity.startsWith("instructor-")) continue;
+            for (const pub of Array.from(rp.trackPublications.values())) {
+              if (pub.isSubscribed && pub.track) {
+                console.log(`[Instructor] re-attaching on reconnect: ${identity} kind=${pub.kind}`);
+                attachTrack(pub.track as RemoteTrack, identity);
+              }
+            }
+          }
+        }, 500);
       });
 
       room.on(RoomEvent.ParticipantConnected, (rp: RemoteParticipant) => {
@@ -501,10 +523,10 @@ export default function InstructorBroadcaster({
         console.log(`[Instructor] participant disconnected: ${rp.identity}`);
         if (!activeRef.current) return;
         setStudentTiles((prev) => { const n = { ...prev }; delete n[rp.identity]; return n; });
-        // Clean up DOM ref maps
         tileVideoRefs.current.delete(rp.identity);
         tileAudioRefs.current.delete(rp.identity);
         rootAudioRefs.current.delete(rp.identity);
+        rootVideoRefs.current.delete(rp.identity);
       });
 
       room.on(RoomEvent.TrackPublished, (pub, rp) => {
@@ -699,20 +721,30 @@ export default function InstructorBroadcaster({
     <div style={overlay}>
       <div style={studioShell}>
 
-        {/* Always-on hidden audio elements for student audio.
-            These live OUTSIDE the tab system so they're always in the DOM —
-            student audio plays even when the instructor is on the Presentation
-            or Chat tab (not the Students tab where tiles render). */}
+        {/* Always-on hidden audio + video elements for each student.
+            Outside the tab system so they stay mounted regardless of
+            which tab the instructor is viewing. */}
         {Object.values(studentTiles).map((tile) => (
-          <audio
-            key={`audio-root-${tile.identity}`}
-            ref={(el) => {
-              if (el) rootAudioRefs.current.set(tile.identity, el);
-              else rootAudioRefs.current.delete(tile.identity);
-            }}
-            autoPlay
-            style={{ position: "absolute", width: 0, height: 0, opacity: 0, pointerEvents: "none" }}
-          />
+          <div key={`root-media-${tile.identity}`} style={{ position: "absolute", width: 0, height: 0, overflow: "hidden", pointerEvents: "none" }}>
+            <video
+              ref={(el) => {
+                if (el) rootVideoRefs.current.set(tile.identity, el);
+                else rootVideoRefs.current.delete(tile.identity);
+              }}
+              autoPlay
+              playsInline
+              muted
+              style={{ width: 1, height: 1 }}
+            />
+            <audio
+              ref={(el) => {
+                if (el) rootAudioRefs.current.set(tile.identity, el);
+                else rootAudioRefs.current.delete(tile.identity);
+              }}
+              autoPlay
+              style={{ width: 1, height: 1 }}
+            />
+          </div>
         ))}
 
         {/* Header */}
@@ -885,6 +917,7 @@ export default function InstructorBroadcaster({
                       <StudentVideoTile
                         key={tile.identity}
                         tile={tile}
+                        rootVideoRefs={rootVideoRefs}
                         onVideoRef={(el) => {
                           if (el) tileVideoRefs.current.set(tile.identity, el);
                           else tileVideoRefs.current.delete(tile.identity);
