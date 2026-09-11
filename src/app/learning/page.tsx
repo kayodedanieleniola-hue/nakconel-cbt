@@ -15,6 +15,13 @@ export default async function MyCoursePage() {
   if (!session) redirect("/login");
   await syncLearningClassStatuses();
 
+  // Fetch general meetings (open to all active students)
+  const generalMeetings = await prisma.learningClass.findMany({
+    where: { isGeneral: true, status: { in: ["LIVE", "SCHEDULED"] } },
+    orderBy: { startsAt: "asc" },
+    select: { id: true, title: true, instructor: true, status: true, startsAt: true, endsAt: true },
+  });
+
   const student = await prisma.student.findUnique({
     where: { id: session.sub },
     include: {
@@ -135,7 +142,29 @@ export default async function MyCoursePage() {
         {student.course.modules.length === 0 ? <div style={empty}>Your course structure is being prepared. Modules and lessons will appear here when your administrator adds them.</div> : <div style={moduleList}>{student.course.modules.map((module, index) => <article key={module.id} style={moduleCard}><div style={moduleNumber}>{String(index + 1).padStart(2, "0")}</div><div style={{ flex: 1 }}><h3 style={{ margin: 0, color: "var(--burgundy-900)" }}>{module.title}</h3>{module.description && <p style={muted}>{module.description}</p>}<div style={sectionRow}><span>{module.lessons.length} lesson{module.lessons.length === 1 ? "" : "s"}</span><span>{module.classes.length} class{module.classes.length === 1 ? "" : "es"}</span></div>{module.lessons.length > 0 && <ul style={items}>{module.lessons.map((lesson) => <li key={lesson.id}>{lesson.title}</li>)}</ul>}{module.classes.length > 0 && <p style={classNote}>Classes: {module.classes.map((item) => item.title).join(", ")}</p>}</div></article>)}</div>}
         <h2 style={heading}>Classes</h2>
         {allClasses.length === 0 ? <div style={empty}>No classes have been added to this course yet.</div> : <div style={classGrid}>{standaloneClasses.map((item) => <ClassCard key={item.id} item={item} label="Course class" />)}{student.course.modules.flatMap((module) => module.classes.map((item) => <ClassCard key={item.id} item={item} label={module.title} />))}</div>}
-        <h2 style={heading}>Materials</h2>
+
+        {/* ── General Meetings — visible to all students ── */}
+        <h2 style={heading}>🌐 General Meetings</h2>
+        <p style={muted}>General meetings are open to all students. Join when live to see and hear everyone.</p>
+        {generalMeetings.length === 0
+          ? <div style={empty}>No general meetings are currently live or scheduled.</div>
+          : <div style={classGrid}>{generalMeetings.map((item) => (
+              <article key={item.id} style={classCard}>
+                <p style={eyebrow}>🌐 General Meeting</p>
+                <h3 style={{ margin: "0.2rem 0", color: "var(--burgundy-900)" }}>{item.title}</h3>
+                <span style={{ ...statusBadge, ...(item.status === "LIVE" ? liveBadge : {}) }}>
+                  {item.status === "LIVE" ? "● LIVE" : item.status}
+                </span>
+                {item.instructor && <p style={muted}>Host: {item.instructor}</p>}
+                {item.startsAt && <p style={muted}>{formatDate(item.startsAt)}</p>}
+                {item.status === "LIVE" && (
+                  <Link href={`/learning/general/${item.id}`} style={{ ...joinButton, background: "#98661B" }}>
+                    Join General Meeting
+                  </Link>
+                )}
+              </article>
+            ))}</div>
+        }        <h2 style={heading}>Materials</h2>
         {student.course.materials.length === 0 ? <div style={empty}>No learning materials have been shared with this course yet.</div> : <div style={classGrid}>{student.course.materials.map((material) => <article key={material.id} style={classCard}><p style={eyebrow}>Course material</p><h3 style={{ margin: "0.2rem 0", color: "var(--burgundy-900)" }}>{material.title}</h3><p style={muted}>{material.fileName} · {Math.ceil(material.sizeBytes / 1024)} KB</p><a href={`/api/learning/materials/${material.id}`} style={download}>Download material</a></article>)}</div>}
       </section>
     </main>

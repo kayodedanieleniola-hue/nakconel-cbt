@@ -13,6 +13,7 @@ type ClassItem = {
   endsAt: string | null;
   status: string;
   activeMaterialId: string | null;
+  isGeneral?: boolean;
 };
 
 type Module = {
@@ -59,6 +60,7 @@ export default function LearningManagementPage() {
     endsAt: "",
     status: "DRAFT",
     activeMaterialId: "",
+    isGeneral: false,
   });
   const [material, setMaterial] = useState({ title: "", moduleId: "", classId: "", file: null as File | null });
   const [broadcastingClass, setBroadcastingClass] = useState<{ id: string; title: string } | null>(null);
@@ -139,6 +141,7 @@ export default function LearningManagementPage() {
       endsAt: classForm.endsAt || null,
       status: classForm.status || "DRAFT",
       activeMaterialId: classForm.activeMaterialId || null,
+      isGeneral: classForm.isGeneral,
     };
 
     if (await send("POST", payload)) {
@@ -151,6 +154,7 @@ export default function LearningManagementPage() {
         endsAt: "",
         status: "DRAFT",
         activeMaterialId: "",
+        isGeneral: false,
       });
     }
   }
@@ -318,7 +322,22 @@ export default function LearningManagementPage() {
                         ))}
                       </select>
                     </label>
-                    <button style={button}>Create Class</button>
+                    <label style={{ ...label, display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer" }}>
+                      <input
+                        type="checkbox"
+                        checked={classForm.isGeneral}
+                        onChange={(e) => setClassForm({ ...classForm, isGeneral: e.target.checked })}
+                      />
+                      <span>
+                        <strong>General Meeting</strong>
+                        <span style={{ display: "block", fontSize: "0.78rem", color: "#666", fontWeight: 400 }}>
+                          Visible to ALL students regardless of course. No presentation — everyone sees each other&apos;s cameras.
+                        </span>
+                      </span>
+                    </label>
+                    <button style={classForm.isGeneral ? { ...button, background: "#98661B" } : button}>
+                      {classForm.isGeneral ? "Create General Meeting" : "Create Class"}
+                    </button>
                   </form>
                 </section>
               </div>
@@ -571,7 +590,10 @@ function ClassCard({
       ) : (
         <div style={row}>
           <div>
-            <p style={eyebrow}>{item.status}</p>
+            <p style={eyebrow}>
+              {item.status}
+              {item.isGeneral && <span style={{ marginLeft: "0.5rem", background: "#98661B", color: "#fff", borderRadius: 99, padding: "0.1rem 0.5rem", fontSize: "0.68rem", fontWeight: 700 }}>🌐 GENERAL</span>}
+            </p>
             <strong>{item.title}</strong>
             <p style={muted}>
               {item.instructor ? `Instructor: ${item.instructor}` : "Instructor not assigned"}
@@ -582,15 +604,28 @@ function ClassCard({
             </p>
           </div>
           <div style={actions}>
-            <button
-              style={liveButton}
-              onClick={async () => {
-                await send("PATCH", { type: "class", id: item.id, title: item.title, status: "LIVE" });
-                onBroadcast({ id: item.id, title: item.title });
-              }}
-            >
-              {item.status === "LIVE" ? "Studio (LIVE)" : "Start Broadcast"}
-            </button>
+            {item.isGeneral ? (
+              // General meeting — admin joins directly (no presentation stage needed)
+              <button
+                style={liveButton}
+                onClick={async () => {
+                  await send("PATCH", { type: "class", id: item.id, title: item.title, status: "LIVE" });
+                  window.open(`/learning/general/${item.id}`, "_blank");
+                }}
+              >
+                {item.status === "LIVE" ? "🌐 Join Meeting" : "🌐 Start Meeting"}
+              </button>
+            ) : (
+              <button
+                style={liveButton}
+                onClick={async () => {
+                  await send("PATCH", { type: "class", id: item.id, title: item.title, status: "LIVE" });
+                  onBroadcast({ id: item.id, title: item.title });
+                }}
+              >
+                {item.status === "LIVE" ? "Studio (LIVE)" : "Start Broadcast"}
+              </button>
+            )}
             <button style={outline} onClick={() => setEditing(true)}>
               Edit
             </button>

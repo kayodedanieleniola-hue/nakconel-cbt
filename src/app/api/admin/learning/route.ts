@@ -10,7 +10,7 @@ export async function GET() {
   const guard = await requireAdmin();
   if (!guard.ok) return guard.response;
   await syncLearningClassStatuses();
-  const courses = await prisma.course.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, materials: { orderBy: { createdAt: "desc" }, select: { id: true, title: true, fileName: true, mimeType: true, sizeBytes: true, moduleId: true, classId: true } }, modules: { orderBy: { position: "asc" }, select: { id: true, title: true, description: true, position: true, classes: { orderBy: { startsAt: "asc" }, select: { id: true, title: true, instructor: true, description: true, startsAt: true, endsAt: true, status: true, activeMaterialId: true } } } }, classes: { where: { moduleId: null }, orderBy: { startsAt: "asc" }, select: { id: true, title: true, instructor: true, description: true, startsAt: true, endsAt: true, status: true, activeMaterialId: true } } } });
+  const courses = await prisma.course.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, materials: { orderBy: { createdAt: "desc" }, select: { id: true, title: true, fileName: true, mimeType: true, sizeBytes: true, moduleId: true, classId: true } }, modules: { orderBy: { position: "asc" }, select: { id: true, title: true, description: true, position: true, classes: { orderBy: { startsAt: "asc" }, select: { id: true, title: true, instructor: true, description: true, startsAt: true, endsAt: true, status: true, activeMaterialId: true, isGeneral: true } } } }, classes: { where: { moduleId: null }, orderBy: { startsAt: "asc" }, select: { id: true, title: true, instructor: true, description: true, startsAt: true, endsAt: true, status: true, activeMaterialId: true, isGeneral: true } } } });
   return NextResponse.json({ courses });
 }
 
@@ -35,6 +35,7 @@ export async function POST(request: Request) {
     const title = typeof body.title === "string" ? body.title.trim() : "";
     const status = typeof body.status === "string" && STATUSES.has(body.status) ? body.status : "DRAFT";
     const activeMaterialId = typeof body.activeMaterialId === "string" && body.activeMaterialId ? body.activeMaterialId : null;
+    const isGeneral = typeof body.isGeneral === "boolean" ? body.isGeneral : false;
     if (!courseId) return NextResponse.json({ error: "Please select a course before creating a class" }, { status: 400 });
     if (title.length < 2) return NextResponse.json({ error: "Please enter a valid class title" }, { status: 400 });
     if (moduleId && !(await prisma.learningModule.findFirst({ where: { id: moduleId, courseId } })))
@@ -44,7 +45,7 @@ export async function POST(request: Request) {
     if (startsAt && endsAt && endsAt <= startsAt)
       return NextResponse.json({ error: "End time must be after start time" }, { status: 400 });
     const learningClass = await prisma.learningClass.create({
-      data: { courseId, moduleId, title, instructor: text(body.instructor), description: text(body.description), startsAt, endsAt, status, activeMaterialId },
+      data: { courseId, moduleId, title, instructor: text(body.instructor), description: text(body.description), startsAt, endsAt, status, activeMaterialId, isGeneral },
     });
     return NextResponse.json({ learningClass }, { status: 201 });
   }
@@ -76,6 +77,7 @@ export async function PATCH(request: Request) {
   const startsAt = body.startsAt !== undefined ? parseDate(body.startsAt) : existing.startsAt;
   const endsAt = body.endsAt !== undefined ? parseDate(body.endsAt) : existing.endsAt;
   const activeMaterialId = body.activeMaterialId !== undefined ? (typeof body.activeMaterialId === "string" && body.activeMaterialId ? body.activeMaterialId : null) : existing.activeMaterialId;
+  const isGeneral = typeof body.isGeneral === "boolean" ? body.isGeneral : existing.isGeneral;
   const presentationPage = typeof body.presentationPage === "number" && body.presentationPage >= 1
     ? Math.floor(body.presentationPage)
     : existing.presentationPage ?? 1;
@@ -83,7 +85,7 @@ export async function PATCH(request: Request) {
 
   const learningClass = await prisma.learningClass.update({
     where: { id },
-    data: { title, instructor, description, startsAt, endsAt, status, activeMaterialId, presentationPage, recordingUrl },
+    data: { title, instructor, description, startsAt, endsAt, status, activeMaterialId, isGeneral, presentationPage, recordingUrl },
   });
   return NextResponse.json({ learningClass });
 }

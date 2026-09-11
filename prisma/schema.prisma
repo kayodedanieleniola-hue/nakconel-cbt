@@ -75,6 +75,7 @@ model LearningClass {
   startsAt    DateTime?
   endsAt      DateTime?
   status      String          @default("DRAFT") // DRAFT | SCHEDULED | LIVE | COMPLETED | CANCELLED
+  isGeneral         Boolean         @default(false) // true = open to all active students (General Meeting)
   activeMaterialId  String?
   presentationPage  Int?        @default(1) // current page synced to students
   recordingUrl      String?
