@@ -278,7 +278,6 @@ export default function InstructorBroadcaster({
         });
       } else {
         console.warn(`[Instructor] video ref not ready for ${identity} — will retry`);
-        // Retry after next paint
         requestAnimationFrame(() => {
           const el2 = tileVideoRefs.current.get(identity);
           if (el2) {
@@ -289,6 +288,21 @@ export default function InstructorBroadcaster({
               if (!t) return prev;
               return { ...prev, [identity]: { ...t, hasVideo: true } };
             });
+          } else {
+            // Final fallback — wait for React to fully commit tile DOM
+            setTimeout(() => {
+              const el3 = tileVideoRefs.current.get(identity);
+              if (el3) {
+                track.attach(el3);
+                void el3.play().catch(() => {});
+                console.log(`[Instructor] video track attached (timeout) for ${identity}`);
+                setStudentTiles((prev) => {
+                  const t = prev[identity];
+                  if (!t) return prev;
+                  return { ...prev, [identity]: { ...t, hasVideo: true } };
+                });
+              }
+            }, 400);
           }
         });
       }

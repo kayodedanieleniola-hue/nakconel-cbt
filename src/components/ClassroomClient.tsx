@@ -140,152 +140,137 @@ export default function ClassroomClient({
         </button>
       </div>
 
-      {/* ══════════════════════════════════════════════════════════════════
-          TAB 1 — CLASS
-          • Presentation fills the full width
-          • Instructor feed PiP in top-right corner of the stage
-      ══════════════════════════════════════════════════════════════════ */}
-      {activeTab === "class" && (
-        <div style={classTabWrap}>
-
-          {/* Presentation stage */}
-          <div
-            ref={stageRef}
-            style={{ ...stageWrap, ...(isFullscreen ? fullscreenStyle : {}) }}
-          >
-            {/* Stage header — title + fullscreen only, NO download */}
-            <div style={stageTitleBar}>
-              <span style={stageName}>
-                {selected ? selected.title : learningClass.title}
-                {selected && (
-                  <span style={mimeTag}> · {formatFileType(selected.mimeType)}</span>
-                )}
-                {presState.page > 1 && (
-                  <span style={pagePill}> p.{presState.page}</span>
-                )}
-              </span>
-              <button
-                type="button"
-                onClick={toggleFullscreen}
-                style={fsBtn}
-                title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
-              >
-                {isFullscreen ? "⤡" : "⛶"}
-              </button>
-            </div>
-
-            {/* Presentation viewport — NO download, sandboxed */}
-            <div style={presViewport}>
-              {selected && previewable ? (
-                <iframe
-                  key={`${selected.id}-p${presState.page}`}
-                  title={selected.title}
-                  src={`/api/learning/materials/${selected.id}?view=inline&page=${presState.page}`}
-                  style={presIframe}
-                  // sandbox: allow-scripts needed for PDF.js inside the iframe;
-                  // allow-same-origin lets the browser render same-origin PDF/images.
-                  // downloads, forms, popups and top-navigation are all blocked.
-                  sandbox="allow-scripts allow-same-origin"
-                />
-              ) : selected ? (
-                <div style={presPlaceholder}>
-                  <span style={{ fontSize: "2.5rem" }}>📁</span>
-                  <p style={presPlaceholderText}>{selected.title}</p>
-                  <p style={presPlaceholderSub}>
-                    This format cannot be previewed inline.
-                  </p>
-                </div>
-              ) : (
-                <div style={presPlaceholder}>
-                  <span style={{ fontSize: "2.5rem" }}>📊</span>
-                  <p style={presPlaceholderText}>Waiting for instructor…</p>
-                  <p style={presPlaceholderSub}>
-                    The presentation will appear here automatically.
-                  </p>
-                </div>
+      {/* ── ClassroomVideoFeed — ALWAYS mounted, never conditional.
+          Conditional rendering causes the room to disconnect when the
+          student switches tabs. We keep it mounted and use CSS visibility
+          so the LiveKit connection, camera, and mic stay alive permanently. ── */}
+      <div style={{ display: activeTab === "class" ? "contents" : "none" }}>
+        {/* Presentation stage */}
+        <div
+          ref={stageRef}
+          style={{ ...stageWrap, ...(isFullscreen ? fullscreenStyle : {}) }}
+        >
+          {/* Stage header — title + fullscreen only, NO download */}
+          <div style={stageTitleBar}>
+            <span style={stageName}>
+              {selected ? selected.title : learningClass.title}
+              {selected && (
+                <span style={mimeTag}> · {formatFileType(selected.mimeType)}</span>
               )}
-            </div>
-
-            {/* Instructor PiP — floats over the stage, top-right corner */}
-            <div style={pipWrap}>
-              <span style={pipLabel}>Instructor</span>
-              {/* We clip ClassroomVideoFeed to only show the instructor video.
-                  overflow:hidden + aspectRatio height cuts off status bar,
-                  self-preview and mic meter that render below the video. */}
-              <div style={pipFeed}>
-                <ClassroomVideoFeed
-                  classId={learningClass.id}
-                  onRoomReady={setActiveRoom}
-                  onPresentationState={handlePresentationState}
-                  pipMode
-                />
-              </div>
-              <ClassroomPollOverlay classId={learningClass.id} />
-            </div>
-          </div>
-
-          {/* Sub-tabs: Agenda | Chat */}
-          <div style={classSubTabBar}>
+              {presState.page > 1 && (
+                <span style={pagePill}> p.{presState.page}</span>
+              )}
+            </span>
             <button
               type="button"
-              onClick={() => setClassSubTab("presentation")}
-              style={{ ...subTabBtn, ...(classSubTab === "presentation" ? subTabActive : {}) }}
+              onClick={toggleFullscreen}
+              style={fsBtn}
+              title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
             >
-              📋 Agenda
-            </button>
-            <button
-              type="button"
-              onClick={() => setClassSubTab("chat")}
-              style={{ ...subTabBtn, ...(classSubTab === "chat" ? subTabActive : {}) }}
-            >
-              💬 Chat &amp; Q&amp;A
+              {isFullscreen ? "⤡" : "⛶"}
             </button>
           </div>
 
-          <div style={classSubContent}>
-            {classSubTab === "presentation" && (
-              <div style={agendaWrap}>
-                <h4 style={agendaTitle}>{learningClass.title}</h4>
-                <p style={agendaMeta}>Course: <strong>{learningClass.course}</strong></p>
-                {learningClass.module && (
-                  <p style={agendaMeta}>Module: <strong>{learningClass.module}</strong></p>
-                )}
-                {learningClass.instructor && (
-                  <p style={agendaMeta}>Instructor: <strong>{learningClass.instructor}</strong></p>
-                )}
-                <hr style={agendaDivider} />
-                <p style={agendaBody}>
-                  {learningClass.description ??
-                    "Welcome to this live classroom session. Follow along on the presentation stage as your instructor covers the module materials."}
+          {/* Presentation viewport — NO toolbar, NO download */}
+          <div style={presViewport}>
+            {selected && previewable ? (
+              <iframe
+                key={`${selected.id}-p${presState.page}`}
+                title={selected.title}
+                src={`/api/learning/materials/${selected.id}?view=inline&page=${presState.page}${selected.mimeType === "application/pdf" ? "#toolbar=0&navpanes=0&scrollbar=0" : ""}`}
+                style={presIframe}
+              />
+            ) : selected ? (
+              <div style={presPlaceholder}>
+                <span style={{ fontSize: "2.5rem" }}>📁</span>
+                <p style={presPlaceholderText}>{selected.title}</p>
+                <p style={presPlaceholderSub}>
+                  This format cannot be previewed inline.
                 </p>
-                <hr style={agendaDivider} />
-                <p style={viewOnlyNotice}>
-                  📌 Presentation is controlled by your instructor and updates automatically.
-                  Downloading materials is not permitted during the live session.
+              </div>
+            ) : (
+              <div style={presPlaceholder}>
+                <span style={{ fontSize: "2.5rem" }}>📊</span>
+                <p style={presPlaceholderText}>Waiting for instructor…</p>
+                <p style={presPlaceholderSub}>
+                  The presentation will appear here automatically.
                 </p>
               </div>
             )}
-            {classSubTab === "chat" && (
-              <div style={{ padding: "0.85rem" }}>
-                <ClassroomChat
-                  classId={learningClass.id}
-                  room={activeRoom}
-                  isInstructor={false}
-                />
-              </div>
-            )}
+          </div>
+
+          {/* Instructor PiP — floats over the stage, top-right corner */}
+          <div style={pipWrap}>
+            <span style={pipLabel}>Instructor</span>
+            <div style={pipFeed}>
+              <ClassroomVideoFeed
+                classId={learningClass.id}
+                onRoomReady={setActiveRoom}
+                onPresentationState={handlePresentationState}
+                pipMode
+              />
+            </div>
+            <ClassroomPollOverlay classId={learningClass.id} />
           </div>
         </div>
-      )}
+
+        {/* Sub-tabs: Agenda | Chat */}
+        <div style={classSubTabBar}>
+          <button
+            type="button"
+            onClick={() => setClassSubTab("presentation")}
+            style={{ ...subTabBtn, ...(classSubTab === "presentation" ? subTabActive : {}) }}
+          >
+            📋 Agenda
+          </button>
+          <button
+            type="button"
+            onClick={() => setClassSubTab("chat")}
+            style={{ ...subTabBtn, ...(classSubTab === "chat" ? subTabActive : {}) }}
+          >
+            💬 Chat &amp; Q&amp;A
+          </button>
+        </div>
+
+        <div style={classSubContent}>
+          {classSubTab === "presentation" && (
+            <div style={agendaWrap}>
+              <h4 style={agendaTitle}>{learningClass.title}</h4>
+              <p style={agendaMeta}>Course: <strong>{learningClass.course}</strong></p>
+              {learningClass.module && (
+                <p style={agendaMeta}>Module: <strong>{learningClass.module}</strong></p>
+              )}
+              {learningClass.instructor && (
+                <p style={agendaMeta}>Instructor: <strong>{learningClass.instructor}</strong></p>
+              )}
+              <hr style={agendaDivider} />
+              <p style={agendaBody}>
+                {learningClass.description ??
+                  "Welcome to this live classroom session. Follow along on the presentation stage as your instructor covers the module materials."}
+              </p>
+              <hr style={agendaDivider} />
+              <p style={viewOnlyNotice}>
+                📌 Presentation is controlled by your instructor and updates automatically.
+                Downloading materials is not permitted during the live session.
+              </p>
+            </div>
+          )}
+          {classSubTab === "chat" && (
+            <div style={{ padding: "0.85rem" }}>
+              <ClassroomChat
+                classId={learningClass.id}
+                room={activeRoom}
+                isInstructor={false}
+              />
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* ══════════════════════════════════════════════════════════════════
           TAB 2 — STUDENTS
-          • Student's own camera (self-preview from ClassroomVideoFeed)
-          • Other students shown by ClassroomVideoFeed's tile area
-          Note: ClassroomVideoFeed already handles self-preview + publishing.
-          On this tab we show a second instance of the feed focused on students.
-          We reuse the same room by passing onRoomReady only once (class tab mounts
-          the feed; students tab is informational — camera is already publishing).
+          Shows self-preview info. Camera is already live from the PiP
+          ClassroomVideoFeed above (which is always mounted).
       ══════════════════════════════════════════════════════════════════ */}
       {activeTab === "students" && (
         <div style={studentsTabWrap}>
@@ -293,7 +278,7 @@ export default function ClassroomClient({
             Your camera is live. The instructor and other participants can see you.
           </p>
           <p style={studentsHintSub}>
-            Your self-preview and mic level are shown in the Class tab under the Instructor Feed.
+            Switch back to the Class tab to view the presentation and instructor feed.
           </p>
           <div style={studentsNotice}>
             <span style={{ fontSize: "1.8rem" }}>📷</span>
@@ -301,7 +286,7 @@ export default function ClassroomClient({
               Camera is broadcasting
             </p>
             <p style={{ margin: "0.2rem 0 0", fontSize: "0.78rem", color: "#a38b80" }}>
-              Switch back to the Class tab to view the presentation
+              Your microphone is also live
             </p>
           </div>
         </div>
