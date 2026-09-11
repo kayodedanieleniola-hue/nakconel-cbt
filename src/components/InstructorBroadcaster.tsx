@@ -37,6 +37,68 @@ import {
 } from "livekit-client";
 import ClassroomChat from "@/components/ClassroomChat";
 
+// ── Audio level meter ─────────────────────────────────────────────────────────
+
+function AudioLevelMeter({ track }: { track: LocalTrack | null }) {
+  const [level, setLevel] = useState(0);
+  const rafRef = useRef<number>(0);
+
+  useEffect(() => {
+    if (!track || track.kind !== Track.Kind.Audio) return;
+    const mediaTrack = track.mediaStreamTrack;
+    if (!mediaTrack) return;
+
+    let ctx: AudioContext | null = null;
+    try {
+      ctx = new AudioContext();
+      const source = ctx.createMediaStreamSource(new MediaStream([mediaTrack]));
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+      source.connect(analyser);
+      const data = new Uint8Array(analyser.frequencyBinCount);
+
+      function tick() {
+        analyser.getByteFrequencyData(data);
+        const avg = data.reduce((a, b) => a + b, 0) / data.length;
+        setLevel(Math.min(100, Math.round((avg / 128) * 100)));
+        rafRef.current = requestAnimationFrame(tick);
+      }
+      rafRef.current = requestAnimationFrame(tick);
+    } catch { /* AudioContext unavailable */ }
+
+    return () => {
+      cancelAnimationFrame(rafRef.current);
+      ctx?.close().catch(() => {});
+    };
+  }, [track]);
+
+  if (!track) return null;
+  const barColor = level > 60 ? "#4dff88" : level > 20 ? "#ffd98a" : "#8c766b";
+
+  return (
+    <div style={meterWrap} title={`Mic transmitting: ${level}%`}>
+      <span style={meterLabel}>🎤 Audio</span>
+      <div style={meterTrack}>
+        <div style={{ ...meterFill, width: `${level}%`, background: barColor }} />
+      </div>
+      <span style={{ ...meterLabel, color: barColor, minWidth: 34 }}>{level}%</span>
+    </div>
+  );
+}
+
+const meterWrap: React.CSSProperties = {
+  display: "flex", alignItems: "center", gap: "0.4rem",
+  background: "#180c0b", border: "1px solid #3b2220",
+  borderRadius: 4, padding: "0.3rem 0.55rem",
+};
+const meterLabel: React.CSSProperties = { fontSize: "0.7rem", color: "#a38b80", whiteSpace: "nowrap" };
+const meterTrack: React.CSSProperties = {
+  flex: 1, height: 7, background: "#2a1210", borderRadius: 3, overflow: "hidden", minWidth: 60,
+};
+const meterFill: React.CSSProperties = {
+  height: "100%", borderRadius: 3, transition: "width 0.08s ease-out, background 0.2s",
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
@@ -150,6 +212,8 @@ export default function InstructorBroadcaster({
   const [cameraOn,   setCameraOn]   = useState(true);
   const [micOn,      setMicOn]      = useState(true);
   const [quality,    setQuality]    = useState<"4k" | "1080p" | "720p" | "480p">("1080p");
+  // Exposed to AudioLevelMeter — set once tracks are captured
+  const [micTrackForMeter, setMicTrackForMeter] = useState<LocalTrack | null>(null);
 
   // Student tiles: keyed by identity
   const [studentTiles, setStudentTiles] = useState<Record<string, StudentTile>>({});
@@ -315,7 +379,10 @@ export default function InstructorBroadcaster({
         if (!res.ok || !data.url || !data.token) throw new Error(data.error || "LiveKit not configured");
         livekitUrl = data.url as string;
         token = data.token as string;
-        console.log(`[Instructor] token obtained — room=${data.room}`);
+        // Normalise: LiveKit SDK needs wss:// not https://
+        if (livekitUrl.startsWith("https://")) livekitUrl = livekitUrl.replace("https://", "wss://");
+        if (livekitUrl.startsWith("http://"))  livekitUrl = livekitUrl.replace("http://",  "ws://");
+        console.log(`[Instructor] token obtained — room=${data.room} url=${livekitUrl}`);
       } catch (err) {
         if (activeRef.current) {
           setErrorMsg(err instanceof Error ? err.message : "Could not get token");
@@ -453,6 +520,7 @@ export default function InstructorBroadcaster({
         const audioTrack = tracks.find((t) => t.kind === Track.Kind.Audio) ?? null;
         videoTrackRef.current = videoTrack;
         audioTrackRef.current = audioTrack;
+        if (activeRef.current && audioTrack) setMicTrackForMeter(audioTrack);
 
         if (videoTrack && localVideoRef.current) {
           videoTrack.attach(localVideoRef.current);
@@ -792,6 +860,9 @@ export default function InstructorBroadcaster({
               </div>
               <p style={selfLabel}>You (Instructor)</p>
             </div>
+
+            {/* Audio level meter — confirms mic is transmitting */}
+            <AudioLevelMeter track={micTrackForMeter} />
 
             <div style={controlsCol}>
               <button
