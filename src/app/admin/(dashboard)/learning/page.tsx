@@ -326,7 +326,9 @@ export default function LearningManagementPage() {
               {/* Material Upload */}
               <section style={card}>
                 <h2>Upload Material</h2>
-                <p style={muted}>PDF, slides, images, documents, and practice files up to 4 MB.</p>
+                <p style={muted}>
+                  Allowed: PDF, DOC/DOCX, TXT, XLS/XLSX, CSV, PPT/PPTX, PNG, JPG, WebP, SVG — up to 10 MB.
+                </p>
                 <form onSubmit={uploadMaterial}>
                   <input
                     required
@@ -350,6 +352,7 @@ export default function LearningManagementPage() {
                   <input
                     type="file"
                     required
+                    accept=".pdf,.doc,.docx,.txt,.xls,.xlsx,.csv,.ppt,.pptx,.png,.jpg,.jpeg,.webp,.svg"
                     onChange={(e) => setMaterial({ ...material, file: e.target.files?.[0] ?? null })}
                     style={input}
                   />
@@ -412,6 +415,7 @@ export default function LearningManagementPage() {
         <InstructorBroadcaster
           classId={broadcastingClass.id}
           classTitle={broadcastingClass.title}
+          materials={selected?.materials ?? []}
           onClose={() => setBroadcastingClass(null)}
         />
       )}

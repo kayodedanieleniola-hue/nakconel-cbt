@@ -76,11 +76,14 @@ export async function PATCH(request: Request) {
   const startsAt = body.startsAt !== undefined ? parseDate(body.startsAt) : existing.startsAt;
   const endsAt = body.endsAt !== undefined ? parseDate(body.endsAt) : existing.endsAt;
   const activeMaterialId = body.activeMaterialId !== undefined ? (typeof body.activeMaterialId === "string" && body.activeMaterialId ? body.activeMaterialId : null) : existing.activeMaterialId;
+  const presentationPage = typeof body.presentationPage === "number" && body.presentationPage >= 1
+    ? Math.floor(body.presentationPage)
+    : existing.presentationPage ?? 1;
   const recordingUrl = body.recordingUrl !== undefined ? (typeof body.recordingUrl === "string" ? body.recordingUrl : null) : existing.recordingUrl;
 
   const learningClass = await prisma.learningClass.update({
     where: { id },
-    data: { title, instructor, description, startsAt, endsAt, status, activeMaterialId, recordingUrl },
+    data: { title, instructor, description, startsAt, endsAt, status, activeMaterialId, presentationPage, recordingUrl },
   });
   return NextResponse.json({ learningClass });
 }

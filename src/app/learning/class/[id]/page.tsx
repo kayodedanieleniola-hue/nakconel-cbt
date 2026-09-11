@@ -42,5 +42,6 @@ export default async function ClassroomPage({ params }: { params: Promise<{ id: 
     instructor: learningClass.instructor,
     description: learningClass.description,
     activeMaterialId: learningClass.activeMaterialId,
+    presentationPage: learningClass.presentationPage ?? 1,
   }} materials={learningClass.course.materials} />;
 }
