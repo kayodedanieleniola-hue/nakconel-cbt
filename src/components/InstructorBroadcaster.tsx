@@ -207,6 +207,13 @@ export default function InstructorBroadcaster({
   const tileVideoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
   const tileAudioRefs = useRef<Map<string, HTMLAudioElement>>(new Map());
 
+  // ALWAYS-ON audio elements rendered at the root (outside the tab system).
+  // Student tiles are only mounted when the "students" tab is active, so
+  // any <audio> inside a tile is unmounted when viewing other tabs — meaning
+  // audio track attachment fails. These root-level elements are ALWAYS in
+  // the DOM so the instructor hears students regardless of which tab is open.
+  const rootAudioRefs = useRef<Map<string, HTMLAudioElement>>(new Map());
+
   // Callback ref for instructor self-preview — same pattern as student side.
   // Attaches the captured video track the instant the <video> element mounts.
   const selfVideoCallbackRef = useCallback((el: HTMLVideoElement | null) => {
@@ -286,46 +293,31 @@ export default function InstructorBroadcaster({
         });
       }
     } else if (track.kind === Track.Kind.Audio) {
-      const el = tileAudioRefs.current.get(identity);
-      if (el) {
+      // Use rootAudioRefs — these are always in the DOM regardless of active tab.
+      // tileAudioRefs are inside StudentVideoTile which only mounts on the students tab.
+      const attach = (el: HTMLAudioElement) => {
         track.attach(el);
         void el.play().catch(() => {});
-        console.log(`[Instructor] audio track attached to tile for ${identity}`);
+        console.log(`[Instructor] audio track attached (root) for ${identity}`);
         setStudentTiles((prev) => {
           const t = prev[identity];
           if (!t) return prev;
           return { ...prev, [identity]: { ...t, hasAudio: true } };
         });
+      };
+
+      const el = rootAudioRefs.current.get(identity);
+      if (el) {
+        attach(el);
       } else {
-        // Audio element not in DOM yet — retry after paint (same as video)
-        console.warn(`[Instructor] audio ref not ready for ${identity} — will retry`);
+        // Root audio element not yet in DOM — retry
         requestAnimationFrame(() => {
-          const el2 = tileAudioRefs.current.get(identity);
-          if (el2) {
-            track.attach(el2);
-            void el2.play().catch(() => {});
-            console.log(`[Instructor] audio track attached (retry) for ${identity}`);
-            setStudentTiles((prev) => {
-              const t = prev[identity];
-              if (!t) return prev;
-              return { ...prev, [identity]: { ...t, hasAudio: true } };
-            });
-          } else {
-            // Final fallback: wait 300ms for React to commit the DOM
-            setTimeout(() => {
-              const el3 = tileAudioRefs.current.get(identity);
-              if (el3) {
-                track.attach(el3);
-                void el3.play().catch(() => {});
-                console.log(`[Instructor] audio track attached (timeout) for ${identity}`);
-                setStudentTiles((prev) => {
-                  const t = prev[identity];
-                  if (!t) return prev;
-                  return { ...prev, [identity]: { ...t, hasAudio: true } };
-                });
-              }
-            }, 300);
-          }
+          const el2 = rootAudioRefs.current.get(identity);
+          if (el2) { attach(el2); return; }
+          setTimeout(() => {
+            const el3 = rootAudioRefs.current.get(identity);
+            if (el3) attach(el3);
+          }, 300);
         });
       }
     }
@@ -498,6 +490,7 @@ export default function InstructorBroadcaster({
         // Clean up DOM ref maps
         tileVideoRefs.current.delete(rp.identity);
         tileAudioRefs.current.delete(rp.identity);
+        rootAudioRefs.current.delete(rp.identity);
       });
 
       room.on(RoomEvent.TrackPublished, (pub, rp) => {
@@ -691,6 +684,22 @@ export default function InstructorBroadcaster({
   return (
     <div style={overlay}>
       <div style={studioShell}>
+
+        {/* Always-on hidden audio elements for student audio.
+            These live OUTSIDE the tab system so they're always in the DOM —
+            student audio plays even when the instructor is on the Presentation
+            or Chat tab (not the Students tab where tiles render). */}
+        {Object.values(studentTiles).map((tile) => (
+          <audio
+            key={`audio-root-${tile.identity}`}
+            ref={(el) => {
+              if (el) rootAudioRefs.current.set(tile.identity, el);
+              else rootAudioRefs.current.delete(tile.identity);
+            }}
+            autoPlay
+            style={{ position: "absolute", width: 0, height: 0, opacity: 0, pointerEvents: "none" }}
+          />
+        ))}
 
         {/* Header */}
         <div style={studioHeader}>

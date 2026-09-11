@@ -174,53 +174,53 @@ export default function ClassroomVideoFeed({
     async function connect() {
       console.log(`[Student] connecting — classId=${classId}`);
 
-      // ── STEP 1: Capture camera + mic FIRST (before network) ───────────────
-      // This way the student sees themselves immediately regardless of
-      // whether LiveKit cloud is reachable.
-      let vidTrack: LocalTrack | null = null;
-      let audTrack: LocalTrack | null = null;
-      try {
-        const tracks = await createLocalTracks({ audio: true, video: { facingMode: "user" } });
-        if (!activeRef.current) { tracks.forEach((t) => t.stop()); return; }
+      // ── STEP 1 & 2 run in PARALLEL ────────────────────────────────────────
+      // Camera capture and LiveKit token fetch run at the same time.
+      // Previously camera was step 1 and blocked step 2 — if the user
+      // was slow to click Allow, or the camera API hung, LiveKit never
+      // connected and the status stayed "Connecting…" forever.
 
-        vidTrack = tracks.find((t) => t.kind === Track.Kind.Video) ?? null;
-        audTrack = tracks.find((t) => t.kind === Track.Kind.Audio) ?? null;
-        localVideoTrack.current = vidTrack;
-        localAudioTrack.current = audTrack;
+      // ── Camera capture (non-blocking) ─────────────────────────────────────
+      const cameraPromise = (async () => {
+        try {
+          const tracks = await createLocalTracks({ audio: true, video: { facingMode: "user" } });
+          if (!activeRef.current) { tracks.forEach((t) => t.stop()); return; }
 
-        // Show self-preview immediately — before any network calls.
-        // We store the track in pendingVidTrack so the callback ref can
-        // attach it the moment the <video> element mounts in the DOM.
-        if (vidTrack) {
-          if (selfVidRef.current) {
-            // Element already mounted (re-render case)
-            vidTrack.attach(selfVidRef.current);
-            void selfVidRef.current.play().catch(() => {});
-          } else {
-            // Element not yet mounted — callback ref will attach it
-            pendingVidTrack.current = vidTrack;
+          const vidTrack = tracks.find((t) => t.kind === Track.Kind.Video) ?? null;
+          const audTrack = tracks.find((t) => t.kind === Track.Kind.Audio) ?? null;
+          localVideoTrack.current = vidTrack;
+          localAudioTrack.current = audTrack;
+
+          if (vidTrack) {
+            if (selfVidRef.current) {
+              vidTrack.attach(selfVidRef.current);
+              void selfVidRef.current.play().catch(() => {});
+            } else {
+              pendingVidTrack.current = vidTrack;
+            }
           }
-        }
 
-        if (activeRef.current) {
-          setCameraReady(true);
-          setMicTrack(audTrack);
-          console.log("[Student] camera + mic captured — self-preview active");
-        }
-      } catch (camErr) {
-        console.warn("[Student] camera/mic capture failed:", camErr);
-        if (activeRef.current) {
-          const msg = camErr instanceof Error ? camErr.message : "Camera unavailable";
-          const denied = /permission|denied|notallowed/i.test(msg);
-          setCameraError(
-            denied
-              ? "Camera access denied — instructor won't see you. Click the camera icon in your browser address bar to allow."
+          if (activeRef.current) {
+            setCameraReady(true);
+            setMicTrack(audTrack);
+            console.log("[Student] camera + mic captured");
+          }
+          return { vidTrack, audTrack };
+        } catch (camErr) {
+          console.warn("[Student] camera/mic failed:", camErr);
+          if (activeRef.current) {
+            const msg = camErr instanceof Error ? camErr.message : "Camera unavailable";
+            const denied = /permission|denied|notallowed/i.test(msg);
+            setCameraError(denied
+              ? "Camera access denied — instructor won't see you. Allow camera in your browser settings."
               : `Camera unavailable: ${msg}`
-          );
+            );
+          }
+          return { vidTrack: null, audTrack: null };
         }
-      }
+      })();
 
-      // ── STEP 2: Get LiveKit token ─────────────────────────────────────────
+      // ── LiveKit token (non-blocking) ───────────────────────────────────────
       let livekitUrl: string, token: string;
       try {
         const res  = await fetch(`/api/learning/livekit/token?classId=${encodeURIComponent(classId)}`);
@@ -228,7 +228,6 @@ export default function ClassroomVideoFeed({
         if (!res.ok || !data.url || !data.token) throw new Error(data.error || "Token unavailable");
         livekitUrl = data.url as string;
         token      = data.token as string;
-        // Normalise URL: LiveKit SDK needs wss:// not https://
         if (livekitUrl.startsWith("https://")) livekitUrl = livekitUrl.replace("https://", "wss://");
         if (livekitUrl.startsWith("http://"))  livekitUrl = livekitUrl.replace("http://",  "ws://");
         console.log(`[Student] token obtained — room=${data.room} url=${livekitUrl}`);
@@ -239,7 +238,7 @@ export default function ClassroomVideoFeed({
           setStatus(localMode ? "Local mode (no cloud)" : `Offline · ${msg}`);
           console.warn("[Student] token error:", msg);
         }
-        return; // Camera preview still shows — only LiveKit is skipped
+        return;
       }
 
       if (!activeRef.current) return;
@@ -317,7 +316,9 @@ export default function ClassroomVideoFeed({
 
       if (!activeRef.current) { void room.disconnect(); return; }
 
-      // ── STEP 4: Publish tracks to LiveKit ─────────────────────────────────
+      // ── Publish tracks (wait for camera result now that LiveKit is ready) ──
+      const camResult = await cameraPromise;
+      const { vidTrack, audTrack } = camResult ?? { vidTrack: null, audTrack: null };
       if (vidTrack || audTrack) {
         try {
           const toPublish = [vidTrack, audTrack].filter(Boolean) as LocalTrack[];
