@@ -194,17 +194,29 @@ export default function InstructorBroadcaster({
   materials: Material[];
   onClose: () => void;
 }) {
-  // ── Stable refs (never trigger re-renders) ────────────────────────────────
-  const roomRef       = useRef<Room | null>(null);
-  const localVideoRef = useRef<HTMLVideoElement>(null);
-  const videoTrackRef = useRef<LocalTrack | null>(null);
-  const audioTrackRef = useRef<LocalTrack | null>(null);
-  const bcRef         = useRef<BroadcastChannel | null>(null);
-  const activeRef     = useRef(true);
+  // ── Stable refs ───────────────────────────────────────────────────────────
+  const roomRef          = useRef<Room | null>(null);
+  const localVideoRef    = useRef<HTMLVideoElement | null>(null);
+  const pendingVideoTrack = useRef<LocalTrack | null>(null); // waiting to attach to self-preview
+  const videoTrackRef    = useRef<LocalTrack | null>(null);
+  const audioTrackRef    = useRef<LocalTrack | null>(null);
+  const bcRef            = useRef<BroadcastChannel | null>(null);
+  const activeRef        = useRef(true);
 
   // Maps identity → DOM element for imperative track attachment
   const tileVideoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
   const tileAudioRefs = useRef<Map<string, HTMLAudioElement>>(new Map());
+
+  // Callback ref for instructor self-preview — same pattern as student side.
+  // Attaches the captured video track the instant the <video> element mounts.
+  const selfVideoCallbackRef = useCallback((el: HTMLVideoElement | null) => {
+    localVideoRef.current = el;
+    if (el && pendingVideoTrack.current) {
+      pendingVideoTrack.current.attach(el);
+      void el.play().catch(() => {});
+      pendingVideoTrack.current = null;
+    }
+  }, []);
 
   // ── UI state ──────────────────────────────────────────────────────────────
   const [connectionStatus, setConnectionStatus] = useState<"connecting" | "live" | "error">("connecting");
@@ -404,13 +416,16 @@ export default function InstructorBroadcaster({
       // 3. Register ALL events BEFORE connect()
 
       room.on(RoomEvent.Connected, () => {
-        console.log(`[Instructor] connected — room=${room.name}`);
-        if (activeRef.current) setConnectionStatus("live");
+        console.log(`[Instructor] connected — room=${room.name} numParticipants=${room.numParticipants}`);
+        if (activeRef.current) { setConnectionStatus("live"); setErrorMsg(""); }
       });
 
-      room.on(RoomEvent.Disconnected, () => {
-        console.log("[Instructor] disconnected");
-        if (activeRef.current) setConnectionStatus("error");
+      room.on(RoomEvent.Disconnected, (reason) => {
+        console.log(`[Instructor] disconnected — reason=${reason ?? "unknown"}`);
+        if (activeRef.current) {
+          setConnectionStatus("error");
+          setErrorMsg(`Disconnected: ${reason ?? "unknown reason"}`);
+        }
       });
 
       room.on(RoomEvent.Reconnecting, () => console.log("[Instructor] reconnecting…"));
@@ -499,7 +514,8 @@ export default function InstructorBroadcaster({
       } catch (err) {
         console.error("[Instructor] room.connect() failed:", err);
         if (activeRef.current) {
-          setErrorMsg(err instanceof Error ? err.message : "Connection failed");
+          const msg = err instanceof Error ? err.message : "Connection failed";
+          setErrorMsg(`LiveKit error: ${msg}`);
           setConnectionStatus("error");
         }
         return;
@@ -522,9 +538,13 @@ export default function InstructorBroadcaster({
         audioTrackRef.current = audioTrack;
         if (activeRef.current && audioTrack) setMicTrackForMeter(audioTrack);
 
-        if (videoTrack && localVideoRef.current) {
-          videoTrack.attach(localVideoRef.current);
-          void localVideoRef.current.play().catch(() => {});
+        if (videoTrack) {
+          if (localVideoRef.current) {
+            videoTrack.attach(localVideoRef.current);
+            void localVideoRef.current.play().catch(() => {});
+          } else {
+            pendingVideoTrack.current = videoTrack;
+          }
         }
 
         for (const track of tracks) {
@@ -844,7 +864,7 @@ export default function InstructorBroadcaster({
           <div style={rightCol}>
             <div style={selfPreviewWrap}>
               <div style={selfPreviewStage}>
-                <video ref={localVideoRef} autoPlay playsInline muted style={selfPreviewVideo} />
+                <video ref={selfVideoCallbackRef} autoPlay playsInline muted style={selfPreviewVideo} />
                 {!cameraOn && (
                   <div style={cameraOffOverlay}>
                     <p style={{ margin: 0, color: "#a38b80", fontSize: "0.85rem" }}>Camera OFF</p>
