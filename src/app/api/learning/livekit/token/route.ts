@@ -49,23 +49,27 @@ export async function GET(request: Request) {
   }
 
   const room = `classroom-${learningClass.id}`;
-  const identity = isAdmin ? `instructor-${adminSession.sub}` : `student-${studentSession!.sub}`;
+  const identity = isAdmin
+    ? `instructor-${adminSession.sub}`
+    : `student-${studentSession!.sub}`;
 
+  // Resolve a real display name so student tiles show the actual name
+  // rather than the raw identity string.
   let displayName = identity;
   if (isAdmin) {
-    const admin = await prisma.admin.findUnique({ where: { id: adminSession.sub }, select: { fullName: true } });
+    const admin = await prisma.admin.findUnique({
+      where: { id: adminSession.sub },
+      select: { fullName: true },
+    });
     displayName = admin?.fullName ?? "Instructor";
   } else if (enrolledStudent) {
     displayName = enrolledStudent.fullName;
   }
 
-  // Every participant — instructor and student alike — can publish, subscribe,
-  // and send data messages. This is a live classroom, not a one-way broadcast:
-  // students are meant to be seen and heard just as much as the instructor.
-  // A previous version gated student publishing behind an in-app "permission"
-  // flow, but that flow only ever updated the UI — it never changed what
-  // LiveKit's own server would actually allow, so a student's publish attempt
-  // was silently rejected no matter what the UI showed.
+  // Every participant — instructor and student — can publish, subscribe,
+  // and send data messages. Students publish their camera/mic automatically
+  // on join; the instructor sees them as live video tiles with no manual
+  // accept step required.
   const token = new AccessToken(apiKey, apiSecret, { identity, name: displayName });
   token.addGrant({
     roomJoin: true,

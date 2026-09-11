@@ -1,9 +1,64 @@
-"use client";
+﻿"use client";
 
-import { useEffect, useRef, useState } from "react";
-import { createLocalTracks, LocalTrack, Room, RoomEvent, VideoPresets } from "livekit-client";
+import { useEffect, useRef, useState, useCallback } from "react";
+import {
+  createLocalTracks,
+  LocalTrack,
+  Room,
+  RoomEvent,
+  Track,
+  RemoteParticipant,
+  RemoteTrackPublication,
+  VideoPresets,
+} from "livekit-client";
 import ClassroomChat from "@/components/ClassroomChat";
 import { LocalClassroomPeer } from "@/lib/localP2P";
+
+// ── Per-student live video tile ───────────────────────────────────────────────
+// Isolated component so the <video> element is stable across re-renders.
+// React never re-creates it on unrelated state changes, which would
+// detach the LiveKit track and blank the feed.
+
+type StudentTile = {
+  identity: string;
+  name: string;
+  videoPublication: RemoteTrackPublication | null;
+};
+
+function StudentVideoTile({ tile }: { tile: StudentTile }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    const pub = tile.videoPublication;
+    if (!pub?.track) return;
+    if (videoRef.current) {
+      pub.track.attach(videoRef.current);
+      void videoRef.current.play().catch(() => {});
+    }
+    return () => {
+      if (videoRef.current) pub.track?.detach(videoRef.current);
+    };
+  }, [tile.videoPublication]);
+
+  return (
+    <div style={tileCard}>
+      <div style={tileVideoWrap}>
+        {tile.videoPublication?.track ? (
+          <video ref={videoRef} autoPlay playsInline muted style={tileVideo} />
+        ) : (
+          <div style={tileNoVideo}>
+            <span style={tileAvatarIcon}>👤</span>
+            <span style={tileNoVideoText}>Camera connecting…</span>
+          </div>
+        )}
+        <span style={tileLiveDot}>● LIVE</span>
+      </div>
+      <span style={tileName}>{tile.name}</span>
+    </div>
+  );
+}
+
+// ── Main InstructorBroadcaster ────────────────────────────────────────────────
 
 export default function InstructorBroadcaster({
   classId,
@@ -19,45 +74,58 @@ export default function InstructorBroadcaster({
   const roomRef = useRef<Room | null>(null);
   const localTracksRef = useRef<LocalTrack[]>([]);
   const p2pRef = useRef<LocalClassroomPeer | null>(null);
+  const bcRef = useRef<BroadcastChannel | null>(null);
 
   const [quality, setQuality] = useState<"4k" | "1080p" | "720p" | "480p">("1080p");
-  const [status, setStatus] = useState("Initializing camera & microphone...");
+  const [status, setStatus] = useState("Initializing camera & microphone…");
   const [isBroadcasting, setIsBroadcasting] = useState(false);
   const [cameraOn, setCameraOn] = useState(true);
   const [micOn, setMicOn] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
 
-  const getResolutionPreset = (preset: "4k" | "1080p" | "720p" | "480p") => {
-    switch (preset) {
-      case "4k":
-        return VideoPresets.h2160.resolution;
-      case "1080p":
-        return VideoPresets.h1080.resolution;
-      case "720p":
-        return VideoPresets.h720.resolution;
-      case "480p":
-        return { width: 854, height: 480, frameRate: 30 };
-    }
-  };
+  // Live student tiles keyed by participant identity
+  const [studentTiles, setStudentTiles] = useState<Record<string, StudentTile>>({});
 
-  const [remoteParticipants, setRemoteParticipants] = useState<{ identity: string; name: string; canVideo: boolean }[]>([]);
-  const [permittedStudents, setPermittedStudents] = useState<Record<string, boolean>>({});
-  const [raisedHands, setRaisedHands] = useState<Record<string, string>>({}); // identity -> name
-  const [studentFrames, setStudentFrames] = useState<Record<string, string>>({}); // identity -> base64 frame
-
-  // Real per-student video/audio, from actual LiveKit tracks — this is what
-  // was missing before: remoteParticipants only ever tracked names for a
-  // roster list, nothing here ever subscribed to or rendered a student's
-  // actual camera/mic. studentMediaRefs holds the live DOM elements;
-  // studentHasTrack just triggers a re-render when a tile needs to appear.
-  const studentMediaRefs = useRef<Record<string, { video: HTMLVideoElement | null; audio: HTMLAudioElement | null }>>({});
-  const [studentHasTrack, setStudentHasTrack] = useState<Record<string, boolean>>({});
+  // Hand-raise (BroadcastChannel / same-machine signalling)
+  const [raisedHands, setRaisedHands] = useState<Record<string, string>>({});
 
   const [showPollModal, setShowPollModal] = useState(false);
   const [pollQuestion, setPollQuestion] = useState("");
   const [pollOptionsStr, setPollOptionsStr] = useState("Yes, No, Needs Clarification");
 
-  const bcRef = useRef<BroadcastChannel | null>(null);
+  const getResolutionPreset = (preset: "4k" | "1080p" | "720p" | "480p") => {
+    switch (preset) {
+      case "4k":    return VideoPresets.h2160.resolution;
+      case "1080p": return VideoPresets.h1080.resolution;
+      case "720p":  return VideoPresets.h720.resolution;
+      case "480p":  return { width: 854, height: 480, frameRate: 30 };
+    }
+  };
+
+  // Seed tile map from participants already in the room when we join
+  const syncTiles = useCallback((room: Room) => {
+    setStudentTiles(() => {
+      const next: Record<string, StudentTile> = {};
+      for (const [identity, rp] of Array.from(room.remoteParticipants.entries())) {
+        if (identity.startsWith("instructor-")) continue;
+        let videoPub: RemoteTrackPublication | null = null;
+        for (const pub of Array.from(rp.trackPublications.values())) {
+          if (pub.kind === Track.Kind.Video && pub.isSubscribed && pub.track) {
+            videoPub = pub;
+            break;
+          }
+        }
+        next[identity] = {
+          identity,
+          name: rp.name || identity.replace(/^student-/, ""),
+          videoPublication: videoPub,
+        };
+      }
+      return next;
+    });
+  }, []);
+
+  // ── Broadcast effect ──────────────────────────────────────────────────────
 
   useEffect(() => {
     let active = true;
@@ -65,35 +133,28 @@ export default function InstructorBroadcaster({
     let pingInterval: NodeJS.Timeout | undefined;
     let bc: BroadcastChannel | undefined;
 
+    // BroadcastChannel — same-machine tab signalling + JPEG fallback frames
     try {
       bc = new BroadcastChannel(`nak-classroom-${classId}`);
       bcRef.current = bc;
       bc.postMessage({ type: "INSTRUCTOR_PING" });
 
       pingInterval = setInterval(() => {
-        if (bc) bc.postMessage({ type: "INSTRUCTOR_PING" });
+        bc?.postMessage({ type: "INSTRUCTOR_PING" });
       }, 3000);
 
       bc.onmessage = (event) => {
         if (!active) return;
-        const data = event.data;
-        if (!data) return;
-
-        if (data.type === "STUDENT_JOIN" && data.identity) {
-          setRemoteParticipants((prev) => {
-            if (prev.some((p) => p.identity === data.identity)) return prev;
-            return [...prev, { identity: data.identity, name: data.name || data.identity, canVideo: !!permittedStudents[data.identity] }];
-          });
-        } else if (data.type === "RAISE_HAND" && data.identity) {
-          setRaisedHands((prev) => ({ ...prev, [data.identity]: data.name || data.identity }));
-        } else if (data.type === "LOWER_HAND" && data.identity) {
+        const d = event.data;
+        if (!d) return;
+        if (d.type === "RAISE_HAND" && d.identity) {
+          setRaisedHands((prev) => ({ ...prev, [d.identity]: d.name || d.identity }));
+        } else if (d.type === "LOWER_HAND" && d.identity) {
           setRaisedHands((prev) => {
             const next = { ...prev };
-            delete next[data.identity];
+            delete next[d.identity];
             return next;
           });
-        } else if (data.type === "STUDENT_FRAME" && data.identity && data.frame) {
-          setStudentFrames((prev) => ({ ...prev, [data.identity]: data.frame }));
         }
       };
     } catch {
@@ -101,13 +162,12 @@ export default function InstructorBroadcaster({
     }
 
     async function startBroadcast() {
-      // Capture local camera & mic tracks first so video renders locally immediately
       try {
+        // 1. Capture instructor camera + mic
         const tracks = await createLocalTracks({
           audio: true,
           video: { resolution: getResolutionPreset(quality) },
         });
-
         localTracksRef.current = tracks;
 
         const mediaTracks = tracks.map((t) => t.mediaStreamTrack);
@@ -117,7 +177,6 @@ export default function InstructorBroadcaster({
           localVideoRef.current.srcObject = localStream;
           void localVideoRef.current.play().catch(() => {});
         }
-
         for (const track of tracks) {
           if (track.kind === "video" && localVideoRef.current) {
             track.attach(localVideoRef.current);
@@ -125,7 +184,7 @@ export default function InstructorBroadcaster({
           }
         }
 
-        // Initialize 2-Way Local WebRTC P2P Call
+        // 2. Local P2P for same-machine student audio
         try {
           const peer = new LocalClassroomPeer(classId, "instructor");
           p2pRef.current = peer;
@@ -137,26 +196,20 @@ export default function InstructorBroadcaster({
             }
           };
         } catch {
-          // P2P initialization fallback
+          // P2P not available
         }
 
         if (active) {
           setStatus("BROADCASTING LIVE");
           setIsBroadcasting(true);
-          // Sync LIVE status with backend DB
           void fetch("/api/admin/learning", {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              type: "class",
-              id: classId,
-              title: classTitle,
-              status: "LIVE",
-            }),
+            body: JSON.stringify({ type: "class", id: classId, title: classTitle, status: "LIVE" }),
           }).catch(() => {});
         }
 
-        // Setup local BroadcastChannel fallback stream
+        // 3. BroadcastChannel JPEG frames for same-machine students
         const canvas = document.createElement("canvas");
         const ctx = canvas.getContext("2d");
         fallbackInterval = setInterval(() => {
@@ -176,73 +229,76 @@ export default function InstructorBroadcaster({
           }
         }, 100);
 
-        // Connect to LiveKit server if credentials are configured
+        // 4. Connect to LiveKit and subscribe to student tracks
         try {
-          const response = await fetch(`/api/learning/livekit/token?classId=${encodeURIComponent(classId)}`);
-          const data = await response.json();
-          if (response.ok && data.url && data.token) {
-            const room = new Room();
-            roomRef.current = room;
+          const res = await fetch(
+            `/api/learning/livekit/token?classId=${encodeURIComponent(classId)}`
+          );
+          const data = await res.json();
+          if (!res.ok || !data.url || !data.token) throw new Error("LiveKit not configured");
 
-            const updateRoster = () => {
-              if (!active) return;
-              const list: { identity: string; name: string; canVideo: boolean }[] = [];
-              for (const rp of Array.from(room.remoteParticipants.values())) {
-                list.push({
-                  identity: rp.identity,
-                  name: rp.name || rp.identity,
-                  canVideo: !!permittedStudents[rp.identity],
-                });
-              }
-              setRemoteParticipants(list);
-            };
+          const room = new Room();
+          roomRef.current = room;
 
-            room.on(RoomEvent.ParticipantConnected, updateRoster);
-            room.on(RoomEvent.ParticipantDisconnected, updateRoster);
+          // New student joins → add tile immediately, no manual accept needed
+          room.on(RoomEvent.ParticipantConnected, (rp: RemoteParticipant) => {
+            if (!active || rp.identity.startsWith("instructor-")) return;
+            setStudentTiles((prev) => ({
+              ...prev,
+              [rp.identity]: {
+                identity: rp.identity,
+                name: rp.name || rp.identity.replace(/^student-/, ""),
+                videoPublication: null,
+              },
+            }));
+          });
 
-            // The actual fix: subscribe to and render each student's real
-            // published tracks. Attaching to a ref that isn't mounted yet
-            // (tile renders after this event fires) is handled by also
-            // re-attempting the attach once the tile's ref callback runs.
-            room.on(RoomEvent.TrackSubscribed, (track, _publication, participant) => {
-              if (!active) return;
-              const identity = participant.identity;
-              if (track.kind === "video") {
-                const el = studentMediaRefs.current[identity]?.video;
-                if (el) track.attach(el);
-              } else if (track.kind === "audio") {
-                const el = studentMediaRefs.current[identity]?.audio;
-                if (el) track.attach(el);
-              }
-              setStudentHasTrack((prev) => ({ ...prev, [identity]: true }));
+          // Student disconnects → remove tile
+          room.on(RoomEvent.ParticipantDisconnected, (rp: RemoteParticipant) => {
+            if (!active) return;
+            setStudentTiles((prev) => {
+              const next = { ...prev };
+              delete next[rp.identity];
+              return next;
             });
-            room.on(RoomEvent.TrackUnsubscribed, (track, _publication, participant) => {
-              track.detach();
-              if (!active) return;
-              setStudentHasTrack((prev) => {
-                const stillHasAny = participant.videoTrackPublications.size > 0 || participant.audioTrackPublications.size > 0;
-                if (stillHasAny) return prev;
-                const next = { ...prev };
-                delete next[participant.identity];
-                return next;
-              });
+          });
+
+          // Student's video track becomes available → attach to their tile
+          room.on(RoomEvent.TrackSubscribed, (_track, pub, rp: RemoteParticipant) => {
+            if (!active || rp.identity.startsWith("instructor-")) return;
+            if (pub.kind !== Track.Kind.Video) return;
+            setStudentTiles((prev) => {
+              if (!prev[rp.identity]) return prev;
+              return { ...prev, [rp.identity]: { ...prev[rp.identity], videoPublication: pub } };
             });
+          });
 
-            await room.connect(data.url, data.token);
+          // Student's video removed → show placeholder
+          room.on(RoomEvent.TrackUnsubscribed, (_track, pub, rp: RemoteParticipant) => {
+            if (!active || pub.kind !== Track.Kind.Video) return;
+            setStudentTiles((prev) => {
+              if (!prev[rp.identity]) return prev;
+              return { ...prev, [rp.identity]: { ...prev[rp.identity], videoPublication: null } };
+            });
+          });
 
-            for (const track of tracks) {
-              if (track.kind === "video") {
-                await room.localParticipant.publishTrack(track, { simulcast: true });
-              } else {
-                await room.localParticipant.publishTrack(track);
-              }
+          await room.connect(data.url, data.token);
+
+          // Publish instructor tracks
+          for (const track of tracks) {
+            if (track.kind === "video") {
+              await room.localParticipant.publishTrack(track, { simulcast: true });
+            } else {
+              await room.localParticipant.publishTrack(track);
             }
           }
+
+          // Seed tiles for students already in the room when we join
+          if (active) syncTiles(room);
         } catch {
-          // LiveKit cloud server not configured — local fallback continues
+          // LiveKit not configured — BroadcastChannel fallback continues
         }
       } catch (err) {
-        console.error("Instructor broadcast error:", err);
         if (active) {
           const msg = err instanceof Error ? err.message : "Failed to start broadcast";
           setErrorMsg(msg);
@@ -257,102 +313,43 @@ export default function InstructorBroadcaster({
       active = false;
       if (fallbackInterval) clearInterval(fallbackInterval);
       if (pingInterval) clearInterval(pingInterval);
-      if (p2pRef.current) p2pRef.current.destroy();
-      if (bc) {
-        bc.postMessage({ type: "STOP" });
-        bc.close();
-      }
-      for (const track of localTracksRef.current) {
-        track.stop();
-        track.detach();
-      }
+      if (p2pRef.current) { p2pRef.current.destroy(); p2pRef.current = null; }
+      if (bc) { bc.postMessage({ type: "STOP" }); bc.close(); }
+      for (const track of localTracksRef.current) { track.stop(); track.detach(); }
+      localTracksRef.current = [];
       roomRef.current?.removeAllListeners();
       void roomRef.current?.disconnect();
     };
-  }, [classId, quality]);
+  }, [classId, quality, syncTiles]);
 
-  const attachExistingStudentTracks = (identity: string) => {
-    const room = roomRef.current;
-    const refs = studentMediaRefs.current[identity];
-    if (!room || !refs) return;
-    const participant = room.remoteParticipants.get(identity);
-    if (!participant) return;
-    if (refs.video) {
-      for (const pub of participant.videoTrackPublications.values()) {
-        if (pub.track) pub.track.attach(refs.video);
-      }
-    }
-    if (refs.audio) {
-      for (const pub of participant.audioTrackPublications.values()) {
-        if (pub.track) pub.track.attach(refs.audio);
-      }
-    }
-  };
-
-  const toggleVideoPermission = async (targetIdentity: string) => {
-    const nextState = !permittedStudents[targetIdentity];
-    setPermittedStudents((prev) => ({ ...prev, [targetIdentity]: nextState }));
-
-    // Lower student hand if permission is granted
-    if (nextState) {
-      setRaisedHands((prev) => {
-        const next = { ...prev };
-        delete next[targetIdentity];
-        return next;
-      });
-    }
-
-    if (bcRef.current) {
-      bcRef.current.postMessage({
-        type: nextState ? "GRANT_VIDEO" : "REVOKE_VIDEO",
-        targetIdentity,
-      });
-    }
-
-    if (roomRef.current) {
-      
-      const payload = new TextEncoder().encode(
-        JSON.stringify({
-          type: nextState ? "GRANT_VIDEO" : "REVOKE_VIDEO",
-          targetIdentity,
-        })
-      );
-      await roomRef.current.localParticipant.publishData(payload, { reliable: true });
-    }
-  };
+  // ── Camera / mic controls ─────────────────────────────────────────────────
 
   const toggleCamera = () => {
-    const videoTrack = localTracksRef.current.find((t) => t.kind === "video");
-    if (videoTrack) {
-      if (cameraOn) {
-        videoTrack.mute();
-        setCameraOn(false);
-      } else {
-        videoTrack.unmute();
-        setCameraOn(true);
-      }
-    }
+    const vt = localTracksRef.current.find((t) => t.kind === "video");
+    if (!vt) return;
+    if (cameraOn) { vt.mute(); setCameraOn(false); }
+    else          { vt.unmute(); setCameraOn(true); }
   };
 
   const toggleMic = () => {
-    const audioTrack = localTracksRef.current.find((t) => t.kind === "audio");
-    if (audioTrack) {
-      if (micOn) {
-        audioTrack.mute();
-        setMicOn(false);
-      } else {
-        audioTrack.unmute();
-        setMicOn(true);
-      }
-    }
+    const at = localTracksRef.current.find((t) => t.kind === "audio");
+    if (!at) return;
+    if (micOn) { at.mute(); setMicOn(false); }
+    else       { at.unmute(); setMicOn(true); }
   };
+
+  const studentCount = Object.keys(studentTiles).length;
+
+  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <div style={overlay}>
       <div style={modalCard}>
+
+        {/* Header */}
         <div style={modalHeader}>
           <div>
-            <span style={liveTag}>INSTRUCTOR LIVE STUDIO (ADAPTIVE 4K & LIVE MONITOR)</span>
+            <span style={liveTag}>INSTRUCTOR LIVE STUDIO</span>
             <h3 style={modalTitle}>{classTitle}</h3>
           </div>
           <button type="button" onClick={onClose} style={closeBtn}>
@@ -362,151 +359,73 @@ export default function InstructorBroadcaster({
 
         <audio ref={remoteAudioRef} autoPlay style={{ display: "none" }} />
 
-        {/* Hand Raise Live Notifications */}
+        {/* Hand-raise notifications */}
         {Object.keys(raisedHands).length > 0 && (
           <div style={handRaiseBanner}>
             <div style={{ flex: 1 }}>
               <strong style={{ color: "#ffd98a", fontSize: "0.85rem" }}>
-                Question / Hand Raised ({Object.keys(raisedHands).length})
+                ✋ Hand Raised ({Object.keys(raisedHands).length})
               </strong>
               <p style={{ margin: "0.15rem 0 0", fontSize: "0.78rem", color: "#f3eee7" }}>
-                {Object.values(raisedHands).join(", ")} raised their hand to ask a question!
+                {Object.values(raisedHands).join(", ")} raised their hand
               </p>
             </div>
-            {Object.keys(raisedHands).map((identity) => (
-              <button
-                key={identity}
-                type="button"
-                onClick={() => toggleVideoPermission(identity)}
-                style={grantHandBtn}
-              >
-                Grant Video & Speaking
-              </button>
-            ))}
           </div>
         )}
 
+        {/* Instructor preview */}
         <div style={previewStage}>
           <video ref={localVideoRef} autoPlay playsInline muted style={previewVideo} />
-
           {!cameraOn && (
             <div style={cameraOffOverlay}>
-              <p style={{ margin: "0.4rem 0 0", fontSize: "0.85rem", color: "#a38b80" }}>
-                Camera is turned OFF
-              </p>
+              <p style={{ margin: 0, fontSize: "0.85rem", color: "#a38b80" }}>Camera is OFF</p>
             </div>
           )}
-
           <div style={statusOverlay}>
             <span style={{ ...statusBadge, ...(isBroadcasting ? liveBadge : alertBadge) }}>
-              {isBroadcasting
-                ? `● LIVE (${quality.toUpperCase()} · ADAPTIVE SIMULCAST)`
-                : status}
+              {isBroadcasting ? `● LIVE (${quality.toUpperCase()} · SIMULCAST)` : status}
             </span>
           </div>
         </div>
 
         {errorMsg && <p style={errorNotice}>{errorMsg}</p>}
 
-        {/* Real live student video/audio — this is the actual fix. Each
-            tile subscribes to that specific student's published tracks. */}
-        {remoteParticipants.length > 0 && (
-          <div style={studentGridSection}>
-            <label style={qualityLabel}>Live Student Video ({remoteParticipants.length} connected):</label>
+        {/* ── Live student video grid ───────────────────────────────────── */}
+        <div style={studentGridSection}>
+          <div style={studentGridHeader}>
+            <span style={sectionLabel}>Connected Students ({studentCount})</span>
+            {studentCount === 0 && (
+              <span style={noStudentsNote}>Waiting for students to join…</span>
+            )}
+          </div>
+
+          {studentCount > 0 && (
             <div style={studentGrid}>
-              {remoteParticipants.map((p) => (
-                <div key={p.identity} style={studentCard}>
-                  <video
-                    ref={(el) => {
-                      studentMediaRefs.current[p.identity] = { ...studentMediaRefs.current[p.identity], video: el };
-                      if (el) attachExistingStudentTracks(p.identity);
-                    }}
-                    autoPlay
-                    playsInline
-                    muted={false}
-                    style={studentVideoFrame}
-                  />
-                  <audio
-                    ref={(el) => {
-                      studentMediaRefs.current[p.identity] = { ...studentMediaRefs.current[p.identity], audio: el };
-                      if (el) attachExistingStudentTracks(p.identity);
-                    }}
-                    autoPlay
-                  />
-                  {!studentHasTrack[p.identity] && (
-                    <div style={studentNoVideoOverlay}>Camera off</div>
-                  )}
-                  <span style={studentCardBadge}>{p.name}</span>
-                </div>
+              {Object.values(studentTiles).map((tile) => (
+                <StudentVideoTile key={tile.identity} tile={tile} />
               ))}
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
-        {/* Legacy same-device fallback grid — only matters when testing
-            student and instructor in two tabs of the same browser, where
-            LiveKit tracks above already work. Harmless to leave, safe to
-            remove once confirmed unnecessary. */}
-        {Object.keys(studentFrames).length > 0 && (
-          <div style={studentGridSection}>
-            <label style={qualityLabel}>Live Student Video Grid ({Object.keys(studentFrames).length} Active):</label>
-            <div style={studentGrid}>
-              {Object.entries(studentFrames).map(([id, frame]) => (
-                <div key={id} style={studentCard}>
-                  <img src={frame} alt="Student Feed" style={studentVideoFrame} />
-                  <span style={studentCardBadge}>{id.replace("student-", "")}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Resolution Quality Selector */}
+        {/* Resolution selector */}
         <div style={qualitySelectorRow}>
-          <label style={qualityLabel}>Broadcast Resolution & Quality:</label>
+          <label style={sectionLabel}>Broadcast Resolution:</label>
           <select
             value={quality}
             onChange={(e) => setQuality(e.target.value as "4k" | "1080p" | "720p" | "480p")}
             style={qualitySelect}
           >
-            <option value="4k">4K Ultra HD (3840 × 2160 @ 30fps) - Max Clarity</option>
-            <option value="1080p">1080p Full HD (1920 × 1080 @ 30fps)</option>
-            <option value="720p">720p HD (1280 × 720 @ 30fps) - Balanced</option>
-            <option value="480p">480p SD (854 × 480 @ 30fps) - Low Bandwidth</option>
+            <option value="4k">4K Ultra HD (3840 × 2160) — Max Clarity</option>
+            <option value="1080p">1080p Full HD (1920 × 1080)</option>
+            <option value="720p">720p HD (1280 × 720) — Balanced</option>
+            <option value="480p">480p SD (854 × 480) — Low Bandwidth</option>
           </select>
         </div>
 
-        {/* Student Video Permissions Manager */}
-        <div style={permSection}>
-          <label style={qualityLabel}>Connected Students & Video Permissions ({remoteParticipants.length}):</label>
-          {remoteParticipants.length === 0 ? (
-            <p style={permEmptyText}>No students currently connected to live classroom.</p>
-          ) : (
-            <div style={permList}>
-              {remoteParticipants.map((p) => {
-                const isPermitted = permittedStudents[p.identity];
-                return (
-                  <div key={p.identity} style={permRow}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                      <strong style={{ fontSize: "0.85rem", color: "#fff" }}>{p.name}</strong>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => toggleVideoPermission(p.identity)}
-                      style={{ ...permBtn, ...(isPermitted ? permRevokeBtn : permGrantBtn) }}
-                    >
-                      {isPermitted ? "Revoke Video Permission" : "Grant Video Permission"}
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Live Classroom Chat & Moderated Q&A */}
+        {/* Chat */}
         <div style={chatSection}>
-          <label style={qualityLabel}>Live Studio Chat & Moderated Q&A:</label>
+          <label style={sectionLabel}>Live Studio Chat &amp; Q&amp;A:</label>
           <ClassroomChat
             classId={classId}
             room={roomRef.current}
@@ -516,6 +435,7 @@ export default function InstructorBroadcaster({
           />
         </div>
 
+        {/* Controls */}
         <div style={controlsRow}>
           <button
             type="button"
@@ -524,7 +444,6 @@ export default function InstructorBroadcaster({
           >
             {cameraOn ? "Camera ON" : "Camera OFF"}
           </button>
-
           <button
             type="button"
             onClick={toggleMic}
@@ -532,7 +451,6 @@ export default function InstructorBroadcaster({
           >
             {micOn ? "Microphone ON" : "Microphone Muted"}
           </button>
-
           <button
             type="button"
             onClick={() => setShowPollModal(true)}
@@ -540,7 +458,6 @@ export default function InstructorBroadcaster({
           >
             Launch Live Poll
           </button>
-
           <button
             type="button"
             onClick={async () => {
@@ -556,9 +473,7 @@ export default function InstructorBroadcaster({
                     recordingUrl: "/sample-replay.mp4",
                   }),
                 });
-              } catch {
-                // DB sync error
-              }
+              } catch { /* DB sync error */ }
               onClose();
             }}
             style={endBtn}
@@ -567,11 +482,13 @@ export default function InstructorBroadcaster({
           </button>
         </div>
 
-        {/* Live Poll Creation Modal */}
+        {/* Live Poll Modal */}
         {showPollModal && (
           <div style={pollOverlay}>
             <div style={pollCard}>
-              <h4 style={{ margin: "0 0 0.5rem", color: "#ffd98a", fontSize: "1.1rem" }}>Launch In-Class Live Poll</h4>
+              <h4 style={{ margin: "0 0 0.5rem", color: "#ffd98a", fontSize: "1.1rem" }}>
+                Launch In-Class Live Poll
+              </h4>
               <p style={{ margin: "0 0 0.8rem", fontSize: "0.8rem", color: "#b08585" }}>
                 Ask enrolled students a question in real-time during your live lecture.
               </p>
@@ -592,7 +509,6 @@ export default function InstructorBroadcaster({
                 placeholder="Yes, No, Partially"
                 style={pollInput}
               />
-
               <div style={{ display: "flex", gap: "0.5rem", marginTop: "1rem", justifyContent: "flex-end" }}>
                 <button type="button" onClick={() => setShowPollModal(false)} style={pollCancelBtn}>
                   Cancel
@@ -619,9 +535,7 @@ export default function InstructorBroadcaster({
                       }
                       setShowPollModal(false);
                       setPollQuestion("");
-                    } catch {
-                      // Poll launch error
-                    }
+                    } catch { /* Poll launch error */ }
                   }}
                   style={pollSubmitBtn}
                 >
@@ -631,108 +545,60 @@ export default function InstructorBroadcaster({
             </div>
           </div>
         )}
+
       </div>
     </div>
   );
 }
 
-const pollOverlay = {
+// ── Styles ────────────────────────────────────────────────────────────────────
+
+const overlay: React.CSSProperties = {
   position: "fixed",
   inset: 0,
-  background: "rgba(0,0,0,0.85)",
-  zIndex: 10000,
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  padding: "1rem",
-} as const;
-
-const pollCard = {
-  background: "#220c0c",
-  border: "1px solid #98661B",
-  borderRadius: 10,
-  padding: "1.25rem",
-  width: "420px",
-  maxWidth: "100%",
-  color: "#fff",
-} as const;
-
-const pollInput = {
-  width: "100%",
-  background: "#120505",
-  border: "1px solid #4d1c1c",
-  borderRadius: 6,
-  padding: "0.55rem 0.75rem",
-  color: "#fff",
-  fontSize: "0.85rem",
-} as const;
-
-const pollCancelBtn = {
-  background: "#331010",
-  color: "#ff9999",
-  border: "none",
-  borderRadius: 6,
-  padding: "0.45rem 0.85rem",
-  fontSize: "0.82rem",
-  cursor: "pointer",
-} as const;
-
-const pollSubmitBtn = {
-  background: "linear-gradient(135deg, #98661B, #d4af37)",
-  color: "#1a0808",
-  border: "none",
-  borderRadius: 6,
-  padding: "0.45rem 0.95rem",
-  fontSize: "0.82rem",
-  fontWeight: 800,
-  cursor: "pointer",
-} as const;
-
-const overlay = {
-  position: "fixed",
-  inset: 0,
-  background: "rgba(0, 0, 0, 0.75)",
+  background: "rgba(0,0,0,0.75)",
   backdropFilter: "blur(4px)",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
   zIndex: 9999,
   padding: "1rem",
-} as const;
+  overflowY: "auto",
+};
 
-const modalCard = {
+const modalCard: React.CSSProperties = {
   background: "#1e1312",
   border: "1px solid #98661B",
   borderRadius: 10,
   padding: "1.2rem",
   width: "100%",
-  maxWidth: 640,
+  maxWidth: 780,
   color: "#f3eee7",
   display: "flex",
   flexDirection: "column",
   gap: "1rem",
-} as const;
+};
 
-const modalHeader = {
+const modalHeader: React.CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
   alignItems: "flex-start",
-} as const;
+};
 
-const liveTag = {
+const liveTag: React.CSSProperties = {
   color: "#98661B",
   fontSize: "0.72rem",
   fontWeight: 700,
   letterSpacing: "0.05em",
-} as const;
+};
 
-const modalTitle = {
+const modalTitle: React.CSSProperties = {
   margin: "0.2rem 0 0",
   fontSize: "1.15rem",
   color: "#fff",
-} as const;
+};
 
-const closeBtn = {
+const closeBtn: React.CSSProperties = {
   background: "transparent",
   border: "1px solid #4a2725",
   color: "#a38b80",
@@ -740,9 +606,9 @@ const closeBtn = {
   padding: "0.35rem 0.65rem",
   fontSize: "0.8rem",
   cursor: "pointer",
-} as const;
+};
 
-const previewStage = {
+const previewStage: React.CSSProperties = {
   position: "relative",
   background: "#100707",
   border: "1px solid #3b2220",
@@ -752,107 +618,168 @@ const previewStage = {
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-} as const;
+};
 
-const previewVideo = {
+const previewVideo: React.CSSProperties = {
   width: "100%",
   height: "100%",
   objectFit: "cover",
-} as const;
+};
 
-const cameraOffOverlay = {
+const cameraOffOverlay: React.CSSProperties = {
   position: "absolute",
   inset: 0,
   background: "#120a09",
   display: "flex",
-  flexDirection: "column",
   alignItems: "center",
   justifyContent: "center",
-} as const;
+};
 
-const statusOverlay = {
+const statusOverlay: React.CSSProperties = {
   position: "absolute",
   top: "0.6rem",
   left: "0.6rem",
-} as const;
+};
 
-const statusBadge = {
+const statusBadge: React.CSSProperties = {
   fontSize: "0.75rem",
   fontWeight: 700,
   padding: "0.25rem 0.6rem",
   borderRadius: 4,
-} as const;
+};
 
-const liveBadge = {
+const liveBadge: React.CSSProperties = {
   background: "#4d1010",
   color: "#4dff88",
   border: "1px solid #2e5938",
-} as const;
+};
 
-const alertBadge = {
+const alertBadge: React.CSSProperties = {
   background: "#331a08",
   color: "#ffd98a",
   border: "1px solid #98661B",
-} as const;
+};
 
-const errorNotice = {
+const errorNotice: React.CSSProperties = {
   color: "#ff6b6b",
   fontSize: "0.82rem",
   margin: 0,
-} as const;
+};
 
-const controlsRow = {
+const handRaiseBanner: React.CSSProperties = {
+  background: "#3d1f05",
+  border: "1px solid #98661B",
+  borderRadius: 6,
+  padding: "0.6rem 0.8rem",
   display: "flex",
+  alignItems: "center",
   gap: "0.6rem",
-  flexWrap: "wrap",
-} as const;
+};
 
-const ctrlBtn = {
-  flex: 1,
-  padding: "0.65rem",
-  borderRadius: 6,
-  fontSize: "0.85rem",
-  fontWeight: 600,
-  cursor: "pointer",
-  border: "1px solid transparent",
-} as const;
-
-const activeCtrlBtn = {
-  background: "#331614",
-  borderColor: "#98661B",
-  color: "#ffd98a",
-} as const;
-
-const mutedCtrlBtn = {
-  background: "#180c0b",
-  borderColor: "#3b2220",
-  color: "#8c766b",
-} as const;
-
-const endBtn = {
-  background: "#4d1010",
-  borderColor: "#ff4d4d",
-  color: "#fff",
-  padding: "0.65rem 1rem",
-  borderRadius: 6,
-  fontSize: "0.85rem",
-  fontWeight: 600,
-  cursor: "pointer",
-} as const;
-
-const qualitySelectorRow = {
+const studentGridSection: React.CSSProperties = {
   display: "flex",
   flexDirection: "column",
-  gap: "0.35rem",
-} as const;
+  gap: "0.5rem",
+  background: "#180c0b",
+  border: "1px solid #3b2220",
+  borderRadius: 8,
+  padding: "0.85rem",
+};
 
-const qualityLabel = {
+const studentGridHeader: React.CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+};
+
+const noStudentsNote: React.CSSProperties = {
+  fontSize: "0.78rem",
+  color: "#8c766b",
+  fontStyle: "italic",
+};
+
+const studentGrid: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+  gap: "0.75rem",
+};
+
+const tileCard: React.CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  gap: "0.4rem",
+};
+
+const tileVideoWrap: React.CSSProperties = {
+  position: "relative",
+  width: "100%",
+  aspectRatio: "16 / 9",
+  background: "#100707",
+  border: "1px solid #3b2220",
+  borderRadius: 6,
+  overflow: "hidden",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+};
+
+const tileVideo: React.CSSProperties = {
+  width: "100%",
+  height: "100%",
+  objectFit: "cover",
+};
+
+const tileNoVideo: React.CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  gap: "0.3rem",
+};
+
+const tileAvatarIcon: React.CSSProperties = { fontSize: "1.8rem" };
+
+const tileNoVideoText: React.CSSProperties = {
+  fontSize: "0.68rem",
+  color: "#8c766b",
+};
+
+const tileLiveDot: React.CSSProperties = {
+  position: "absolute",
+  top: "0.3rem",
+  right: "0.3rem",
+  fontSize: "0.6rem",
+  fontWeight: 700,
+  color: "#4dff88",
+  background: "rgba(0,0,0,0.6)",
+  padding: "0.1rem 0.3rem",
+  borderRadius: 3,
+};
+
+const tileName: React.CSSProperties = {
+  fontSize: "0.78rem",
+  fontWeight: 600,
+  color: "#f3eee7",
+  textAlign: "center",
+  maxWidth: "100%",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+};
+
+const sectionLabel: React.CSSProperties = {
   fontSize: "0.8rem",
   color: "#ffd98a",
   fontWeight: 600,
-} as const;
+};
 
-const qualitySelect = {
+const qualitySelectorRow: React.CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "0.35rem",
+};
+
+const qualitySelect: React.CSSProperties = {
   background: "#100707",
   color: "#fff",
   border: "1px solid #98661B",
@@ -862,133 +789,102 @@ const qualitySelect = {
   fontWeight: 600,
   cursor: "pointer",
   outline: "none",
-} as const;
+};
 
-const permSection = {
-  display: "flex",
-  flexDirection: "column",
-  gap: "0.4rem",
-  background: "#180c0b",
-  border: "1px solid #3b2220",
-  borderRadius: 6,
-  padding: "0.75rem",
-} as const;
-
-const permEmptyText = {
-  fontSize: "0.8rem",
-  color: "#8c766b",
-  margin: 0,
-  fontStyle: "italic",
-} as const;
-
-const permList = {
-  display: "flex",
-  flexDirection: "column",
-  gap: "0.4rem",
-} as const;
-
-const permRow = {
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-  background: "#241211",
-  padding: "0.4rem 0.6rem",
-  borderRadius: 4,
-} as const;
-
-const permBtn = {
-  borderRadius: 4,
-  padding: "0.3rem 0.55rem",
-  fontSize: "0.75rem",
-  fontWeight: 600,
-  cursor: "pointer",
-  border: "none",
-} as const;
-
-const permGrantBtn = {
-  background: "#98661B",
-  color: "#fff",
-} as const;
-
-const permRevokeBtn = {
-  background: "#4d1010",
-  color: "#ff4d4d",
-  border: "1px solid #ff4d4d",
-} as const;
-
-const handRaiseBanner = {
-  background: "#3d1f05",
-  border: "1px solid #98661B",
-  borderRadius: 6,
-  padding: "0.6rem 0.8rem",
-  display: "flex",
-  alignItems: "center",
-  gap: "0.6rem",
-} as const;
-
-const grantHandBtn = {
-  background: "#98661B",
-  color: "#fff",
-  border: "none",
-  borderRadius: 4,
-  padding: "0.35rem 0.65rem",
-  fontSize: "0.78rem",
-  fontWeight: 700,
-  cursor: "pointer",
-} as const;
-
-const studentGridSection = {
-  display: "flex",
-  flexDirection: "column",
-  gap: "0.4rem",
-} as const;
-
-const studentGrid = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))",
-  gap: "0.5rem",
-} as const;
-
-const studentCard = {
-  position: "relative",
-  background: "#100707",
-  border: "1px solid #98661B",
-  borderRadius: 6,
-  aspectRatio: "16 / 9",
-  overflow: "hidden",
-} as const;
-
-const studentVideoFrame = {
-  width: "100%",
-  height: "100%",
-  objectFit: "cover",
-} as const;
-
-const studentCardBadge = {
-  position: "absolute",
-  bottom: "0.2rem",
-  left: "0.2rem",
-  background: "rgba(0,0,0,0.75)",
-  color: "#ffd98a",
-  padding: "0.1rem 0.3rem",
-  borderRadius: 3,
-  fontSize: "0.65rem",
-  fontWeight: 600,
-} as const;
-
-const studentNoVideoOverlay = {
-  position: "absolute",
-  inset: 0,
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  background: "#100707",
-  color: "#8c766b",
-  fontSize: "0.72rem",
-} as const;
-
-const chatSection = {
+const chatSection: React.CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: "0.35rem",
-} as const;
+};
+
+const controlsRow: React.CSSProperties = {
+  display: "flex",
+  gap: "0.6rem",
+  flexWrap: "wrap",
+};
+
+const ctrlBtn: React.CSSProperties = {
+  flex: 1,
+  padding: "0.65rem",
+  borderRadius: 6,
+  fontSize: "0.85rem",
+  fontWeight: 600,
+  cursor: "pointer",
+  border: "1px solid transparent",
+};
+
+const activeCtrlBtn: React.CSSProperties = {
+  background: "#331614",
+  borderColor: "#98661B",
+  color: "#ffd98a",
+};
+
+const mutedCtrlBtn: React.CSSProperties = {
+  background: "#180c0b",
+  borderColor: "#3b2220",
+  color: "#8c766b",
+};
+
+const endBtn: React.CSSProperties = {
+  background: "#4d1010",
+  border: "1px solid #ff4d4d",
+  color: "#fff",
+  padding: "0.65rem 1rem",
+  borderRadius: 6,
+  fontSize: "0.85rem",
+  fontWeight: 600,
+  cursor: "pointer",
+};
+
+const pollOverlay: React.CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  background: "rgba(0,0,0,0.85)",
+  zIndex: 10000,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: "1rem",
+};
+
+const pollCard: React.CSSProperties = {
+  background: "#220c0c",
+  border: "1px solid #98661B",
+  borderRadius: 10,
+  padding: "1.25rem",
+  width: "420px",
+  maxWidth: "100%",
+  color: "#fff",
+};
+
+const pollInput: React.CSSProperties = {
+  width: "100%",
+  background: "#120505",
+  border: "1px solid #4d1c1c",
+  borderRadius: 6,
+  padding: "0.55rem 0.75rem",
+  color: "#fff",
+  fontSize: "0.85rem",
+  boxSizing: "border-box",
+};
+
+const pollCancelBtn: React.CSSProperties = {
+  background: "#331010",
+  color: "#ff9999",
+  border: "none",
+  borderRadius: 6,
+  padding: "0.45rem 0.85rem",
+  fontSize: "0.82rem",
+  cursor: "pointer",
+};
+
+const pollSubmitBtn: React.CSSProperties = {
+  background: "linear-gradient(135deg, #98661B, #d4af37)",
+  color: "#1a0808",
+  border: "none",
+  borderRadius: 6,
+  padding: "0.45rem 0.95rem",
+  fontSize: "0.82rem",
+  fontWeight: 800,
+  cursor: "pointer",
+};
