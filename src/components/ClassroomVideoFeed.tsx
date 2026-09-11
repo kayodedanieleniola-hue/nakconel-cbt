@@ -160,6 +160,13 @@ export default function ClassroomVideoFeed({
           if (track.kind === Track.Kind.Audio && instructorAudRef.current) {
             track.attach(instructorAudRef.current);
             console.log("[Student] instructor audio attached");
+            // Browsers block autoplay of unmuted audio — attempt play() immediately;
+            // if it fails (autoplay policy), the tap-to-enable overlay will show.
+            try {
+              await instructorAudRef.current.play();
+            } catch {
+              setNeedsTap(true);
+            }
           }
         }
       });

@@ -45,15 +45,14 @@ export async function GET(request: Request) {
   const isPdf   = mime === "application/pdf";
   const inline  = isImage || isPdf;
 
-  // For PDFs with a page param, serve inline so the iframe receives the full
-  // document and the browser scrolls to the requested page via the URL hash
-  // which is appended client-side by the iframe src.
   return new NextResponse(body, {
     headers: {
       "Content-Type": material.mimeType,
       "Content-Disposition": `${inline ? "inline" : "attachment"}; filename="${safeName}"`,
       "Cache-Control": "private, no-store",
-      // Expose the page number as a header so the client can read it if needed
+      // Override the global X-Frame-Options: DENY so this file can be loaded
+      // inside the instructor's own presentation stage iframe (same origin only).
+      "X-Frame-Options": "SAMEORIGIN",
       "X-Presentation-Page": String(isNaN(page) ? 1 : page),
     },
   });
