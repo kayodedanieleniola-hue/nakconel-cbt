@@ -298,7 +298,13 @@ export default function ClassroomVideoFeed({
         )}
       </div>
 
-      <audio ref={instructorAudRef} autoPlay style={{ display: "none" }} />
+      <audio ref={instructorAudRef} autoPlay style={{
+        position: "absolute",
+        width: 0,
+        height: 0,
+        opacity: 0,
+        pointerEvents: "none",
+      }} />
 
       <div style={statusRow}>
         <span style={{ ...statusBadge, ...(isStreamActive ? liveBadge : offlineBadge) }}>
