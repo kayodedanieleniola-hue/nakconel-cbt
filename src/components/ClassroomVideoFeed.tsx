@@ -12,7 +12,7 @@
  *  3. Room stays alive; connection status is surfaced clearly.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import {
   Room,
   RoomEvent,
@@ -112,7 +112,10 @@ export default function ClassroomVideoFeed({
   const activeRef        = useRef(true);
   const instructorVidRef = useRef<HTMLVideoElement>(null);
   const instructorAudRef = useRef<HTMLAudioElement>(null);
-  const selfVidRef       = useRef<HTMLVideoElement>(null);
+  // selfVidRef uses a callback ref so the track attaches the instant
+  // the element mounts — not gated on cameraReady state.
+  const selfVidRef       = useRef<HTMLVideoElement | null>(null);
+  const pendingVidTrack  = useRef<LocalTrack | null>(null); // track waiting to attach
   const localVideoTrack  = useRef<LocalTrack | null>(null);
   const localAudioTrack  = useRef<LocalTrack | null>(null);
 
@@ -120,6 +123,18 @@ export default function ClassroomVideoFeed({
   const onPresentationRef = useRef(onPresentationState);
   useEffect(() => { onRoomReadyRef.current = onRoomReady; });
   useEffect(() => { onPresentationRef.current = onPresentationState; });
+
+  // Callback ref for self-preview — attaches the video track the instant
+  // the <video> element mounts, eliminating the race condition where
+  // vidTrack.attach() was called before the element existed in the DOM.
+  const selfVideoCallbackRef = useCallback((el: HTMLVideoElement | null) => {
+    selfVidRef.current = el;
+    if (el && pendingVidTrack.current) {
+      pendingVidTrack.current.attach(el);
+      void el.play().catch(() => {});
+      pendingVidTrack.current = null;
+    }
+  }, []);
 
   const [instructorLive,  setInstructorLive]  = useState(false);
   const [needsTap,        setNeedsTap]        = useState(false);
@@ -170,10 +185,18 @@ export default function ClassroomVideoFeed({
         localVideoTrack.current = vidTrack;
         localAudioTrack.current = audTrack;
 
-        // Show self-preview immediately — before any network calls
-        if (vidTrack && selfVidRef.current) {
-          vidTrack.attach(selfVidRef.current);
-          void selfVidRef.current.play().catch(() => {});
+        // Show self-preview immediately — before any network calls.
+        // We store the track in pendingVidTrack so the callback ref can
+        // attach it the moment the <video> element mounts in the DOM.
+        if (vidTrack) {
+          if (selfVidRef.current) {
+            // Element already mounted (re-render case)
+            vidTrack.attach(selfVidRef.current);
+            void selfVidRef.current.play().catch(() => {});
+          } else {
+            // Element not yet mounted — callback ref will attach it
+            pendingVidTrack.current = vidTrack;
+          }
         }
 
         if (activeRef.current) {
@@ -380,19 +403,43 @@ export default function ClassroomVideoFeed({
         )}
       </div>
 
-      {/* Self-preview — shown as soon as camera is captured, not gated on LiveKit */}
-      {cameraReady && (
-        <div style={selfWrap}>
-          <video ref={selfVidRef} autoPlay playsInline muted style={selfVideo} />
-          <div style={selfFooter}>
-            <span style={selfLabel}>
-              You (live){cameraPublished ? " · ✓ Connected" : " · connecting…"}
+      {/* Self-preview — always rendered once camera is granted,
+          shown immediately; no longer gated on LiveKit connection */}
+      <div style={selfWrap}>
+        {/* <video> is ALWAYS in the DOM once cameraReady.
+            CSS hides it until a track is attached (hasVideo driven by
+            cameraReady state). Using callback ref so track attaches
+            the instant the element mounts. */}
+        <video
+          ref={selfVideoCallbackRef}
+          autoPlay
+          playsInline
+          muted
+          style={{
+            ...selfVideo,
+            display: cameraReady ? "block" : "none",
+          }}
+        />
+        {!cameraReady && (
+          <div style={selfPlaceholder}>
+            <span style={{ fontSize: "1.5rem" }}>📷</span>
+            <span style={{ fontSize: "0.72rem", color: "#8c766b" }}>
+              Waiting for camera…
             </span>
           </div>
-          {/* Audio level meter — shows mic is capturing */}
-          <AudioLevelMeter track={micTrack} />
+        )}
+        <div style={selfFooter}>
+          <span style={selfLabel}>
+            {cameraReady
+              ? cameraPublished
+                ? "You (live) · ✓ Connected"
+                : "You (live) · connecting…"
+              : ""}
+          </span>
         </div>
-      )}
+        {/* Audio level meter */}
+        {cameraReady && <AudioLevelMeter track={micTrack} />}
+      </div>
 
       {cameraError && (
         <p style={camErrNote}>{cameraError}</p>
@@ -455,6 +502,15 @@ const selfVideo: React.CSSProperties = {
   width: "100%", aspectRatio: "16/9",
   objectFit: "cover", borderRadius: 4,
   border: "1px solid #98661B", background: "#100707",
+};
+const selfPlaceholder: React.CSSProperties = {
+  width: "100%", aspectRatio: "16/9",
+  background: "#100707",
+  border: "1px solid #3b2220",
+  borderRadius: 4,
+  display: "flex", flexDirection: "column",
+  alignItems: "center", justifyContent: "center",
+  gap: "0.3rem",
 };
 const selfFooter: React.CSSProperties = {
   display: "flex", justifyContent: "center",
