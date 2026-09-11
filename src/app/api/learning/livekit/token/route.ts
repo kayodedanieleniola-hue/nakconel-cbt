@@ -23,7 +23,7 @@ export async function GET(request: Request) {
         select: {
           id: true,
           name: true,
-          students: { select: { id: true, status: true } },
+          students: { select: { id: true, status: true, fullName: true } },
         },
       },
     },
@@ -32,11 +32,11 @@ export async function GET(request: Request) {
   if (!learningClass) return NextResponse.json({ error: "Class not found" }, { status: 404 });
 
   const isAdmin = !!adminSession;
-  const isEnrolledStudent =
-    !!studentSession &&
-    learningClass.course.students.some((s) => s.id === studentSession.sub && s.status === "active");
+  const enrolledStudent = studentSession
+    ? learningClass.course.students.find((s) => s.id === studentSession.sub && s.status === "active")
+    : undefined;
 
-  if (!isAdmin && !isEnrolledStudent) {
+  if (!isAdmin && !enrolledStudent) {
     return NextResponse.json({ error: "Access denied: Not enrolled in this course" }, { status: 403 });
   }
 
@@ -49,17 +49,30 @@ export async function GET(request: Request) {
   }
 
   const room = `classroom-${learningClass.id}`;
-  const identity = isAdmin
-    ? `instructor-${adminSession.sub}`
-    : `student-${studentSession!.sub}`;
+  const identity = isAdmin ? `instructor-${adminSession.sub}` : `student-${studentSession!.sub}`;
 
-  const token = new AccessToken(apiKey, apiSecret, { identity, name: identity });
+  let displayName = identity;
+  if (isAdmin) {
+    const admin = await prisma.admin.findUnique({ where: { id: adminSession.sub }, select: { fullName: true } });
+    displayName = admin?.fullName ?? "Instructor";
+  } else if (enrolledStudent) {
+    displayName = enrolledStudent.fullName;
+  }
+
+  // Every participant — instructor and student alike — can publish, subscribe,
+  // and send data messages. This is a live classroom, not a one-way broadcast:
+  // students are meant to be seen and heard just as much as the instructor.
+  // A previous version gated student publishing behind an in-app "permission"
+  // flow, but that flow only ever updated the UI — it never changed what
+  // LiveKit's own server would actually allow, so a student's publish attempt
+  // was silently rejected no matter what the UI showed.
+  const token = new AccessToken(apiKey, apiSecret, { identity, name: displayName });
   token.addGrant({
     roomJoin: true,
     room,
-    canPublish: isAdmin,
+    canPublish: true,
     canSubscribe: true,
-    canPublishData: isAdmin,
+    canPublishData: true,
   });
 
   return NextResponse.json({

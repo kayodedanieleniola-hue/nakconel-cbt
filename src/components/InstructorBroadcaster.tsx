@@ -45,6 +45,14 @@ export default function InstructorBroadcaster({
   const [raisedHands, setRaisedHands] = useState<Record<string, string>>({}); // identity -> name
   const [studentFrames, setStudentFrames] = useState<Record<string, string>>({}); // identity -> base64 frame
 
+  // Real per-student video/audio, from actual LiveKit tracks — this is what
+  // was missing before: remoteParticipants only ever tracked names for a
+  // roster list, nothing here ever subscribed to or rendered a student's
+  // actual camera/mic. studentMediaRefs holds the live DOM elements;
+  // studentHasTrack just triggers a re-render when a tile needs to appear.
+  const studentMediaRefs = useRef<Record<string, { video: HTMLVideoElement | null; audio: HTMLAudioElement | null }>>({});
+  const [studentHasTrack, setStudentHasTrack] = useState<Record<string, boolean>>({});
+
   const [showPollModal, setShowPollModal] = useState(false);
   const [pollQuestion, setPollQuestion] = useState("");
   const [pollOptionsStr, setPollOptionsStr] = useState("Yes, No, Needs Clarification");
@@ -192,6 +200,34 @@ export default function InstructorBroadcaster({
             room.on(RoomEvent.ParticipantConnected, updateRoster);
             room.on(RoomEvent.ParticipantDisconnected, updateRoster);
 
+            // The actual fix: subscribe to and render each student's real
+            // published tracks. Attaching to a ref that isn't mounted yet
+            // (tile renders after this event fires) is handled by also
+            // re-attempting the attach once the tile's ref callback runs.
+            room.on(RoomEvent.TrackSubscribed, (track, _publication, participant) => {
+              if (!active) return;
+              const identity = participant.identity;
+              if (track.kind === "video") {
+                const el = studentMediaRefs.current[identity]?.video;
+                if (el) track.attach(el);
+              } else if (track.kind === "audio") {
+                const el = studentMediaRefs.current[identity]?.audio;
+                if (el) track.attach(el);
+              }
+              setStudentHasTrack((prev) => ({ ...prev, [identity]: true }));
+            });
+            room.on(RoomEvent.TrackUnsubscribed, (track, _publication, participant) => {
+              track.detach();
+              if (!active) return;
+              setStudentHasTrack((prev) => {
+                const stillHasAny = participant.videoTrackPublications.size > 0 || participant.audioTrackPublications.size > 0;
+                if (stillHasAny) return prev;
+                const next = { ...prev };
+                delete next[participant.identity];
+                return next;
+              });
+            });
+
             await room.connect(data.url, data.token);
 
             for (const track of tracks) {
@@ -234,6 +270,24 @@ export default function InstructorBroadcaster({
       void roomRef.current?.disconnect();
     };
   }, [classId, quality]);
+
+  const attachExistingStudentTracks = (identity: string) => {
+    const room = roomRef.current;
+    const refs = studentMediaRefs.current[identity];
+    if (!room || !refs) return;
+    const participant = room.remoteParticipants.get(identity);
+    if (!participant) return;
+    if (refs.video) {
+      for (const pub of participant.videoTrackPublications.values()) {
+        if (pub.track) pub.track.attach(refs.video);
+      }
+    }
+    if (refs.audio) {
+      for (const pub of participant.audioTrackPublications.values()) {
+        if (pub.track) pub.track.attach(refs.audio);
+      }
+    }
+  };
 
   const toggleVideoPermission = async (targetIdentity: string) => {
     const nextState = !permittedStudents[targetIdentity];
@@ -354,7 +408,45 @@ export default function InstructorBroadcaster({
 
         {errorMsg && <p style={errorNotice}>{errorMsg}</p>}
 
-        {/* Live Student Monitor Grid */}
+        {/* Real live student video/audio — this is the actual fix. Each
+            tile subscribes to that specific student's published tracks. */}
+        {remoteParticipants.length > 0 && (
+          <div style={studentGridSection}>
+            <label style={qualityLabel}>Live Student Video ({remoteParticipants.length} connected):</label>
+            <div style={studentGrid}>
+              {remoteParticipants.map((p) => (
+                <div key={p.identity} style={studentCard}>
+                  <video
+                    ref={(el) => {
+                      studentMediaRefs.current[p.identity] = { ...studentMediaRefs.current[p.identity], video: el };
+                      if (el) attachExistingStudentTracks(p.identity);
+                    }}
+                    autoPlay
+                    playsInline
+                    muted={false}
+                    style={studentVideoFrame}
+                  />
+                  <audio
+                    ref={(el) => {
+                      studentMediaRefs.current[p.identity] = { ...studentMediaRefs.current[p.identity], audio: el };
+                      if (el) attachExistingStudentTracks(p.identity);
+                    }}
+                    autoPlay
+                  />
+                  {!studentHasTrack[p.identity] && (
+                    <div style={studentNoVideoOverlay}>Camera off</div>
+                  )}
+                  <span style={studentCardBadge}>{p.name}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Legacy same-device fallback grid — only matters when testing
+            student and instructor in two tabs of the same browser, where
+            LiveKit tracks above already work. Harmless to leave, safe to
+            remove once confirmed unnecessary. */}
         {Object.keys(studentFrames).length > 0 && (
           <div style={studentGridSection}>
             <label style={qualityLabel}>Live Student Video Grid ({Object.keys(studentFrames).length} Active):</label>
@@ -882,6 +974,17 @@ const studentCardBadge = {
   borderRadius: 3,
   fontSize: "0.65rem",
   fontWeight: 600,
+} as const;
+
+const studentNoVideoOverlay = {
+  position: "absolute",
+  inset: 0,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  background: "#100707",
+  color: "#8c766b",
+  fontSize: "0.72rem",
 } as const;
 
 const chatSection = {
