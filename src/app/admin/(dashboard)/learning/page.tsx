@@ -610,7 +610,7 @@ function ClassCard({
                 style={liveButton}
                 onClick={async () => {
                   await send("PATCH", { type: "class", id: item.id, title: item.title, status: "LIVE" });
-                  window.open(`/learning/general/${item.id}`, "_blank");
+                  window.open(`/admin/general/${item.id}`, "_blank");
                 }}
               >
                 {item.status === "LIVE" ? "🌐 Join Meeting" : "🌐 Start Meeting"}
