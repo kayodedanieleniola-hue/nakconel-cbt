@@ -2,15 +2,17 @@
 
 /**
  * GeneralClassroomClient — NAKCONEL Learning Center
- * Mobile layout matches the design mockup:
- *   top bar → video grid (instructor large + student tiles) →
- *   inline tab panel (Participants / Chat / Q&A / Materials) →
- *   bottom control bar
+ * Mobile layout matches the design mockup.
  * Desktop keeps the original side-panel layout.
  * All LiveKit logic is unchanged.
+ *
+ * CAMERA FIX: One hidden <video> element (hiddenSelfRef) holds the LiveKit
+ * track at all times. Visible self-tile <video> elements mirror its srcObject
+ * via a useEffect so the same stream appears in whichever tile is visible —
+ * without fighting over a shared ref.
  */
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Room, RoomEvent, Track,
@@ -22,7 +24,7 @@ import {
 const BG        = "#110505";
 const SURFACE   = "#1c0808";
 const CARD      = "#250d0d";
-const CARD2     = "#1a1a1a";   // mockup dark tile bg
+const CARD2     = "#1a1a1a";
 const RIM       = "#341414";
 const WINE      = "#6b1f1f";
 const GOLD      = "#e8b84b";
@@ -36,33 +38,27 @@ const INK       = "#180808";
 const RED       = "#e53535";
 const MIC_ON    = "#22c55e";
 const MIC_OFF   = "#e53535";
-const PANEL_BG  = "#141414";   // mockup bottom panel bg
-const PANEL_HDR = "#1e1e1e";   // mockup tab-bar bg
+const PANEL_BG  = "#141414";
+const PANEL_HDR = "#1e1e1e";
 
 /* ─── SVG icons ──────────────────────────────────────────────────────────── */
 const Mic = ({ s=18, c="currentColor" }: { s?: number; c?: string }) => (
   <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="9" y="2" width="6" height="12" rx="3"/>
-    <path d="M5 10a7 7 0 0 0 14 0"/>
-    <line x1="12" y1="19" x2="12" y2="22"/>
-    <line x1="8" y1="22" x2="16" y2="22"/>
+    <rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/>
+    <line x1="12" y1="19" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/>
   </svg>
 );
 const MicOff = ({ s=18, c="currentColor" }: { s?: number; c?: string }) => (
   <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <line x1="2" y1="2" x2="22" y2="22"/>
-    <path d="M18.89 13.23A7 7 0 0 0 19 12"/>
-    <path d="M5 10a7 7 0 0 0 11.64 5.23"/>
-    <path d="M15 9.34V6a3 3 0 0 0-5.68-1.33"/>
-    <path d="M9 9v3a3 3 0 0 0 5.12 2.12"/>
-    <line x1="12" y1="19" x2="12" y2="22"/>
-    <line x1="8" y1="22" x2="16" y2="22"/>
+    <path d="M18.89 13.23A7 7 0 0 0 19 12"/><path d="M5 10a7 7 0 0 0 11.64 5.23"/>
+    <path d="M15 9.34V6a3 3 0 0 0-5.68-1.33"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12"/>
+    <line x1="12" y1="19" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/>
   </svg>
 );
 const Cam = ({ s=18, c="currentColor" }: { s?: number; c?: string }) => (
   <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M23 7 16 12 23 17z"/>
-    <rect x="1" y="5" width="15" height="14" rx="2"/>
+    <path d="M23 7 16 12 23 17z"/><rect x="1" y="5" width="15" height="14" rx="2"/>
   </svg>
 );
 const CamOff = ({ s=18, c="currentColor" }: { s?: number; c?: string }) => (
@@ -73,10 +69,8 @@ const CamOff = ({ s=18, c="currentColor" }: { s?: number; c?: string }) => (
 );
 const People = ({ s=18, c="currentColor" }: { s?: number; c?: string }) => (
   <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-    <circle cx="9" cy="7" r="4"/>
-    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-    <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
   </svg>
 );
 const ChatIcon = ({ s=18, c="currentColor" }: { s?: number; c?: string }) => (
@@ -86,18 +80,15 @@ const ChatIcon = ({ s=18, c="currentColor" }: { s?: number; c?: string }) => (
 );
 const QAIcon = ({ s=18, c="currentColor" }: { s?: number; c?: string }) => (
   <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10"/>
-    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+    <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
     <line x1="12" y1="17" x2="12.01" y2="17"/>
   </svg>
 );
-const Materials = ({ s=18, c="currentColor" }: { s?: number; c?: string }) => (
+const MaterialsIcon = ({ s=18, c="currentColor" }: { s?: number; c?: string }) => (
   <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-    <polyline points="14 2 14 8 20 8"/>
-    <line x1="16" y1="13" x2="8" y2="13"/>
-    <line x1="16" y1="17" x2="8" y2="17"/>
-    <polyline points="10 9 9 9 8 9"/>
+    <polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/>
+    <line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
   </svg>
 );
 const More = ({ s=18, c="currentColor" }: { s?: number; c?: string }) => (
@@ -115,14 +106,12 @@ const PhoneOff = ({ s=18, c="currentColor" }: { s?: number; c?: string }) => (
 const Present = ({ s=18, c="currentColor" }: { s?: number; c?: string }) => (
   <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <rect x="2" y="3" width="20" height="14" rx="2"/>
-    <line x1="8" y1="21" x2="16" y2="21"/>
-    <line x1="12" y1="17" x2="12" y2="21"/>
+    <line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
   </svg>
 );
 const Bell = ({ s=18, c="currentColor" }: { s?: number; c?: string }) => (
   <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-    <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
   </svg>
 );
 const Search = ({ s=15, c="currentColor" }: { s?: number; c?: string }) => (
@@ -203,36 +192,25 @@ function RemoteTile({ tile, large=false, compact=false }: { tile: PTile; large?:
     return () => { if (audioRef.current) ap.track?.detach(audioRef.current); };
   }, [tile.audioPub]);
 
-  const nameFontSize = large ? "0.82rem" : compact ? "0.6rem" : "0.72rem";
-  const avatarSize   = large ? 56 : compact ? 28 : 38;
-
+  const sz = large ? 56 : compact ? 28 : 38;
   return (
     <div style={{ position:"relative", borderRadius:large?12:8, overflow:"hidden", background:CARD2, border:isHost?`2px solid ${GOLD}`:"1px solid rgba(255,255,255,0.08)", width:"100%", height:"100%", display:"flex", alignItems:"center", justifyContent:"center" }}>
-      <video ref={videoRef} autoPlay playsInline muted style={{ position:"absolute", inset:0, width:"100%", height:"100%", objectFit:"cover", display:tile.videoPub?.track?"block":"none" }}/>
-      {!tile.videoPub?.track && (
-        <div style={{ width:avatarSize, height:avatarSize, borderRadius:"50%", background:isHost?`linear-gradient(135deg,${GOLD},#f6de88)`:`linear-gradient(135deg,#2a2a2a,#3a3a3a)`, color:isHost?INK:WHITE, display:"flex", alignItems:"center", justifyContent:"center", fontSize:large?"1.5rem":compact?"0.85rem":"1.1rem", fontWeight:800, flexShrink:0 }}>
+      <video ref={videoRef} autoPlay playsInline muted style={{ position:"absolute", inset:0, width:"100%", height:"100%", objectFit:"cover", display:camLive?"block":"none" }}/>
+      {!camLive && (
+        <div style={{ width:sz, height:sz, borderRadius:"50%", background:isHost?`linear-gradient(135deg,${GOLD},#f6de88)`:`linear-gradient(135deg,#2a2a2a,#3a3a3a)`, color:isHost?INK:WHITE, display:"flex", alignItems:"center", justifyContent:"center", fontSize:large?"1.5rem":compact?"0.85rem":"1.1rem", fontWeight:800 }}>
           {tile.name.charAt(0).toUpperCase()}
         </div>
       )}
       <audio ref={audioRef} autoPlay style={{ position:"absolute", width:0, height:0, opacity:0, pointerEvents:"none" }}/>
-
-      {/* Instructor label top-left */}
       {isHost && large && (
-        <div style={{ position:"absolute", top:"0.4rem", left:"0.4rem", background:"rgba(0,0,0,0.6)", backdropFilter:"blur(4px)", borderRadius:5, padding:"0.15rem 0.45rem", fontSize:"0.62rem", color:WHITE, fontWeight:600 }}>
-          Instructor
-        </div>
+        <div style={{ position:"absolute", top:"0.4rem", left:"0.4rem", background:"rgba(0,0,0,0.6)", backdropFilter:"blur(4px)", borderRadius:5, padding:"0.15rem 0.45rem", fontSize:"0.62rem", color:WHITE, fontWeight:600 }}>Instructor</div>
       )}
-      {/* Expand icon top-right on large */}
       {large && (
-        <div style={{ position:"absolute", top:"0.4rem", right:"0.4rem", background:"rgba(0,0,0,0.5)", borderRadius:5, padding:"0.2rem", display:"flex", alignItems:"center", justifyContent:"center" }}>
-          <ExpandIcon s={13} c={WHITE}/>
-        </div>
+        <div style={{ position:"absolute", top:"0.4rem", right:"0.4rem", background:"rgba(0,0,0,0.5)", borderRadius:5, padding:"0.2rem", display:"flex" }}><ExpandIcon s={13} c={WHITE}/></div>
       )}
-
-      {/* Bottom name bar */}
-      <div style={{ position:"absolute", bottom:0, left:0, right:0, background:"linear-gradient(to top,rgba(0,0,0,0.75) 0%,transparent 100%)", padding:large?"1.5rem 0.6rem 0.45rem":compact?"0.6rem 0.35rem 0.25rem":"0.9rem 0.45rem 0.3rem", display:"flex", justifyContent:"space-between", alignItems:"flex-end" }}>
-        <span style={{ color:WHITE, fontSize:nameFontSize, fontWeight:700, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", maxWidth:"70%" }}>{tile.name}</span>
-        <div style={{ display:"flex", alignItems:"center", gap:"0.2rem" }}>
+      <div style={{ position:"absolute", bottom:0, left:0, right:0, background:"linear-gradient(to top,rgba(0,0,0,0.75),transparent)", padding:large?"1.5rem 0.6rem 0.45rem":compact?"0.6rem 0.35rem 0.25rem":"0.9rem 0.45rem 0.3rem", display:"flex", justifyContent:"space-between", alignItems:"flex-end" }}>
+        <span style={{ color:WHITE, fontSize:large?"0.82rem":compact?"0.6rem":"0.72rem", fontWeight:700, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", maxWidth:"70%" }}>{tile.name}</span>
+        <div style={{ display:"flex", gap:"0.2rem" }}>
           <div style={{ width:large?24:compact?16:20, height:large?24:compact?16:20, borderRadius:"50%", background:micLive?"rgba(34,197,94,0.25)":"rgba(229,53,53,0.7)", display:"flex", alignItems:"center", justifyContent:"center" }}>
             {micLive ? <Mic s={large?12:compact?8:10} c={MIC_ON}/> : <MicOff s={large?12:compact?8:10} c={WHITE}/>}
           </div>
@@ -247,12 +225,67 @@ function RemoteTile({ tile, large=false, compact=false }: { tile: PTile; large?:
   );
 }
 
+/* ─── Self video tile — mirrors stream from hiddenSelfRef ────────────────── */
+function SelfVideoTile({
+  hiddenSrc,
+  micOn,
+  studentName,
+  cameraOn,
+  compact = false,
+  showExpandIcon = false,
+}: {
+  hiddenSrc: MediaStream | null;
+  micOn: boolean;
+  studentName: string;
+  cameraOn: boolean;
+  compact?: boolean;
+  showExpandIcon?: boolean;
+}) {
+  const vidRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    const el = vidRef.current;
+    if (!el || !hiddenSrc) return;
+    el.srcObject = hiddenSrc;
+    void el.play().catch(() => {});
+  }, [hiddenSrc]);
+
+  const showing = !!hiddenSrc && cameraOn;
+  const sz = compact ? 26 : 44;
+
+  return (
+    <>
+      <video ref={vidRef} autoPlay playsInline muted
+        style={{ position:"absolute", inset:0, width:"100%", height:"100%", objectFit:"cover", display:showing?"block":"none" }}/>
+      {!showing && (
+        <div style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center" }}>
+          <div style={{ width:sz, height:sz, borderRadius:"50%", background:`linear-gradient(135deg,${GOLD},#f6de88)`, color:INK, display:"flex", alignItems:"center", justifyContent:"center", fontSize:compact?"0.8rem":"1.1rem", fontWeight:800 }}>
+            {studentName.charAt(0).toUpperCase()}
+          </div>
+        </div>
+      )}
+      {showExpandIcon && (
+        <div style={{ position:"absolute", top:"0.4rem", right:"0.4rem", background:"rgba(0,0,0,0.5)", borderRadius:5, padding:"0.2rem", display:"flex" }}><ExpandIcon s={12} c={WHITE}/></div>
+      )}
+      <div style={{ position:"absolute", bottom:0, left:0, right:0, background:"linear-gradient(to top,rgba(0,0,0,0.75),transparent)", padding:compact?"0.6rem 0.35rem 0.25rem":"0.9rem 0.5rem 0.3rem", display:"flex", justifyContent:"space-between", alignItems:"flex-end" }}>
+        <span style={{ color:WHITE, fontSize:compact?"0.6rem":"0.72rem", fontWeight:700 }}>{compact?"You":studentName}</span>
+        <div style={{ width:compact?16:20, height:compact?16:20, borderRadius:"50%", background:micOn?"rgba(34,197,94,0.25)":"rgba(229,53,53,0.7)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+          {micOn ? <Mic s={compact?8:10} c={MIC_ON}/> : <MicOff s={compact?8:10} c={WHITE}/>}
+        </div>
+      </div>
+    </>
+  );
+}
+
 /* ─── Main ───────────────────────────────────────────────────────────────── */
 export default function GeneralClassroomClient({ meeting, studentName }: { meeting: Meeting; studentName: string }) {
   const roomRef      = useRef<Room|null>(null);
   const activeRef    = useRef(true);
-  const selfVidRef   = useRef<HTMLVideoElement|null>(null);
-  const pendingTrack = useRef<LocalTrack|null>(null);
+
+  /* CAMERA FIX: single hidden video element always mounted — the LiveKit track
+     attaches here once and never gets unmounted. Visible tiles mirror srcObject. */
+  const hiddenSelfRef = useRef<HTMLVideoElement|null>(null);
+  const [selfStream,  setSelfStream]  = useState<MediaStream|null>(null);
 
   const [connStatus,   setConnStatus]   = useState<"connecting"|"live"|"error">("connecting");
   const [cameraReady,  setCameraReady]  = useState(false);
@@ -285,16 +318,7 @@ export default function GeneralClassroomClient({ meeting, studentName }: { meeti
     return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(sc).padStart(2,"0")}`;
   };
 
-  const selfVideoRef = useCallback((el: HTMLVideoElement|null) => {
-    selfVidRef.current = el;
-    if (el && pendingTrack.current) {
-      pendingTrack.current.attach(el);
-      void el.play().catch(() => {});
-      pendingTrack.current = null;
-    }
-  }, []);
-
-  /* LiveKit — unchanged ─────────────────────────────────────────────────── */
+  /* LiveKit — logic unchanged ───────────────────────────────────────────── */
   useEffect(() => {
     activeRef.current = true;
     async function connect() {
@@ -305,9 +329,14 @@ export default function GeneralClassroomClient({ meeting, studentName }: { meeti
           const vid = tracks.find(t => t.kind === Track.Kind.Video) ?? null;
           const aud = tracks.find(t => t.kind === Track.Kind.Audio) ?? null;
           localVideoTrack.current = vid; localAudioTrack.current = aud;
-          if (vid) {
-            if (selfVidRef.current) { vid.attach(selfVidRef.current); void selfVidRef.current.play().catch(() => {}); }
-            else pendingTrack.current = vid;
+          if (vid && vid.mediaStreamTrack) {
+            // Attach to the hidden element — always mounted
+            const stream = new MediaStream([vid.mediaStreamTrack]);
+            if (hiddenSelfRef.current) {
+              hiddenSelfRef.current.srcObject = stream;
+              void hiddenSelfRef.current.play().catch(() => {});
+            }
+            setSelfStream(stream);
           }
           if (activeRef.current) setCameraReady(true);
           return { vid, aud };
@@ -334,7 +363,7 @@ export default function GeneralClassroomClient({ meeting, studentName }: { meeti
       });
       room.on(RoomEvent.ParticipantDisconnected, (rp: RemoteParticipant) => {
         if (!activeRef.current) return;
-        setParticipants(p => { const n = { ...p }; delete n[rp.identity]; return n; });
+        setParticipants(p => { const n={...p}; delete n[rp.identity]; return n; });
       });
       room.on(RoomEvent.TrackSubscribed, (track, pub, rp: RemoteParticipant) => {
         if (!activeRef.current) return;
@@ -390,59 +419,45 @@ export default function GeneralClassroomClient({ meeting, studentName }: { meeti
     if (camOn) { void vt.mute(); setCamOn(false); } else { void vt.unmute(); setCamOn(true); }
   };
 
-  const remoteList  = Object.values(participants);
-  const totalCount  = remoteList.length + 1;
-  const hostTile    = remoteList.find(t => t.identity.startsWith("instructor-"));
-  const otherTiles  = remoteList.filter(t => !t.identity.startsWith("instructor-"));
-  const connColor   = connStatus === "live" ? MIC_ON : connStatus === "error" ? RED : GOLD;
+  const remoteList = Object.values(participants);
+  const totalCount = remoteList.length + 1;
+  const hostTile   = remoteList.find(t => t.identity.startsWith("instructor-"));
+  const otherTiles = remoteList.filter(t => !t.identity.startsWith("instructor-"));
+  const connColor  = connStatus === "live" ? MIC_ON : connStatus === "error" ? RED : GOLD;
 
-  /* ── Self video tile helper ────────────────────────────────────────────── */
-  function SelfTileContent({ compact=false }: { compact?: boolean }) {
-    const avatarSize = compact ? 26 : 44;
-    const camLive    = cameraReady && camOn;
-    return (
-      <>
-        <video ref={selfVideoRef} autoPlay playsInline muted style={{ position:"absolute", inset:0, width:"100%", height:"100%", objectFit:"cover", display:camLive?"block":"none" }}/>
-        {!camLive && (
-          <div style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center" }}>
-            <div style={{ width:avatarSize, height:avatarSize, borderRadius:"50%", background:`linear-gradient(135deg,${GOLD},#f6de88)`, color:INK, display:"flex", alignItems:"center", justifyContent:"center", fontSize:compact?"0.8rem":"1.1rem", fontWeight:800 }}>
-              {studentName.charAt(0).toUpperCase()}
-            </div>
-          </div>
-        )}
-        <div style={{ position:"absolute", bottom:0, left:0, right:0, background:"linear-gradient(to top,rgba(0,0,0,0.75) 0%,transparent 100%)", padding:compact?"0.6rem 0.35rem 0.25rem":"0.9rem 0.5rem 0.3rem", display:"flex", justifyContent:"space-between", alignItems:"flex-end" }}>
-          <span style={{ color:WHITE, fontSize:compact?"0.6rem":"0.72rem", fontWeight:700 }}>{compact?"You":studentName}</span>
-          <div style={{ width:compact?16:20, height:compact?16:20, borderRadius:"50%", background:micOn?"rgba(34,197,94,0.25)":"rgba(229,53,53,0.7)", display:"flex", alignItems:"center", justifyContent:"center" }}>
-            {micOn ? <Mic s={compact?8:10} c={MIC_ON}/> : <MicOff s={compact?8:10} c={WHITE}/>}
-          </div>
-        </div>
-      </>
-    );
-  }
+  /* shared self-tile props */
+  const selfProps = { hiddenSrc: selfStream, micOn, studentName, cameraOn: camOn && cameraReady };
 
   /* ════════════════════════════════════════════════════════════════════════ */
-  /* MOBILE LAYOUT — matches the design mockup                                */
+  /* MOBILE LAYOUT                                                            */
   /* ════════════════════════════════════════════════════════════════════════ */
   if (isMobile) {
-    /* Build the grid tiles:
-       - Slot 0 (large left): host if present, else self
-       - Slots 1-4 (2x2 right): students (first 4), self goes in first empty spot */
-    const gridStudents = otherTiles.slice(0, 4);
+    // Large left = host (if present) else self
+    // Right 4 slots = students; if host present + 0 students → self in slot 0 once only
+    const rightSlots: Array<PTile | "self" | null> = [];
+    if (hostTile) {
+      for (let i = 0; i < 4; i++) {
+        if (otherTiles[i]) rightSlots.push(otherTiles[i]);
+        else if (i === 0 && otherTiles.length === 0) rightSlots.push("self");
+        else rightSlots.push(null);
+      }
+    } else {
+      for (let i = 0; i < 4; i++) rightSlots.push(otherTiles[i] ?? null);
+    }
 
     return (
       <div style={{ height:"100dvh", background:"#0d0d0d", color:WHITE, fontFamily:"system-ui,-apple-system,'Segoe UI',sans-serif", display:"flex", flexDirection:"column", overflow:"hidden" }}>
 
-        {/* ── TOP BAR (matches mockup) ─────────────────────────────────── */}
+        {/* Always-mounted hidden video — track attaches here once, never unmounts */}
+        <video ref={hiddenSelfRef} autoPlay playsInline muted
+          style={{ position:"absolute", width:1, height:1, opacity:0, pointerEvents:"none", top:-9999 }}/>
+
+        {/* ── TOP BAR ────────────────────────────────────────────────── */}
         <div style={{ height:56, padding:"0 0.75rem", display:"flex", alignItems:"center", gap:"0.5rem", background:"#111111", borderBottom:"1px solid rgba(255,255,255,0.06)", flexShrink:0 }}>
-          {/* Back */}
           <Link href="/learning" style={{ display:"flex", alignItems:"center", justifyContent:"center", width:34, height:34, borderRadius:8, background:"rgba(255,255,255,0.07)", color:"rgba(255,255,255,0.7)", textDecoration:"none", flexShrink:0 }}>
             <BackArrow s={18} c="rgba(255,255,255,0.8)"/>
           </Link>
-
-          {/* Logo */}
           <NakLogo light compact/>
-
-          {/* Title block */}
           <div style={{ flex:1, minWidth:0, padding:"0 0.25rem" }}>
             <div style={{ color:WHITE, fontWeight:700, fontSize:"0.82rem", lineHeight:1.2, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
               {meeting.title || "General Meeting"}
@@ -452,14 +467,10 @@ export default function GeneralClassroomClient({ meeting, studentName }: { meeti
               <span style={{ background:RED, color:WHITE, fontWeight:800, fontSize:"0.52rem", padding:"0.08rem 0.38rem", borderRadius:3, letterSpacing:"0.06em" }}>LIVE</span>
             </div>
           </div>
-
-          {/* Timer */}
           <div style={{ display:"flex", alignItems:"center", gap:"0.25rem", background:"rgba(255,255,255,0.07)", border:"1px solid rgba(255,255,255,0.09)", borderRadius:7, padding:"0.22rem 0.5rem", flexShrink:0 }}>
             <span style={{ fontSize:"0.62rem", color:"rgba(255,255,255,0.5)" }}>⏱</span>
             <span style={{ fontWeight:700, fontSize:"0.72rem", fontVariantNumeric:"tabular-nums", color:WHITE }}>{fmt(elapsed)}</span>
           </div>
-
-          {/* Participants count */}
           <div style={{ width:34, height:34, borderRadius:8, background:"rgba(255,255,255,0.07)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, position:"relative" }}>
             <People s={16} c="rgba(255,255,255,0.7)"/>
             <span style={{ position:"absolute", top:-3, right:-3, background:GOLD, color:INK, borderRadius:"50%", width:15, height:15, fontSize:"0.48rem", fontWeight:800, display:"flex", alignItems:"center", justifyContent:"center" }}>
@@ -468,82 +479,61 @@ export default function GeneralClassroomClient({ meeting, studentName }: { meeti
           </div>
         </div>
 
-        {/* ── SCROLLABLE CONTENT ─────────────────────────────────────────── */}
+        {/* ── SCROLLABLE CONTENT ─────────────────────────────────────── */}
         <div style={{ flex:1, overflowY:"auto", display:"flex", flexDirection:"column", minHeight:0 }}>
 
-          {/* ── VIDEO GRID ───────────────────────────────────────────────── */}
+          {/* VIDEO GRID */}
           <div style={{ padding:"0.55rem 0.55rem 0", flexShrink:0 }}>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gridTemplateRows:"auto auto", gap:"0.4rem" }}>
-
-              {/* Left column: large instructor tile spanning 2 rows */}
+              {/* Large left */}
               <div style={{ gridColumn:"1", gridRow:"1 / 3", position:"relative", borderRadius:12, overflow:"hidden", background:CARD2, border:`2px solid ${GOLD}`, aspectRatio:"3/4", minHeight:0 }}>
-                {hostTile ? (
-                  <RemoteTile tile={hostTile} large/>
-                ) : (
-                  <div style={{ position:"absolute", inset:0 }}>
-                    {/* self in large slot when no host */}
-                    <SelfTileContent/>
-                    <div style={{ position:"absolute", top:"0.4rem", left:"0.4rem", background:"rgba(0,0,0,0.6)", backdropFilter:"blur(4px)", borderRadius:5, padding:"0.15rem 0.45rem", fontSize:"0.6rem", color:WHITE, fontWeight:600 }}>You</div>
-                    <div style={{ position:"absolute", top:"0.4rem", right:"0.4rem", background:"rgba(0,0,0,0.5)", borderRadius:5, padding:"0.2rem", display:"flex" }}><ExpandIcon s={12} c={WHITE}/></div>
-                  </div>
-                )}
-              </div>
-
-              {/* Right column: 2x2 student tiles */}
-              {[0, 1, 2, 3].map((i) => {
-                // If host is present, show students in right slots + self in last empty
-                const allRight: Array<"self" | PTile> = [];
-                if (hostTile) {
-                  for (const t of gridStudents) allRight.push(t);
-                  // Fill with self if needed
-                  while (allRight.length < 4) allRight.push("self");
-                } else {
-                  // No host: students fill right, self was already in large left
-                  for (const t of gridStudents) allRight.push(t);
-                  while (allRight.length < 4) allRight.push("self");
+                {hostTile
+                  ? <RemoteTile tile={hostTile} large/>
+                  : <SelfVideoTile {...selfProps} showExpandIcon/>
                 }
-                const slot = allRight[i];
+              </div>
+              {/* Right 4 slots */}
+              {rightSlots.map((slot, i) => {
                 if (!slot) return <div key={i} style={{ borderRadius:8, background:"rgba(255,255,255,0.04)", border:"1px dashed rgba(255,255,255,0.08)", aspectRatio:"4/3" }}/>;
-
                 return (
                   <div key={i} style={{ borderRadius:8, overflow:"hidden", background:CARD2, border:"1px solid rgba(255,255,255,0.08)", aspectRatio:"4/3", position:"relative" }}>
-                    {slot === "self" ? (
-                      <SelfTileContent compact/>
-                    ) : (
-                      <RemoteTile tile={slot} compact/>
-                    )}
+                    {slot === "self"
+                      ? <SelfVideoTile {...selfProps} compact/>
+                      : <RemoteTile tile={slot} compact/>
+                    }
                   </div>
                 );
               })}
             </div>
           </div>
 
-          {/* ── INLINE PANEL (tab bar + content) ─────────────────────────── */}
+          {/* INLINE PANEL */}
           <div style={{ flex:1, background:PANEL_BG, marginTop:"0.55rem", display:"flex", flexDirection:"column", minHeight:0 }}>
-
-            {/* Tab bar + collapse toggle */}
             <div style={{ display:"flex", alignItems:"center", background:PANEL_HDR, borderBottom:"1px solid rgba(255,255,255,0.07)", flexShrink:0 }}>
               {(["participants","chat","qa","materials"] as const).map(t => {
-                const icons = { participants: <People s={13} c={activeTab===t?GOLD:"rgba(255,255,255,0.5)"}/>, chat: <ChatIcon s={13} c={activeTab===t?GOLD:"rgba(255,255,255,0.5)"}/>, qa: <QAIcon s={13} c={activeTab===t?GOLD:"rgba(255,255,255,0.5)"}/>, materials: <Materials s={13} c={activeTab===t?GOLD:"rgba(255,255,255,0.5)"}/>  };
+                const icons = {
+                  participants:<People s={13} c={activeTab===t?GOLD:"rgba(255,255,255,0.5)"}/>,
+                  chat:<ChatIcon s={13} c={activeTab===t?GOLD:"rgba(255,255,255,0.5)"}/>,
+                  qa:<QAIcon s={13} c={activeTab===t?GOLD:"rgba(255,255,255,0.5)"}/>,
+                  materials:<MaterialsIcon s={13} c={activeTab===t?GOLD:"rgba(255,255,255,0.5)"}/>
+                };
                 const labels = { participants:"Participants", chat:"Chat", qa:"Q&A", materials:"Materials" };
                 return (
-                  <button key={t} type="button" onClick={() => { setActiveTab(t); setPanelOpen(true); }} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:"0.15rem", background:"transparent", border:"none", borderBottom:activeTab===t?`2px solid ${GOLD}`:"2px solid transparent", padding:"0.6rem 0.1rem", cursor:"pointer", WebkitTapHighlightColor:"transparent" }}>
+                  <button key={t} type="button" onClick={() => { setActiveTab(t); setPanelOpen(true); }}
+                    style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:"0.15rem", background:"transparent", border:"none", borderBottom:activeTab===t?`2px solid ${GOLD}`:"2px solid transparent", padding:"0.6rem 0.1rem", cursor:"pointer", WebkitTapHighlightColor:"transparent" }}>
                     {icons[t]}
                     <span style={{ fontSize:"0.58rem", fontWeight:600, color:activeTab===t?GOLD:"rgba(255,255,255,0.5)" }}>{labels[t]}</span>
                   </button>
                 );
               })}
-              {/* Collapse toggle */}
-              <button type="button" onClick={() => setPanelOpen(v => !v)} style={{ width:40, display:"flex", alignItems:"center", justifyContent:"center", background:"transparent", border:"none", cursor:"pointer", padding:"0.6rem 0.3rem", flexShrink:0, WebkitTapHighlightColor:"transparent" }}>
+              <button type="button" onClick={() => setPanelOpen(v => !v)}
+                style={{ width:40, display:"flex", alignItems:"center", justifyContent:"center", background:"transparent", border:"none", cursor:"pointer", padding:"0.6rem 0.3rem", flexShrink:0, WebkitTapHighlightColor:"transparent" }}>
                 {panelOpen ? <ChevronDown2 s={15} c="rgba(255,255,255,0.4)"/> : <ChevronUp s={15} c="rgba(255,255,255,0.4)"/>}
               </button>
             </div>
 
-            {/* Panel content */}
             {panelOpen && (
               <div style={{ flex:1, overflow:"hidden", display:"flex", flexDirection:"column", minHeight:180 }}>
-
-                {/* Participants */}
                 {activeTab === "participants" && (
                   <div style={{ display:"flex", flexDirection:"column", overflow:"hidden", flex:1 }}>
                     <div style={{ padding:"0.6rem 0.75rem", borderBottom:"1px solid rgba(255,255,255,0.06)", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
@@ -554,19 +544,12 @@ export default function GeneralClassroomClient({ meeting, studentName }: { meeti
                       </div>
                     </div>
                     <div style={{ flex:1, overflowY:"auto" }}>
-                      {/* Self row */}
                       <ParticipantRow name={studentName} role="Student" micOn={micOn} camOn={camOn} isHost={false} isSelf/>
-                      {/* Host row */}
                       {hostTile && <ParticipantRow name={hostTile.name} role="Instructor" micOn={!!hostTile.audioPub?.track} camOn={!!hostTile.videoPub?.track} isHost isSelf={false}/>}
-                      {/* Others */}
-                      {otherTiles.map(t => (
-                        <ParticipantRow key={t.identity} name={t.name} role="Student" micOn={!!t.audioPub?.track} camOn={!!t.videoPub?.track} isHost={false} isSelf={false}/>
-                      ))}
+                      {otherTiles.map(t => <ParticipantRow key={t.identity} name={t.name} role="Student" micOn={!!t.audioPub?.track} camOn={!!t.videoPub?.track} isHost={false} isSelf={false}/>)}
                     </div>
                   </div>
                 )}
-
-                {/* Chat */}
                 {activeTab === "chat" && (
                   <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
                     <div style={{ flex:1, overflowY:"auto", padding:"0.75rem" }}>
@@ -580,8 +563,6 @@ export default function GeneralClassroomClient({ meeting, studentName }: { meeti
                     </div>
                   </div>
                 )}
-
-                {/* Q&A */}
                 {activeTab === "qa" && (
                   <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", padding:"1.5rem" }}>
                     <div style={{ textAlign:"center" }}>
@@ -590,8 +571,6 @@ export default function GeneralClassroomClient({ meeting, studentName }: { meeti
                     </div>
                   </div>
                 )}
-
-                {/* Materials */}
                 {activeTab === "materials" && (
                   <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", padding:"1.5rem" }}>
                     <div style={{ textAlign:"center" }}>
@@ -605,16 +584,15 @@ export default function GeneralClassroomClient({ meeting, studentName }: { meeti
           </div>
         </div>
 
-        {/* ── BOTTOM CONTROL BAR (matches mockup) ──────────────────────── */}
+        {/* ── BOTTOM CONTROLS ────────────────────────────────────────── */}
         <div style={{ background:"#111111", borderTop:"1px solid rgba(255,255,255,0.07)", padding:"0.45rem 0.3rem calc(0.5rem + env(safe-area-inset-bottom,0px))", display:"flex", alignItems:"center", justifyContent:"space-around", flexShrink:0 }}>
           <MobileCtrlBtn icon={<Mic s={20} c={micOn?MIC_ON:"rgba(255,255,255,0.7)"}/>} label="Mic" onClick={toggleMic} active={micOn} activeColor={MIC_ON}/>
           <MobileCtrlBtn icon={<Cam s={20} c={camOn?WHITE:"rgba(255,255,255,0.4)"}/>} label="Camera" onClick={toggleCam} active={camOn}/>
           <MobileCtrlBtn icon={<Present s={20} c={WHITE}/>} label="Present" highlight/>
-          <MobileCtrlBtn icon={<Materials s={20} c="rgba(255,255,255,0.7)"/>} label="Materials" onClick={() => { setActiveTab("materials"); setPanelOpen(true); }}/>
+          <MobileCtrlBtn icon={<MaterialsIcon s={20} c="rgba(255,255,255,0.7)"/>} label="Materials" onClick={() => { setActiveTab("materials"); setPanelOpen(true); }}/>
           <MobileCtrlBtn icon={<ChatIcon s={20} c={activeTab==="chat"&&panelOpen?GOLD:"rgba(255,255,255,0.7)"}/>} label="Chat" onClick={() => { setActiveTab("chat"); setPanelOpen(true); }} active={activeTab==="chat"&&panelOpen}/>
           <MobileCtrlBtn icon={<QAIcon s={20} c={activeTab==="qa"&&panelOpen?GOLD:"rgba(255,255,255,0.7)"}/>} label="Q&A" onClick={() => { setActiveTab("qa"); setPanelOpen(true); }} active={activeTab==="qa"&&panelOpen}/>
           <MobileCtrlBtn icon={<More s={20} c="rgba(255,255,255,0.7)"/>} label="More"/>
-          {/* Leave — red pill */}
           <Link href="/learning" style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:"0.22rem", background:RED, color:WHITE, borderRadius:14, padding:"0.55rem 0.65rem", textDecoration:"none", minWidth:52, WebkitTapHighlightColor:"transparent" }}>
             <PhoneOff s={20} c={WHITE}/>
             <span style={{ fontSize:"0.58rem", fontWeight:700 }}>Leave</span>
@@ -631,10 +609,15 @@ export default function GeneralClassroomClient({ meeting, studentName }: { meeti
   }
 
   /* ════════════════════════════════════════════════════════════════════════ */
-  /* DESKTOP LAYOUT — unchanged                                               */
+  /* DESKTOP LAYOUT                                                           */
   /* ════════════════════════════════════════════════════════════════════════ */
   return (
     <div style={{ minHeight:"100dvh", background:BG, color:WHITE, fontFamily:"system-ui,-apple-system,'Segoe UI',sans-serif", display:"flex", flexDirection:"column" }}>
+
+      {/* Always-mounted hidden video */}
+      <video ref={hiddenSelfRef} autoPlay playsInline muted
+        style={{ position:"absolute", width:1, height:1, opacity:0, pointerEvents:"none", top:-9999 }}/>
+
       {/* top bar */}
       <header style={{ height:58, padding:"0 1.5rem", flexShrink:0, background:`linear-gradient(180deg,${SURFACE} 0%,rgba(28,8,8,0.97) 100%)`, borderBottom:"1px solid rgba(255,255,255,0.07)", display:"flex", alignItems:"center", justifyContent:"space-between", gap:"1rem", backdropFilter:"blur(10px)" }}>
         <div style={{ display:"flex", alignItems:"center", gap:"1rem" }}>
@@ -669,9 +652,7 @@ export default function GeneralClassroomClient({ meeting, studentName }: { meeti
             </span>
           </div>
           <div style={{ width:1, height:24, background:"rgba(255,255,255,0.1)" }}/>
-          <button style={{ background:"transparent", border:"none", cursor:"pointer", padding:"0.3rem" }}>
-            <Bell s={18} c="rgba(255,255,255,0.65)"/>
-          </button>
+          <button style={{ background:"transparent", border:"none", cursor:"pointer", padding:"0.3rem" }}><Bell s={18} c="rgba(255,255,255,0.65)"/></button>
           <div style={{ display:"flex", alignItems:"center", gap:"0.45rem" }}>
             <div style={{ width:34, height:34, borderRadius:"50%", background:`linear-gradient(135deg,${GOLD},#f6de88)`, color:INK, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800, fontSize:"0.9rem", boxShadow:`0 0 10px ${GOLD_GLOW}` }}>
               {studentName.charAt(0).toUpperCase()}
@@ -690,16 +671,15 @@ export default function GeneralClassroomClient({ meeting, studentName }: { meeti
         <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden", padding:"0.9rem", gap:"0.75rem" }}>
           <div style={{ display:"grid", gridTemplateColumns:"1fr 0.48fr", gap:"0.75rem" }}>
             <div style={{ position:"relative", borderRadius:14, overflow:"hidden", background:`linear-gradient(160deg,${RIM},${CARD})`, aspectRatio:"4/3", border:`2px solid ${GOLD}`, boxShadow:`0 0 28px ${GOLD_GLOW},0 6px 24px rgba(0,0,0,0.55)` }}>
-              {hostTile ? <RemoteTile tile={hostTile} large/> : (
-                <div style={{ position:"absolute", inset:0 }}>
-                  <SelfTileContent/>
-                </div>
-              )}
+              {hostTile
+                ? <RemoteTile tile={hostTile} large/>
+                : <SelfVideoTile {...selfProps}/>
+              }
             </div>
             <div style={{ display:"flex", flexDirection:"column", gap:"0.75rem" }}>
               {hostTile && (
                 <div style={{ flex:1, position:"relative", borderRadius:10, overflow:"hidden", background:`linear-gradient(160deg,${RIM},${CARD})`, border:`2px solid ${GOLD}` }}>
-                  <SelfTileContent compact/>
+                  <SelfVideoTile {...selfProps} compact/>
                 </div>
               )}
               {otherTiles[0] && <div style={{ flex:1, position:"relative" }}><RemoteTile tile={otherTiles[0]}/></div>}
@@ -714,9 +694,7 @@ export default function GeneralClassroomClient({ meeting, studentName }: { meeti
           {(hostTile ? otherTiles : otherTiles.slice(1)).length > 0 && (
             <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(180px,1fr))", gap:"0.75rem" }}>
               {(hostTile ? otherTiles : otherTiles.slice(1)).map(t => (
-                <div key={t.identity} style={{ position:"relative", aspectRatio:"16/9" }}>
-                  <RemoteTile tile={t}/>
-                </div>
+                <div key={t.identity} style={{ position:"relative", aspectRatio:"16/9" }}><RemoteTile tile={t}/></div>
               ))}
             </div>
           )}
@@ -794,13 +772,13 @@ export default function GeneralClassroomClient({ meeting, studentName }: { meeti
           </div>
         </div>
         <div style={{ display:"flex", gap:"0.28rem" }}>
-          {[
+          {([
             { icon:<Mic s={20} c={micOn?MIC_ON:MIC_OFF}/>, label:micOn?"Mute":"Unmute", onClick:toggleMic, active:micOn, color:micOn?MIC_ON:MIC_OFF },
             { icon:<Cam s={20} c={camOn?WHITE:"rgba(255,255,255,0.4)"}/>, label:camOn?"Stop Video":"Start Video", onClick:toggleCam, active:camOn },
             { icon:<People s={20} c={activeTab==="participants"?GOLD:WHITE}/>, label:"Participants", onClick:()=>setActiveTab("participants"), active:activeTab==="participants" },
             { icon:<ChatIcon s={20} c={activeTab==="chat"?GOLD:WHITE}/>, label:"Chat", onClick:()=>setActiveTab("chat"), active:activeTab==="chat" },
             { icon:<More s={20} c="rgba(255,255,255,0.75)"/>, label:"More" },
-          ].map(({ icon, label, onClick, active, color }) => (
+          ] as { icon:React.ReactNode; label:string; onClick?:()=>void; active?:boolean; color?:string }[]).map(({ icon, label, onClick, active, color }) => (
             <button key={label} type="button" onClick={onClick} style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:"0.22rem", background:active?"rgba(232,184,75,0.14)":"rgba(255,255,255,0.05)", border:active?`1px solid ${GOLD_DIM}`:"1px solid rgba(255,255,255,0.08)", color:color??(active?GOLD:"rgba(255,255,255,0.82)"), borderRadius:10, padding:"0.5rem 0.85rem", cursor:"pointer", minWidth:56, transition:"background 0.15s" }}>
               {icon}
               <span style={{ fontSize:"0.59rem", fontWeight:700, letterSpacing:"0.04em", whiteSpace:"nowrap" }}>{label}</span>
@@ -821,7 +799,7 @@ export default function GeneralClassroomClient({ meeting, studentName }: { meeti
   );
 }
 
-/* ─── Helper sub-components ─────────────────────────────────────────────── */
+/* ─── Helper components ─────────────────────────────────────────────────── */
 
 function MobileCtrlBtn({ icon, label, onClick, active, highlight, activeColor }: {
   icon: React.ReactNode; label: string; onClick?: () => void;
@@ -839,36 +817,23 @@ function ParticipantRow({ name, role, micOn, camOn, isHost, isSelf }: {
   name: string; role: string; micOn: boolean; camOn: boolean; isHost: boolean; isSelf: boolean;
 }) {
   const initial = name.charAt(0).toUpperCase();
-  const avatarBg = isHost
-    ? "linear-gradient(135deg,#6b1f1f,#8b3030)"
-    : isSelf
-    ? `linear-gradient(135deg,${GOLD},#f6de88)`
-    : "rgba(255,255,255,0.1)";
-  const avatarColor = isSelf ? INK : WHITE;
-
+  const avatarBg = isHost ? "linear-gradient(135deg,#6b1f1f,#8b3030)" : isSelf ? `linear-gradient(135deg,${GOLD},#f6de88)` : "rgba(255,255,255,0.1)";
   return (
     <div style={{ display:"flex", alignItems:"center", gap:"0.65rem", padding:"0.55rem 0.75rem", borderBottom:"1px solid rgba(255,255,255,0.05)" }}>
-      <div style={{ width:36, height:36, borderRadius:"50%", background:avatarBg, color:avatarColor, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800, fontSize:"0.88rem", flexShrink:0, position:"relative" }}>
+      <div style={{ width:36, height:36, borderRadius:"50%", background:avatarBg, color:isSelf?INK:WHITE, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800, fontSize:"0.88rem", flexShrink:0, position:"relative" }}>
         {initial}
         <span style={{ position:"absolute", bottom:0, right:0, width:9, height:9, borderRadius:"50%", background:MIC_ON, border:"1.5px solid #141414" }}/>
       </div>
       <div style={{ flex:1, minWidth:0 }}>
-        <div style={{ fontWeight:700, fontSize:"0.78rem", color:WHITE, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
-          {name}{isSelf?" (You)":""}
-        </div>
-        <div style={{ fontSize:"0.6rem", color:"rgba(255,255,255,0.4)" }}>
-          {isHost ? "(Instructor)" : `(${role})`}
-        </div>
+        <div style={{ fontWeight:700, fontSize:"0.78rem", color:WHITE, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{name}{isSelf?" (You)":""}</div>
+        <div style={{ fontSize:"0.6rem", color:"rgba(255,255,255,0.4)" }}>{isHost?"(Instructor)":`(${role})`}</div>
       </div>
-      {/* Mic icon */}
       <div style={{ width:28, height:28, borderRadius:6, background:"rgba(255,255,255,0.06)", display:"flex", alignItems:"center", justifyContent:"center" }}>
         <Mic s={14} c={micOn?MIC_ON:MIC_OFF}/>
       </div>
-      {/* Cam icon */}
       <div style={{ width:28, height:28, borderRadius:6, background:"rgba(255,255,255,0.06)", display:"flex", alignItems:"center", justifyContent:"center" }}>
         <Cam s={14} c={camOn?"rgba(255,255,255,0.7)":"rgba(255,255,255,0.2)"}/>
       </div>
-      {/* More */}
       <div style={{ width:28, height:28, borderRadius:6, background:"rgba(255,255,255,0.06)", display:"flex", alignItems:"center", justifyContent:"center" }}>
         <More s={14} c="rgba(255,255,255,0.45)"/>
       </div>

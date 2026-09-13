@@ -5,6 +5,12 @@
  * Fully responsive: mobile collapses panels into a bottom sheet,
  * slide viewer fills the screen. Desktop preserves the three-column layout.
  * All LiveKit logic unchanged.
+ *
+ * Desktop redesign to match mockup:
+ *  - Background: #111827 (dark gray, not wine)
+ *  - Left panel: Upload btn, search, color-coded file list, My Notes textarea
+ *  - Center: breadcrumb header, PDF toolbar, iframe, video strip with PiP tiles
+ *  - Right panel: Participants (from room) + Chat below
  */
 
 import Link from "next/link";
@@ -15,20 +21,31 @@ import ClassroomPollOverlay from "@/components/ClassroomPollOverlay";
 import { Room } from "livekit-client";
 
 /* ── Brand tokens ─────────────────────────────────────────────────────────── */
-const BG      = "#0f0a0a";
-const BG2     = "#1a0808";
-const BG3     = "#2d1010";
-const WINE    = "#5c1d1d";
+const BG      = "#111827";   // mockup dark gray
+const BG2     = "#1f2937";   // slightly lighter panel bg
+const BG3     = "#374151";   // card/hover bg
+const WINE    = "#7f1d1d";
 const GOLD    = "#d4a843";
 const GOLDD   = "#b8922f";
 const WHITE   = "#ffffff";
-const OFF_W   = "#f8f5f2";
-const GRAY    = "#e5e0db";
-const GRAY2   = "#8a7a72";
-const INK     = "#1a1210";
+const OFF_W   = "#f9fafb";
+const GRAY    = "#e5e7eb";
+const GRAY2   = "#9ca3af";
+const INK     = "#111827";
 const RED_BTN = "#dc2626";
 const GREEN   = "#22c55e";
-const GOLD_GLOW = "rgba(212,168,67,0.18)";
+const BORDER  = "rgba(255,255,255,0.08)";
+
+/* ── File type colors ─────────────────────────────────────────────────────── */
+const FILE_COLORS: Record<string, { bg: string; color: string; label: string }> = {
+  pdf:   { bg:"#fee2e2", color:"#dc2626", label:"PDF" },
+  ppt:   { bg:"#ffedd5", color:"#ea580c", label:"PPT" },
+  doc:   { bg:"#dbeafe", color:"#2563eb", label:"DOC" },
+  xls:   { bg:"#dcfce7", color:"#16a34a", label:"XLS" },
+  img:   { bg:"#f3e8ff", color:"#9333ea", label:"IMG" },
+  zip:   { bg:"#f3f4f6", color:"#6b7280", label:"ZIP" },
+  other: { bg:"#f3f4f6", color:"#6b7280", label:"FILE" },
+};
 
 type Material = { id: string; title: string; fileName: string; mimeType: string; sizeBytes?: number };
 type LearningClass = {
@@ -38,6 +55,16 @@ type LearningClass = {
 };
 
 /* ── Helpers ─────────────────────────────────────────────────────────────── */
+function getFileType(mimeType: string): keyof typeof FILE_COLORS {
+  if (mimeType === "application/pdf") return "pdf";
+  if (mimeType.includes("presentation") || mimeType.includes("powerpoint")) return "ppt";
+  if (mimeType.includes("word") || mimeType.includes("document")) return "doc";
+  if (mimeType.includes("excel") || mimeType.includes("spreadsheet")) return "xls";
+  if (mimeType.startsWith("image/")) return "img";
+  if (mimeType.includes("zip") || mimeType.includes("compressed")) return "zip";
+  return "other";
+}
+
 function fmtType(m: string) {
   if (m === "application/pdf") return "PDF";
   if (m.startsWith("image/")) return "Image";
@@ -49,14 +76,6 @@ function fmtType(m: string) {
 function fmtSize(bytes: number) {
   if (bytes >= 1048576) return `${(bytes / 1048576).toFixed(1)} MB`;
   return `${Math.ceil(bytes / 1024)} KB`;
-}
-function fileIcon(mimeType: string) {
-  if (mimeType === "application/pdf") return "📄";
-  if (mimeType.includes("presentation") || mimeType.includes("powerpoint")) return "📊";
-  if (mimeType.includes("word") || mimeType.includes("document")) return "📝";
-  if (mimeType.includes("excel") || mimeType.includes("spreadsheet")) return "📈";
-  if (mimeType.startsWith("image/")) return "🖼️";
-  return "📁";
 }
 function fmtTime(s: number) {
   const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sc = s % 60;
@@ -73,9 +92,21 @@ function NakLogo({ light = false, compact = false }: { light?: boolean; compact?
       {!compact && (
         <div>
           <div style={{ color: light ? WHITE : INK, fontWeight: 900, fontSize: "1rem", lineHeight: 1 }}>NAK</div>
-          <div style={{ color: light ? "rgba(255,255,255,0.6)" : GRAY2, fontSize: "0.58rem", letterSpacing: "0.06em" }}>Learning Center</div>
+          <div style={{ color: light ? "rgba(255,255,255,0.5)" : GRAY2, fontSize: "0.58rem", letterSpacing: "0.06em" }}>Learning Center</div>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ── File type badge ─────────────────────────────────────────────────────── */
+function FileTypeBadge({ mimeType, size = "normal" }: { mimeType: string; size?: "normal" | "small" }) {
+  const ft = getFileType(mimeType);
+  const cfg = FILE_COLORS[ft];
+  const dim = size === "small" ? 28 : 36;
+  return (
+    <div style={{ width: dim, height: dim, borderRadius: 7, background: cfg.bg, color: cfg.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: size === "small" ? "0.5rem" : "0.55rem", fontWeight: 800, letterSpacing: "0.02em", flexShrink: 0 }}>
+      {cfg.label}
     </div>
   );
 }
@@ -90,13 +121,15 @@ export default function ClassroomClient({
 }) {
   const stageRef   = useRef<HTMLDivElement>(null);
   const [activeRoom,   setActiveRoom]   = useState<Room | null>(null);
-  const [activeTab,    setActiveTab]    = useState<"participants" | "chat" | "qa" | "materials">("materials");
   const [leftTab,      setLeftTab]      = useState<"materials" | "chat" | "qa" | "info">("materials");
+  const [rightTab,     setRightTab]     = useState<"participants" | "chat">("chat");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [elapsed,      setElapsed]      = useState(0);
   const [isMobile,     setIsMobile]     = useState(false);
   const [showSheet,    setShowSheet]    = useState(false);
   const [sheetTab,     setSheetTab]     = useState<"materials" | "chat" | "qa" | "info">("materials");
+  const [notes,        setNotes]        = useState("");
+  const [matSearch,    setMatSearch]    = useState("");
 
   const [presState, setPresState] = useState<PresentationState>({
     materialId:
@@ -108,6 +141,9 @@ export default function ClassroomClient({
 
   const selected    = materials.find((m) => m.id === presState.materialId);
   const previewable = selected?.mimeType === "application/pdf" || !!selected?.mimeType?.startsWith("image/");
+  const filteredMaterials = materials.filter(m =>
+    matSearch === "" || m.title.toLowerCase().includes(matSearch.toLowerCase())
+  );
 
   const handlePresentationState = useCallback((ps: PresentationState) => setPresState(ps), []);
 
@@ -142,85 +178,105 @@ export default function ClassroomClient({
     else void document.exitFullscreen().catch(() => {});
   };
 
-  /* ── shared bottom-sheet / panel content ─────────────────────────────── */
-  function SheetContent({ tab, setTab, dark }: { tab: typeof sheetTab; setTab: (t: typeof sheetTab) => void; dark?: boolean }) {
-    const bdr   = dark ? "1px solid rgba(255,255,255,0.08)" : `1px solid ${GRAY}`;
-    const bgIn  = dark ? "rgba(255,255,255,0.06)" : WHITE;
-    const txtC  = dark ? WHITE : INK;
-    const mutC  = dark ? "rgba(255,255,255,0.4)" : GRAY2;
+  /* ── Left panel content ───────────────────────────────────────────────── */
+  function LeftPanelContent({ dark }: { dark?: boolean }) {
+    const bdr  = dark ? BORDER : `1px solid ${GRAY}`;
+    const bgIn = dark ? "rgba(255,255,255,0.06)" : WHITE;
+    const txtC = dark ? WHITE : INK;
+    const mutC = dark ? GRAY2 : GRAY2;
+    const bg   = dark ? BG2 : OFF_W;
 
-    const tabs: { key: typeof sheetTab; label: string; icon: string }[] = [
-      { key: "materials", label: "Materials", icon: "📁" },
-      { key: "chat",      label: "Chat",      icon: "💬" },
-      { key: "qa",        label: "Q&A",       icon: "❓" },
-      { key: "info",      label: "Info",      icon: "ℹ️" },
+    const tabs: { key: typeof leftTab; label: string }[] = [
+      { key: "materials", label: "Materials" },
+      { key: "chat",      label: "Chat" },
+      { key: "qa",        label: "Q&A" },
+      { key: "info",      label: "Info" },
     ];
 
     return (
-      <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      <div style={{ display: "flex", flexDirection: "column", height: "100%", background: bg }}>
         {/* Tab bar */}
-        <div style={{ display: "flex", borderBottom: bdr, background: dark ? BG2 : WHITE }}>
-          {tabs.map(({ key, label, icon }) => (
-            <button key={key} type="button" onClick={() => setTab(key)} style={{
-              flex: 1, background: "transparent", border: "none",
-              borderBottom: tab === key ? `2px solid ${GOLDD}` : "2px solid transparent",
-              color: tab === key ? GOLDD : mutC,
-              padding: "0.65rem 0.1rem", fontSize: "0.6rem", fontWeight: 700,
-              cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: "0.15rem",
-              WebkitTapHighlightColor: "transparent",
-            }}>
-              <span style={{ fontSize: "0.9rem" }}>{icon}</span>
-              <span>{label}</span>
+        <div style={{ display: "flex", borderBottom: bdr, background: dark ? BG : WHITE, flexShrink: 0 }}>
+          {tabs.map(({ key, label }) => (
+            <button key={key} type="button"
+              onClick={() => dark ? setSheetTab(key as typeof sheetTab) : setLeftTab(key)}
+              style={{ flex: 1, background: "transparent", border: "none",
+                borderBottom: (dark ? sheetTab : leftTab) === key ? `2px solid ${GOLDD}` : "2px solid transparent",
+                color: (dark ? sheetTab : leftTab) === key ? GOLDD : GRAY2,
+                padding: "0.65rem 0.1rem", fontSize: "0.68rem", fontWeight: 700, cursor: "pointer",
+              }}>
+              {label}
             </button>
           ))}
         </div>
 
-        {/* Materials */}
-        {tab === "materials" && (
+        {/* Materials tab */}
+        {(dark ? sheetTab : leftTab) === "materials" && (
           <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-            <div style={{ padding: "0.65rem", borderBottom: bdr }}>
-              <div style={{ fontWeight: 700, fontSize: "0.82rem", color: txtC, marginBottom: "0.4rem" }}>Class Materials</div>
+            {/* Header + Upload btn */}
+            <div style={{ padding: "0.65rem 0.75rem", borderBottom: bdr, flexShrink: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.5rem" }}>
+                <span style={{ fontWeight: 700, fontSize: "0.82rem", color: txtC }}>Class Materials</span>
+                <button style={{ background: GOLDD, color: WHITE, border: "none", borderRadius: 5, padding: "0.25rem 0.6rem", fontSize: "0.68rem", fontWeight: 700, cursor: "pointer" }}>
+                  + Upload
+                </button>
+              </div>
               <div style={{ display: "flex", alignItems: "center", background: bgIn, border: bdr, borderRadius: 6, padding: "0.3rem 0.5rem", gap: "0.3rem" }}>
                 <span style={{ fontSize: "0.8rem", color: mutC }}>🔍</span>
-                <input placeholder="Search materials…" style={{ flex: 1, background: "transparent", border: "none", outline: "none", fontSize: "0.75rem", color: txtC }} />
+                <input
+                  value={matSearch}
+                  onChange={e => setMatSearch(e.target.value)}
+                  placeholder="Search materials…"
+                  style={{ flex: 1, background: "transparent", border: "none", outline: "none", fontSize: "0.75rem", color: txtC }}
+                />
               </div>
             </div>
-            <div style={{ flex: 1, overflowY: "auto", padding: "0.5rem" }}>
-              {materials.length === 0 ? (
+            {/* File list */}
+            <div style={{ flex: 1, overflowY: "auto", padding: "0.4rem 0.5rem" }}>
+              {filteredMaterials.length === 0 ? (
                 <p style={{ color: mutC, fontSize: "0.8rem", textAlign: "center", padding: "1.5rem 0" }}>No materials yet</p>
-              ) : materials.map((m) => {
+              ) : filteredMaterials.map((m) => {
                 const isActive = m.id === presState.materialId;
                 return (
-                  <div key={m.id} style={{ display: "flex", alignItems: "center", gap: "0.6rem", padding: "0.55rem 0.6rem", borderRadius: 8, background: isActive ? "rgba(212,168,67,0.12)" : "transparent", border: isActive ? `1px solid rgba(212,168,67,0.3)` : "1px solid transparent", marginBottom: "0.25rem" }}>
-                    <div style={{ width: 32, height: 32, borderRadius: 6, background: isActive ? GOLDD : dark ? BG3 : "#ede8e2", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1rem", flexShrink: 0 }}>
-                      {fileIcon(m.mimeType)}
-                    </div>
+                  <div key={m.id} style={{ display: "flex", alignItems: "center", gap: "0.55rem", padding: "0.5rem 0.55rem", borderRadius: 8, background: isActive ? (dark ? "rgba(212,168,67,0.12)" : "#fefce8") : "transparent", border: isActive ? `1px solid rgba(212,168,67,0.35)` : "1px solid transparent", marginBottom: "0.2rem", cursor: "default" }}>
+                    <FileTypeBadge mimeType={m.mimeType}/>
                     <div style={{ flex: 1, overflow: "hidden" }}>
                       <div style={{ color: txtC, fontSize: "0.78rem", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.title}</div>
-                      <div style={{ color: mutC, fontSize: "0.62rem" }}>{fmtType(m.mimeType)}{m.sizeBytes ? ` · ${fmtSize(m.sizeBytes)}` : ""}</div>
+                      <div style={{ color: mutC, fontSize: "0.62rem" }}>
+                        {fmtType(m.mimeType)}{m.sizeBytes ? ` · ${fmtSize(m.sizeBytes)}` : ""}
+                      </div>
                     </div>
-                    {isActive && <div style={{ background: GOLDD, color: WHITE, fontSize: "0.55rem", fontWeight: 800, padding: "0.1rem 0.35rem", borderRadius: 3, flexShrink: 0 }}>Live</div>}
+                    {isActive && (
+                      <div style={{ background: GOLDD, color: WHITE, fontSize: "0.55rem", fontWeight: 800, padding: "0.12rem 0.4rem", borderRadius: 4, whiteSpace: "nowrap" }}>
+                        Presenting
+                      </div>
+                    )}
                   </div>
                 );
               })}
             </div>
-            {/* Notes */}
-            <div style={{ padding: "0.65rem", borderTop: bdr }}>
-              <div style={{ fontWeight: 700, fontSize: "0.78rem", color: txtC, marginBottom: "0.35rem" }}>My Notes</div>
-              <textarea placeholder="Take notes during class…" style={{ width: "100%", minHeight: 70, background: bgIn, border: bdr, borderRadius: 6, color: txtC, fontSize: "0.75rem", padding: "0.45rem", resize: "none", outline: "none", boxSizing: "border-box" }} />
+            {/* My Notes */}
+            <div style={{ padding: "0.65rem 0.75rem", borderTop: bdr, flexShrink: 0 }}>
+              <div style={{ fontWeight: 700, fontSize: "0.78rem", color: txtC, marginBottom: "0.35rem" }}>My Class Notes</div>
+              <textarea
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+                placeholder="Take notes during class…"
+                style={{ width: "100%", minHeight: 72, background: bgIn, border: bdr, borderRadius: 6, color: txtC, fontSize: "0.75rem", padding: "0.45rem", resize: "none", outline: "none", boxSizing: "border-box" }}
+              />
             </div>
           </div>
         )}
 
-        {/* Chat */}
-        {tab === "chat" && (
+        {/* Chat tab */}
+        {(dark ? sheetTab : leftTab) === "chat" && (
           <div style={{ flex: 1, overflow: "auto", padding: "0.75rem" }}>
             <ClassroomChat classId={learningClass.id} room={activeRoom} isInstructor={false} />
           </div>
         )}
 
-        {/* Q&A */}
-        {tab === "qa" && (
+        {/* Q&A tab */}
+        {(dark ? sheetTab : leftTab) === "qa" && (
           <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "2rem" }}>
             <div style={{ textAlign: "center" }}>
               <div style={{ fontSize: "2.5rem", marginBottom: "0.5rem" }}>❓</div>
@@ -229,11 +285,11 @@ export default function ClassroomClient({
           </div>
         )}
 
-        {/* Info */}
-        {tab === "info" && (
+        {/* Info tab */}
+        {(dark ? sheetTab : leftTab) === "info" && (
           <div style={{ flex: 1, overflowY: "auto", padding: "0.75rem" }}>
             <div style={{ color: txtC, fontWeight: 700, fontSize: "0.88rem", marginBottom: "0.75rem" }}>{learningClass.title}</div>
-            {([["Course", learningClass.course], ["Instructor", learningClass.instructor ?? "—"], ["Status", "● Live"], ["Duration", fmtTime(elapsed)]] as [string,string][]).map(([k, v]) => (
+            {([["Course", learningClass.course], ["Instructor", learningClass.instructor ?? "—"], ["Status", "● Live"], ["Duration", fmtTime(elapsed)]] as [string, string][]).map(([k, v]) => (
               <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "0.4rem 0", borderBottom: bdr }}>
                 <span style={{ color: mutC, fontSize: "0.75rem" }}>{k}</span>
                 <span style={{ color: k === "Status" ? GREEN : txtC, fontSize: "0.78rem", fontWeight: 600 }}>{v}</span>
@@ -256,10 +312,10 @@ export default function ClassroomClient({
   /* ════════════════════════════════════════════════════════════════════════ */
   if (isMobile) {
     return (
-      <div style={{ height: "100dvh", background: BG, color: WHITE, fontFamily: "system-ui,-apple-system,'Segoe UI',sans-serif", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <div style={{ height: "100dvh", background: "#0f0a0a", color: WHITE, fontFamily: "system-ui,-apple-system,'Segoe UI',sans-serif", display: "flex", flexDirection: "column", overflow: "hidden" }}>
 
-        {/* ── mobile top bar ─────────────────────────────────────────────── */}
-        <div style={{ height: 50, padding: "0 0.85rem", display: "flex", alignItems: "center", justifyContent: "space-between", background: `linear-gradient(180deg,${BG2},rgba(26,8,8,0.97))`, borderBottom: "1px solid rgba(255,255,255,0.07)", flexShrink: 0 }}>
+        {/* mobile top bar */}
+        <div style={{ height: 50, padding: "0 0.85rem", display: "flex", alignItems: "center", justifyContent: "space-between", background: "linear-gradient(180deg,#1a0808,rgba(26,8,8,0.97))", borderBottom: "1px solid rgba(255,255,255,0.07)", flexShrink: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
             <NakLogo light compact />
             <div style={{ width: 1, height: 24, background: "rgba(255,255,255,0.12)" }} />
@@ -280,28 +336,28 @@ export default function ClassroomClient({
           </div>
         </div>
 
-        {/* ── PDF nav bar (mobile compact) ───────────────────────────────── */}
-        <div style={{ background: BG2, borderBottom: "1px solid rgba(255,255,255,0.08)", padding: "0.35rem 0.75rem", display: "flex", alignItems: "center", gap: "0.5rem", flexShrink: 0 }}>
+        {/* PDF nav bar (mobile compact) */}
+        <div style={{ background: "#1a0808", borderBottom: "1px solid rgba(255,255,255,0.08)", padding: "0.35rem 0.75rem", display: "flex", alignItems: "center", gap: "0.5rem", flexShrink: 0 }}>
           {selected ? (
             <>
-              <span style={{ fontSize: "0.85rem" }}>{fileIcon(selected.mimeType)}</span>
+              <FileTypeBadge mimeType={selected.mimeType} size="small" />
               <span style={{ color: WHITE, fontSize: "0.72rem", fontWeight: 600, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{selected.title}</span>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.25rem", color: "rgba(255,255,255,0.6)", fontSize: "0.72rem", background: BG3, borderRadius: 6, padding: "0.2rem 0.5rem" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.25rem", color: "rgba(255,255,255,0.6)", fontSize: "0.72rem", background: "#2d1010", borderRadius: 6, padding: "0.2rem 0.5rem" }}>
                 <span>◄</span>
                 <span style={{ fontWeight: 700, color: WHITE, minWidth: 18, textAlign: "center" }}>{presState.page}</span>
                 <span style={{ color: "rgba(255,255,255,0.3)" }}>/</span>
                 <span>—</span>
                 <span>►</span>
               </div>
-              <button type="button" onClick={toggleFullscreen} style={{ background: BG3, border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.7)", borderRadius: 5, padding: "0.2rem 0.45rem", cursor: "pointer", fontSize: "0.75rem" }}>⛶</button>
+              <button type="button" onClick={toggleFullscreen} style={{ background: "#2d1010", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.7)", borderRadius: 5, padding: "0.2rem 0.45rem", cursor: "pointer", fontSize: "0.75rem" }}>⛶</button>
             </>
           ) : (
             <span style={{ color: "rgba(255,255,255,0.4)", fontSize: "0.72rem" }}>Waiting for instructor…</span>
           )}
         </div>
 
-        {/* ── Slide area (fills remaining space) ─────────────────────────── */}
-        <div ref={stageRef} style={{ flex: 1, overflow: "hidden", background: "#f0ece6", position: "relative", minHeight: 0, ...(isFullscreen ? { position: "fixed", inset: 0, zIndex: 9999, height: "100dvh", width: "100vw" } : {}) }}>
+        {/* Slide area */}
+        <div ref={stageRef} style={{ flex: 1, overflow: "hidden", background: "#f0ece6", position: "relative", minHeight: 0, ...(isFullscreen ? { position: "fixed", inset: 0, zIndex: 9999, height: "100dvh", width: "100vw" } as React.CSSProperties : {}) }}>
           {selected && previewable ? (
             <iframe
               key={`${selected.id}-p${presState.page}`}
@@ -321,15 +377,18 @@ export default function ClassroomClient({
             </div>
           )}
 
-          {/* Instructor PiP — top-right corner */}
+          {/* PiP video + poll overlay — top-right corner */}
           <div style={{ position: "absolute", top: "0.55rem", right: "0.55rem", zIndex: 20 }}>
-            <ClassroomVideoFeed classId={learningClass.id} onRoomReady={setActiveRoom} onPresentationState={handlePresentationState} pipMode />
+            {/* Instructor PiP tile */}
+            <div style={{ width: 100, borderRadius: 8, overflow: "hidden", border: `2px solid ${GOLD}`, background: "#1a0808", marginBottom: "0.3rem" }}>
+              <ClassroomVideoFeed classId={learningClass.id} onRoomReady={setActiveRoom} onPresentationState={handlePresentationState} pipMode />
+            </div>
             <ClassroomPollOverlay classId={learningClass.id} />
           </div>
         </div>
 
-        {/* ── mobile bottom controls ─────────────────────────────────────── */}
-        <div style={{ background: `linear-gradient(0deg,${BG2},rgba(26,8,8,0.97))`, borderTop: "1px solid rgba(255,255,255,0.07)", padding: "0.45rem 0.4rem calc(0.45rem + env(safe-area-inset-bottom,0px))", display: "flex", alignItems: "center", justifyContent: "space-around", flexShrink: 0 }}>
+        {/* mobile bottom controls */}
+        <div style={{ background: "linear-gradient(0deg,#1a0808,rgba(26,8,8,0.97))", borderTop: "1px solid rgba(255,255,255,0.07)", padding: "0.45rem 0.4rem calc(0.45rem + env(safe-area-inset-bottom,0px))", display: "flex", alignItems: "center", justifyContent: "space-around", flexShrink: 0 }}>
           {[
             { icon: "📁", label: "Materials", tab: "materials" as const },
             { icon: "💬", label: "Chat",      tab: "chat"      as const },
@@ -349,16 +408,14 @@ export default function ClassroomClient({
           </Link>
         </div>
 
-        {/* ── bottom sheet ───────────────────────────────────────────────── */}
+        {/* bottom sheet */}
         {showSheet && (
           <>
             <div onClick={() => setShowSheet(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 40, backdropFilter: "blur(3px)" }} />
-            <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 50, background: BG2, borderTop: `2px solid ${GOLDD}`, borderRadius: "20px 20px 0 0", height: "75dvh", display: "flex", flexDirection: "column", boxShadow: "0 -8px 40px rgba(0,0,0,0.65)", animation: "nakSlideUp 0.28s cubic-bezier(.32,.72,0,1)" }}>
-              {/* handle */}
+            <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 50, background: "#1a0808", borderTop: `2px solid ${GOLDD}`, borderRadius: "20px 20px 0 0", height: "75dvh", display: "flex", flexDirection: "column", boxShadow: "0 -8px 40px rgba(0,0,0,0.65)", animation: "nakSlideUp 0.28s cubic-bezier(.32,.72,0,1)" }}>
               <div style={{ display: "flex", justifyContent: "center", padding: "0.6rem 0 0.25rem" }}>
                 <div style={{ width: 36, height: 4, borderRadius: 99, background: "rgba(255,255,255,0.18)" }} />
               </div>
-              {/* close row */}
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 1rem 0.4rem" }}>
                 <span style={{ fontWeight: 700, fontSize: "0.88rem", color: WHITE }}>
                   {sheetTab === "materials" ? "Materials" : sheetTab === "chat" ? "Chat" : sheetTab === "qa" ? "Q&A" : "Class Info"}
@@ -366,7 +423,7 @@ export default function ClassroomClient({
                 <button onClick={() => setShowSheet(false)} style={{ background: "rgba(255,255,255,0.08)", border: "none", borderRadius: "50%", width: 30, height: 30, color: "rgba(255,255,255,0.7)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.9rem" }}>✕</button>
               </div>
               <div style={{ flex: 1, overflow: "hidden" }}>
-                <SheetContent tab={sheetTab} setTab={setSheetTab} dark />
+                <LeftPanelContent dark />
               </div>
             </div>
           </>
@@ -384,33 +441,39 @@ export default function ClassroomClient({
     <div style={{ minHeight: "100dvh", background: BG, color: WHITE, fontFamily: "system-ui, -apple-system, 'Segoe UI', sans-serif", display: "flex", flexDirection: "column" }}>
 
       {/* ── TOP BAR ─────────────────────────────────────────────────────── */}
-      <header style={{ background: BG2, borderBottom: "1px solid rgba(255,255,255,0.08)", height: 56, padding: "0 1.5rem", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", flexShrink: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+      <header style={{ background: BG2, borderBottom: BORDER, height: 56, padding: "0 1.5rem", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", flexShrink: 0 }}>
+        {/* Left: logo + breadcrumb */}
+        <div style={{ display: "flex", alignItems: "center", gap: "1rem", minWidth: 0 }}>
           <NakLogo light />
-          <div style={{ width: 1, height: 32, background: "rgba(255,255,255,0.12)" }} />
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-              <span style={{ color: "rgba(255,255,255,0.6)", fontSize: "0.72rem" }}>○</span>
-              <span style={{ color: "rgba(255,255,255,0.75)", fontSize: "0.78rem" }}>{learningClass.course}</span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-              <span style={{ color: "rgba(255,255,255,0.6)", fontSize: "0.72rem" }}>○</span>
-              <span style={{ color: WHITE, fontSize: "0.82rem", fontWeight: 600 }}>{learningClass.module ?? learningClass.title}</span>
+          <div style={{ width: 1, height: 32, background: BORDER }} />
+          <div style={{ minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", flexWrap: "wrap" }}>
+              <span style={{ color: GRAY2, fontSize: "0.72rem" }}>{learningClass.course}</span>
+              <span style={{ color: GRAY2, fontSize: "0.65rem" }}>›</span>
+              <span style={{ color: WHITE, fontSize: "0.78rem", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 220 }}>
+                {learningClass.module ?? learningClass.title}
+              </span>
             </div>
           </div>
-          <div style={{ background: RED_BTN, color: WHITE, fontWeight: 800, fontSize: "0.7rem", padding: "0.25rem 0.6rem", borderRadius: 99, letterSpacing: "0.06em", display: "flex", alignItems: "center", gap: "0.3rem" }}>
+          <div style={{ background: RED_BTN, color: WHITE, fontWeight: 800, fontSize: "0.7rem", padding: "0.22rem 0.6rem", borderRadius: 99, letterSpacing: "0.06em", display: "flex", alignItems: "center", gap: "0.28rem", flexShrink: 0 }}>
             <span style={{ width: 5, height: 5, borderRadius: "50%", background: WHITE, display: "inline-block" }} />LIVE
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", color: "rgba(255,255,255,0.75)", fontSize: "0.8rem" }}>
+
+        {/* Center: timer + student count */}
+        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexShrink: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", color: GRAY2, fontSize: "0.8rem" }}>
             🕐 {fmtTime(elapsed)}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "0.3rem" }}>
             <span style={{ width: 7, height: 7, borderRadius: "50%", background: GREEN, display: "inline-block" }} />
             <span style={{ color: GREEN, fontSize: "0.72rem", fontWeight: 600 }}>Connected</span>
           </div>
-          <span style={{ fontSize: "1.1rem", cursor: "pointer" }}>🔔</span>
+        </div>
+
+        {/* Right: notification + user */}
+        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexShrink: 0 }}>
+          <span style={{ fontSize: "1.1rem", cursor: "pointer", color: GRAY2 }}>🔔</span>
           <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
             <div style={{ width: 34, height: 34, borderRadius: "50%", background: GOLD, color: INK, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: "0.9rem" }}>S</div>
             <div>
@@ -424,47 +487,40 @@ export default function ClassroomClient({
       {/* ── BODY ────────────────────────────────────────────────────────── */}
       <div style={{ flex: 1, display: "flex", overflow: "hidden", minHeight: 0 }}>
 
-        {/* ── LEFT PANEL ──────────────────────────────────────────────────── */}
-        <div style={{ width: 280, borderRight: "1px solid rgba(255,255,255,0.08)", background: BG2, display: "flex", flexDirection: "column", flexShrink: 0 }}>
-          <div style={{ display: "flex", background: BG2, borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
-            {(["materials","chat","qa","info"] as const).map((t) => (
-              <button key={t} type="button" onClick={() => setLeftTab(t)} style={{ flex:1, background:"transparent", border:"none", borderBottom: leftTab===t ? `2px solid ${GOLD}` : "2px solid transparent", color: leftTab===t ? GOLD : "rgba(255,255,255,0.45)", padding:"0.65rem 0.2rem", fontSize:"0.65rem", fontWeight:700, cursor:"pointer", textTransform:"capitalize" }}>
-                {t === "materials" ? "Materials" : t === "chat" ? "Chat" : t === "qa" ? "Q&A" : "Info"}
-              </button>
-            ))}
-          </div>
-          <div style={{ flex: 1, overflow: "hidden" }}>
-            <SheetContent tab={leftTab} setTab={setLeftTab} />
-          </div>
+        {/* ── LEFT PANEL ──────────────────────────────────────────────── */}
+        <div style={{ width: 262, borderRight: BORDER, display: "flex", flexDirection: "column", flexShrink: 0, overflow: "hidden" }}>
+          <LeftPanelContent />
         </div>
 
-        {/* ── CENTER ──────────────────────────────────────────────────────── */}
+        {/* ── CENTER ──────────────────────────────────────────────────── */}
         <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }}>
           {/* PDF nav bar */}
-          <div style={{ background: BG2, borderBottom: "1px solid rgba(255,255,255,0.08)", padding: "0.4rem 1rem", display: "flex", alignItems: "center", gap: "0.75rem", flexShrink: 0 }}>
-            {selected && (
+          <div style={{ background: BG2, borderBottom: BORDER, padding: "0.4rem 1rem", display: "flex", alignItems: "center", gap: "0.75rem", flexShrink: 0 }}>
+            {selected ? (
               <>
-                <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", background: BG3, borderRadius: 6, padding: "0.25rem 0.6rem" }}>
-                  <span style={{ fontSize: "0.85rem" }}>{fileIcon(selected.mimeType)}</span>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", background: BG3, borderRadius: 6, padding: "0.22rem 0.65rem" }}>
+                  <FileTypeBadge mimeType={selected.mimeType} size="small" />
                   <span style={{ color: WHITE, fontSize: "0.75rem", fontWeight: 600, maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{selected.title}</span>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: "0.3rem", color: "rgba(255,255,255,0.6)", fontSize: "0.78rem" }}>
-                  <span>◄</span>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.3rem", color: GRAY2, fontSize: "0.78rem" }}>
+                  <span style={{ cursor: "pointer" }}>◄</span>
                   <span style={{ fontWeight: 700, color: WHITE }}>{presState.page}</span>
-                  <span style={{ color: "rgba(255,255,255,0.4)" }}>/</span>
+                  <span style={{ color: GRAY2 }}>/</span>
                   <span>—</span>
-                  <span>►</span>
+                  <span style={{ cursor: "pointer" }}>►</span>
                 </div>
               </>
+            ) : (
+              <span style={{ color: GRAY2, fontSize: "0.78rem" }}>Waiting for instructor…</span>
             )}
             <div style={{ marginLeft: "auto", display: "flex", gap: "0.4rem" }}>
-              <button style={{ background: BG3, border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.7)", borderRadius: 5, padding: "0.22rem 0.5rem", cursor: "pointer", fontSize: "0.72rem" }}>100%</button>
-              <button type="button" onClick={toggleFullscreen} style={{ background: BG3, border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.7)", borderRadius: 5, padding: "0.22rem 0.5rem", cursor: "pointer", fontSize: "0.75rem" }}>⛶</button>
+              <button style={{ background: BG3, border: BORDER, color: GRAY2, borderRadius: 5, padding: "0.22rem 0.5rem", cursor: "pointer", fontSize: "0.72rem" }}>100%</button>
+              <button type="button" onClick={toggleFullscreen} style={{ background: BG3, border: BORDER, color: GRAY2, borderRadius: 5, padding: "0.22rem 0.5rem", cursor: "pointer", fontSize: "0.75rem" }}>⛶</button>
             </div>
           </div>
 
           {/* Slide area */}
-          <div ref={stageRef} style={{ flex: 1, overflow: "hidden", background: "#f0ece6", position: "relative", ...(isFullscreen ? { position: "fixed", inset: 0, zIndex: 9999, height: "100dvh", width: "100vw" } : {}) }}>
+          <div ref={stageRef} style={{ flex: 1, overflow: "hidden", background: "#f0ece6", position: "relative", ...(isFullscreen ? { position: "fixed", inset: 0, zIndex: 9999, height: "100dvh", width: "100vw" } as React.CSSProperties : {}) }}>
             {selected && previewable ? (
               <iframe
                 key={`${selected.id}-p${presState.page}`}
@@ -484,107 +540,125 @@ export default function ClassroomClient({
               </div>
             )}
 
-            {/* Instructor PiP */}
-            <div style={{ position: "absolute", top: "0.65rem", right: "0.65rem", zIndex: 20 }}>
+            {/* Instructor PiP — top right */}
+            <div style={{ position: "absolute", top: "0.65rem", right: "0.65rem", zIndex: 20, width: 120, borderRadius: 10, overflow: "hidden", border: `2px solid ${GOLD}`, boxShadow: "0 4px 16px rgba(0,0,0,0.5)", background: "#1a0808" }}>
               <ClassroomVideoFeed classId={learningClass.id} onRoomReady={setActiveRoom} onPresentationState={handlePresentationState} pipMode />
+            </div>
+            <div style={{ position: "absolute", top: "0.65rem", right: "0.65rem", zIndex: 21 }}>
               <ClassroomPollOverlay classId={learningClass.id} />
             </div>
           </div>
 
           {/* Video strip */}
-          <div style={{ background: BG, borderTop: "1px solid rgba(255,255,255,0.08)", padding: "0.65rem 1rem", display: "flex", gap: "0.6rem", overflowX: "auto", flexShrink: 0 }}>
-            <p style={{ margin: "auto 0", color: "rgba(255,255,255,0.4)", fontSize: "0.72rem", whiteSpace: "nowrap" }}>Your camera is live →</p>
-            <div style={{ width: 120, height: 80, borderRadius: 8, background: BG3, border: `1px solid ${GOLD}`, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.65rem", color: GOLD, fontWeight: 700 }}>You (Live)</div>
+          <div style={{ background: BG, borderTop: BORDER, padding: "0.6rem 1rem", display: "flex", gap: "0.6rem", overflowX: "auto", flexShrink: 0, alignItems: "center" }}>
+            <p style={{ margin: "0 0.25rem 0 0", color: GRAY2, fontSize: "0.72rem", whiteSpace: "nowrap", flexShrink: 0 }}>Your camera →</p>
+            {/* Self tile */}
+            <div style={{ width: 120, height: 80, borderRadius: 8, background: BG2, border: `2px solid ${GOLD}`, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden" }}>
+              <div style={{ position: "absolute", bottom: "0.25rem", left: 0, right: 0, textAlign: "center", fontSize: "0.6rem", color: GOLD, fontWeight: 700 }}>You (Live)</div>
+            </div>
+            {/* Instructor tile placeholder */}
+            <div style={{ width: 120, height: 80, borderRadius: 8, background: BG3, border: `1px solid ${BORDER}`, flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "0.2rem" }}>
+              <span style={{ fontSize: "1.2rem" }}>👤</span>
+              <span style={{ fontSize: "0.58rem", color: GRAY2 }}>Instructor</span>
+            </div>
           </div>
         </div>
 
-        {/* ── RIGHT PANEL ─────────────────────────────────────────────────── */}
-        <div style={{ width: 300, borderLeft: "1px solid rgba(255,255,255,0.08)", background: OFF_W, display: "flex", flexDirection: "column", flexShrink: 0 }}>
-          <div style={{ display: "flex", background: WHITE, borderBottom: `1px solid ${GRAY}` }}>
-            {(["participants","chat","qa","materials"] as const).map((t) => (
-              <button key={t} type="button" onClick={() => setActiveTab(t)} style={{ flex:1, background:"transparent", border:"none", borderBottom: activeTab===t ? `2px solid ${GOLDD}` : "2px solid transparent", color: activeTab===t ? GOLDD : GRAY2, padding:"0.65rem 0.1rem", fontSize:"0.6rem", fontWeight:700, cursor:"pointer", display:"flex", flexDirection:"column", alignItems:"center", gap:"0.15rem" }}>
-                <span style={{ fontSize: "0.9rem" }}>{t==="participants"?"👥":t==="chat"?"💬":t==="qa"?"❓":"📁"}</span>
-                <span>{t==="participants"?"People":t==="chat"?"Chat":t==="qa"?"Q&A":"Files"}</span>
+        {/* ── RIGHT PANEL ─────────────────────────────────────────────── */}
+        <div style={{ width: 300, borderLeft: BORDER, background: BG2, display: "flex", flexDirection: "column", flexShrink: 0 }}>
+          {/* Tab bar */}
+          <div style={{ display: "flex", background: BG, borderBottom: BORDER }}>
+            {(["participants", "chat"] as const).map((t) => (
+              <button key={t} type="button" onClick={() => setRightTab(t)} style={{ flex: 1, background: "transparent", border: "none", borderBottom: rightTab === t ? `2px solid ${GOLDD}` : "2px solid transparent", color: rightTab === t ? GOLDD : GRAY2, padding: "0.72rem 0.5rem", fontSize: "0.7rem", fontWeight: 700, cursor: "pointer" }}>
+                {t === "participants" ? "👥 Participants" : "💬 Chat"}
               </button>
             ))}
           </div>
 
-          {activeTab === "participants" && (
-            <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
-              <div style={{ padding:"0.65rem 0.85rem", display:"flex", justifyContent:"space-between", alignItems:"center", borderBottom:`1px solid ${GRAY}` }}>
-                <span style={{ fontWeight:700, fontSize:"0.82rem", color:INK }}>Participants</span>
-                <span style={{ color:GOLDD, fontSize:"0.75rem", cursor:"pointer" }}>View All</span>
+          {/* Participants tab */}
+          {rightTab === "participants" && (
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+              <div style={{ padding: "0.65rem 0.85rem", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: BORDER }}>
+                <span style={{ fontWeight: 700, fontSize: "0.82rem", color: WHITE }}>Participants</span>
+                <span style={{ color: GOLDD, fontSize: "0.75rem", cursor: "pointer" }}>View All</span>
               </div>
-              <div style={{ padding:"0.5rem 0.6rem" }}>
-                <div style={{ display:"flex", alignItems:"center", background:WHITE, border:`1px solid ${GRAY}`, borderRadius:7, padding:"0.35rem 0.55rem", gap:"0.35rem", marginBottom:"0.5rem" }}>
-                  <span style={{ color:GRAY2, fontSize:"0.8rem" }}>🔍</span>
-                  <input placeholder="Search participants…" style={{ flex:1, border:"none", outline:"none", fontSize:"0.75rem", color:INK, background:"transparent" }}/>
+              <div style={{ padding: "0.5rem 0.6rem" }}>
+                <div style={{ display: "flex", alignItems: "center", background: BG3, border: BORDER, borderRadius: 7, padding: "0.35rem 0.55rem", gap: "0.35rem", marginBottom: "0.5rem" }}>
+                  <span style={{ color: GRAY2, fontSize: "0.8rem" }}>🔍</span>
+                  <input placeholder="Search participants…" style={{ flex: 1, border: "none", outline: "none", fontSize: "0.75rem", color: WHITE, background: "transparent" }} />
                 </div>
               </div>
-              <div style={{ flex:1, overflowY:"auto" }}>
-                <div style={{ display:"flex", alignItems:"center", gap:"0.6rem", padding:"0.45rem 0.85rem" }}>
-                  <div style={{ width:34, height:34, borderRadius:"50%", background:GOLD, color:INK, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800, fontSize:"0.85rem", flexShrink:0 }}>S</div>
-                  <div style={{ flex:1 }}>
-                    <div style={{ fontWeight:700, fontSize:"0.8rem", color:INK }}>Student (You)</div>
-                    <div style={{ fontSize:"0.62rem", color:GRAY2 }}>Learner</div>
+              <div style={{ flex: 1, overflowY: "auto" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", padding: "0.45rem 0.85rem", borderBottom: BORDER }}>
+                  <div style={{ width: 34, height: 34, borderRadius: "50%", background: GOLD, color: INK, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: "0.9rem" }}>S</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 700, fontSize: "0.8rem", color: WHITE }}>Student (You)</div>
+                    <div style={{ fontSize: "0.62rem", color: GRAY2 }}>Learner</div>
                   </div>
-                  <span style={{ fontSize:"0.8rem", color:GRAY2 }}>🎤</span>
-                  <span style={{ fontSize:"0.8rem", color:GRAY2 }}>📷</span>
+                  <div style={{ display: "flex", gap: "0.2rem" }}>
+                    <span style={{ fontSize: "0.8rem", color: GRAY2 }}>🎤</span>
+                    <span style={{ fontSize: "0.8rem", color: GRAY2 }}>📷</span>
+                  </div>
+                </div>
+                {/* Instructor row */}
+                <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", padding: "0.45rem 0.85rem", borderBottom: BORDER }}>
+                  <div style={{ width: 34, height: 34, borderRadius: "50%", background: `linear-gradient(135deg,${GOLDD},#f6de88)`, color: INK, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: "0.9rem" }}>
+                    {(learningClass.instructor ?? "I").charAt(0).toUpperCase()}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 700, fontSize: "0.8rem", color: WHITE }}>{learningClass.instructor ?? "Instructor"}</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.3rem" }}>
+                      <div style={{ background: "rgba(212,168,67,0.2)", color: GOLDD, fontSize: "0.55rem", fontWeight: 800, padding: "0.08rem 0.35rem", borderRadius: 3 }}>HOST</div>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: "0.2rem" }}>
+                    <span style={{ fontSize: "0.8rem", color: GREEN }}>🎤</span>
+                    <span style={{ fontSize: "0.8rem", color: GREEN }}>📷</span>
+                  </div>
                 </div>
               </div>
             </div>
           )}
 
-          {activeTab === "chat" && (
-            <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
-              <div style={{ flex:1, overflowY:"auto" }}>
+          {/* Chat tab */}
+          {rightTab === "chat" && (
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+              <div style={{ flex: 1, overflowY: "auto" }}>
                 <ClassroomChat classId={learningClass.id} room={activeRoom} isInstructor={false} />
               </div>
-            </div>
-          )}
-
-          {activeTab === "qa" && (
-            <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", padding:"2rem" }}>
-              <p style={{ color:GRAY2, fontSize:"0.82rem", textAlign:"center" }}>No questions yet. Ask your instructor anything!</p>
-            </div>
-          )}
-
-          {activeTab === "materials" && (
-            <div style={{ flex:1, overflowY:"auto", padding:"0.5rem" }}>
-              {materials.map((m) => (
-                <div key={m.id} style={{ display:"flex", alignItems:"center", gap:"0.55rem", padding:"0.45rem 0.5rem", borderRadius:7, borderBottom:`1px solid ${GRAY}` }}>
-                  <span style={{ fontSize:"1.1rem" }}>{fileIcon(m.mimeType)}</span>
-                  <div style={{ flex:1 }}>
-                    <div style={{ fontWeight:600, fontSize:"0.78rem", color:INK, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{m.title}</div>
-                    <div style={{ fontSize:"0.62rem", color:GRAY2 }}>{fmtType(m.mimeType)}{m.sizeBytes ? ` · ${fmtSize(m.sizeBytes)}` : ""}</div>
-                  </div>
-                  {m.id === presState.materialId && <span style={{ background:GOLDD, color:WHITE, fontSize:"0.55rem", fontWeight:800, padding:"0.1rem 0.3rem", borderRadius:3 }}>Live</span>}
-                </div>
-              ))}
             </div>
           )}
         </div>
       </div>
 
       {/* ── BOTTOM CONTROL BAR ──────────────────────────────────────────── */}
-      <div style={{ background: BG2, borderTop: "1px solid rgba(255,255,255,0.08)", padding: "0.45rem 1.5rem", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", background: BG3, border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "0.4rem 0.75rem", cursor: "pointer" }}>
+      <div style={{ background: BG2, borderTop: BORDER, padding: "0.45rem 1.5rem", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", background: BG3, border: BORDER, borderRadius: 8, padding: "0.4rem 0.75rem", cursor: "pointer" }}>
           <span style={{ fontSize: "0.85rem" }}>🖥️</span>
           <div>
-            <div style={{ color: "rgba(255,255,255,0.5)", fontSize: "0.58rem" }}>Classroom Mode</div>
+            <div style={{ color: GRAY2, fontSize: "0.58rem" }}>Classroom Mode</div>
             <div style={{ color: WHITE, fontSize: "0.7rem", fontWeight: 700 }}>Lecture Mode</div>
           </div>
-          <span style={{ color: "rgba(255,255,255,0.3)", fontSize: "0.65rem" }}>▾</span>
+          <span style={{ color: GRAY2, fontSize: "0.65rem" }}>▾</span>
         </div>
         <div style={{ display: "flex", gap: "0.2rem" }}>
-          {[{ icon:"🎤", label:"Mic" }, { icon:"📷", label:"Camera" }, { icon:"📤", label:"Present", gold:true }, { icon:"📁", label:"Materials" }, { icon:"👥", label:"Participants" }, { icon:"💬", label:"Chat" }, { icon:"❓", label:"Q&A" }, { icon:"⋯", label:"More" }].map(({ icon, label, gold }) => (
-            <button key={label} type="button" style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:"0.12rem", background:gold?GOLDD:"transparent", border:"1px solid transparent", color:gold?WHITE:"rgba(255,255,255,0.75)", borderRadius:8, padding:"0.4rem 0.6rem", cursor:"pointer", minWidth:48 }}>
-              <span style={{ fontSize:"1.1rem" }}>{icon}</span>
-              <span style={{ fontSize:"0.56rem", fontWeight:600, letterSpacing:"0.02em" }}>{label}</span>
+          {[
+            { icon: "🎤", label: "Mic" },
+            { icon: "📷", label: "Camera" },
+            { icon: "📤", label: "Present", gold: true },
+            { icon: "📁", label: "Materials" },
+            { icon: "👥", label: "Participants" },
+            { icon: "💬", label: "Chat" },
+            { icon: "❓", label: "Q&A" },
+            { icon: "⋯", label: "More" },
+          ].map(({ icon, label, gold }) => (
+            <button key={label} type="button" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.12rem", background: gold ? GOLDD : "transparent", border: "1px solid transparent", color: gold ? WHITE : GRAY2, borderRadius: 8, padding: "0.4rem 0.6rem", cursor: "pointer", minWidth: 48 }}>
+              <span style={{ fontSize: "1.1rem" }}>{icon}</span>
+              <span style={{ fontSize: "0.56rem", fontWeight: 600, letterSpacing: "0.02em" }}>{label}</span>
             </button>
           ))}
         </div>
-        <Link href="/learning" style={{ display:"flex", alignItems:"center", gap:"0.4rem", background:RED_BTN, color:WHITE, borderRadius:8, padding:"0.55rem 1.2rem", fontWeight:700, fontSize:"0.85rem", textDecoration:"none" }}>
+        <Link href="/learning" style={{ display: "flex", alignItems: "center", gap: "0.4rem", background: RED_BTN, color: WHITE, borderRadius: 8, padding: "0.55rem 1.2rem", fontWeight: 700, fontSize: "0.85rem", textDecoration: "none" }}>
           Leave
         </Link>
       </div>

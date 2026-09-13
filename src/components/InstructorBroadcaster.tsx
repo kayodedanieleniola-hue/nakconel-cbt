@@ -151,9 +151,17 @@ export default function InstructorBroadcaster({ classId, classTitle, materials, 
   useEffect(() => { presStateRef.current = presState; }, [presState]);
 
   const [activeTab,      setActiveTab]      = useState<"presentation"|"students"|"chat">("presentation");
+  const [rightTab,       setRightTab]       = useState<"participants"|"chat">("participants");
   const [showPollModal,  setShowPollModal]  = useState(false);
   const [pollQuestion,   setPollQuestion]   = useState("");
   const [pollOptionsStr, setPollOptionsStr] = useState("Yes, No, Needs Clarification");
+
+  /* elapsed timer */
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setElapsed(s => s + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
 
   /* responsive */
   const [isMobile,   setIsMobile]   = useState(false);
@@ -621,8 +629,9 @@ export default function InstructorBroadcaster({ classId, classTitle, materials, 
   }
 
   /* ════════════════════════════════════════════════════════════════════════ */
-  /* DESKTOP LAYOUT                                                           */
+  /* DESKTOP LAYOUT — matches mockup: 3-column (materials | presentation+video | participants+chat) */
   /* ════════════════════════════════════════════════════════════════════════ */
+
   function PollModal() {
     return (
       <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.85)", zIndex:10000, display:"flex", alignItems:"center", justifyContent:"center", padding:"1rem" }}>
@@ -653,95 +662,434 @@ export default function InstructorBroadcaster({ classId, classTitle, materials, 
     );
   }
 
+  /* ─────────────────────────────────────────────────────────────────────── */
+
+  // File type helpers for left sidebar
+  function fileTypeBadge(mimeType: string) {
+    if (mimeType === "application/pdf") return { label:"PDF", bg:"#fee2e2", color:"#dc2626" };
+    if (mimeType.includes("presentation")||mimeType.includes("powerpoint")) return { label:"PPT", bg:"#ffedd5", color:"#ea580c" };
+    if (mimeType.includes("word")||mimeType.includes("document")) return { label:"DOC", bg:"#dbeafe", color:"#2563eb" };
+    if (mimeType.includes("excel")||mimeType.includes("spreadsheet")) return { label:"XLS", bg:"#dcfce7", color:"#16a34a" };
+    if (mimeType.startsWith("image/")) return { label:"IMG", bg:"#f3e8ff", color:"#9333ea" };
+    return { label:"FILE", bg:"#f3f4f6", color:"#6b7280" };
+  }
+  function fmtSz(bytes?: number) {
+    if (!bytes) return "";
+    if (bytes >= 1048576) return `${(bytes/1048576).toFixed(1)} MB`;
+    return `${Math.ceil(bytes/1024)} KB`;
+  }
+
+  /* Desktop state for right panel tabs — declared at top level */
+
   return (
-    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.8)", backdropFilter:"blur(4px)", zIndex:9999, display:"flex", alignItems:"stretch", justifyContent:"center", padding:"0.5rem", overflowY:"auto" }}>
-      <div style={{ background:DARK, border:`1px solid ${GOLDB}`, borderRadius:10, width:"100%", maxWidth:1400, display:"flex", flexDirection:"column", overflow:"hidden", maxHeight:"98vh" }}>
+    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.82)", backdropFilter:"blur(4px)", zIndex:9999, display:"flex", alignItems:"stretch", justifyContent:"center", padding:"0.5rem", overflowY:"auto" }}>
+      <div style={{ background:"#111827", width:"100%", maxWidth:1440, display:"flex", flexDirection:"column", borderRadius:12, overflow:"hidden", maxHeight:"98vh", boxShadow:"0 24px 80px rgba(0,0,0,0.7)" }}>
         <HiddenMedia/>
 
-        {/* header */}
-        <div style={{ background:WINE, borderBottom:`1px solid #4a1919`, padding:"0.75rem 1.2rem", display:"flex", justifyContent:"space-between", alignItems:"center", gap:"1rem", flexWrap:"wrap" }}>
-          <div>
-            <span style={{ color:connectionStatus==="live"?GREEN:connectionStatus==="connecting"?GOLD:RED, fontSize:"0.72rem", fontWeight:700, letterSpacing:"0.05em", display:"block" }}>
-              {connectionStatus==="live" ? "● LIVE STUDIO" : connectionStatus==="connecting" ? "◌ CONNECTING…" : "✕ DISCONNECTED"}
-            </span>
-            <h3 style={{ margin:"0.15rem 0 0", fontSize:"1.1rem", color:WHITE }}>{classTitle}</h3>
+        {/* ── TOP BAR ───────────────────────────────────────────────── */}
+        <div style={{ background:"#1f2937", borderBottom:"1px solid rgba(255,255,255,0.08)", padding:"0 1.5rem", height:58, display:"flex", alignItems:"center", justifyContent:"space-between", gap:"1rem", flexShrink:0 }}>
+          {/* Left: breadcrumb */}
+          <div style={{ display:"flex", alignItems:"center", gap:"0.85rem", minWidth:0 }}>
+            <div style={{ display:"flex", alignItems:"center", gap:"0.4rem" }}>
+              <div style={{ width:32, height:32, borderRadius:8, background:`linear-gradient(135deg,${GOLDB},#d4af37)`, display:"flex", alignItems:"center", justifyContent:"center" }}>
+                <span style={{ fontSize:"1rem" }}>✦</span>
+              </div>
+              <div>
+                <div style={{ color:WHITE, fontWeight:900, fontSize:"0.88rem", lineHeight:1 }}>NAK</div>
+                <div style={{ color:"rgba(255,255,255,0.4)", fontSize:"0.48rem", letterSpacing:"0.08em" }}>LEARNING CENTER</div>
+              </div>
+            </div>
+            <div style={{ width:1, height:28, background:"rgba(255,255,255,0.1)" }}/>
+            <div>
+              <div style={{ display:"flex", alignItems:"center", gap:"0.35rem" }}>
+                <span style={{ color:"rgba(255,255,255,0.45)", fontSize:"0.7rem" }}>Live Class</span>
+                <span style={{ color:"rgba(255,255,255,0.3)", fontSize:"0.7rem" }}>›</span>
+                <span style={{ color:WHITE, fontSize:"0.78rem", fontWeight:600, maxWidth:260, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{classTitle}</span>
+              </div>
+              <div style={{ display:"flex", alignItems:"center", gap:"0.4rem", marginTop:"0.1rem" }}>
+                <div style={{ background:RED, color:WHITE, fontWeight:800, fontSize:"0.6rem", padding:"0.12rem 0.45rem", borderRadius:3, letterSpacing:"0.07em", display:"flex", alignItems:"center", gap:"0.22rem" }}>
+                  <span style={{ width:5, height:5, borderRadius:"50%", background:WHITE, display:"inline-block" }}/>LIVE
+                </div>
+              </div>
+            </div>
           </div>
-          <div style={{ display:"flex", gap:"0.6rem", alignItems:"center", flexWrap:"wrap" }}>
+
+          {/* Center: stats */}
+          <div style={{ display:"flex", alignItems:"center", gap:"0.75rem", flexShrink:0 }}>
+            <div style={{ display:"flex", alignItems:"center", gap:"0.35rem", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.09)", borderRadius:8, padding:"0.3rem 0.75rem", fontSize:"0.78rem", color:"rgba(255,255,255,0.8)" }}>
+              <span>👥</span> {studentCount} Students
+            </div>
+            <div style={{ display:"flex", alignItems:"center", gap:"0.35rem", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.09)", borderRadius:8, padding:"0.3rem 0.75rem", fontSize:"0.78rem", fontVariantNumeric:"tabular-nums", color:WHITE }}>
+              🕐 {fmtT(elapsed)}
+            </div>
+            <div style={{ display:"flex", alignItems:"center", gap:"0.3rem" }}>
+              <span style={{ width:7, height:7, borderRadius:"50%", background:connectionStatus==="live"?GREEN:connectionStatus==="connecting"?GOLDB:RED, display:"inline-block" }}/>
+              <span style={{ fontSize:"0.7rem", color:connectionStatus==="live"?GREEN:connectionStatus==="connecting"?GOLDB:RED, fontWeight:600 }}>
+                {connectionStatus==="live"?"Connected":connectionStatus==="connecting"?"Connecting…":"Disconnected"}
+              </span>
+            </div>
+          </div>
+
+          {/* Right: quality + controls */}
+          <div style={{ display:"flex", alignItems:"center", gap:"0.5rem", flexShrink:0 }}>
             <select value={quality} onChange={(e) => setQuality(e.target.value as typeof quality)}
-              style={{ background:DARK2, color:GOLD, border:`1px solid ${GOLDB}`, borderRadius:4, padding:"0.3rem 0.5rem", fontSize:"0.8rem", cursor:"pointer" }}>
+              style={{ background:"#374151", color:GOLD, border:"1px solid rgba(255,255,255,0.15)", borderRadius:6, padding:"0.3rem 0.55rem", fontSize:"0.78rem", cursor:"pointer" }}>
               <option value="4k">4K</option><option value="1080p">1080p</option><option value="720p">720p</option><option value="480p">480p</option>
             </select>
+            <div style={{ display:"flex", alignItems:"center", gap:"0.35rem", background:"rgba(255,255,255,0.07)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:8, padding:"0.25rem 0.7rem" }}>
+              <div style={{ width:30, height:30, borderRadius:"50%", background:`linear-gradient(135deg,${GOLDB},#d4af37)`, color:WHITE, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800, fontSize:"0.82rem" }}>I</div>
+              <div>
+                <div style={{ color:WHITE, fontSize:"0.75rem", fontWeight:700 }}>Instructor</div>
+                <div style={{ color:GOLDB, fontSize:"0.58rem" }}>Host</div>
+              </div>
+            </div>
             <button type="button" onClick={endBroadcast}
-              style={{ background:"#4d1010", border:`1px solid ${RED}`, color:WHITE, borderRadius:4, padding:"0.35rem 0.75rem", fontSize:"0.8rem", fontWeight:600, cursor:"pointer" }}>
-              End Broadcast
+              style={{ background:"#dc2626", border:"none", color:WHITE, borderRadius:8, padding:"0.42rem 1rem", fontSize:"0.82rem", fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", gap:"0.35rem" }}>
+              ⏹ End Class
             </button>
             <button type="button" onClick={onClose}
-              style={{ background:"transparent", border:"1px solid #4a2725", color:MUTED, borderRadius:4, padding:"0.35rem 0.55rem", fontSize:"0.85rem", cursor:"pointer" }}>✕</button>
+              style={{ background:"rgba(255,255,255,0.07)", border:"1px solid rgba(255,255,255,0.12)", color:"rgba(255,255,255,0.6)", borderRadius:6, padding:"0.35rem 0.55rem", fontSize:"0.85rem", cursor:"pointer" }}>✕</button>
           </div>
         </div>
 
-        {errorMsg && <p style={{ color:"#ff9a8a", background:"#2a0808", padding:"0.4rem 1rem", margin:0, fontSize:"0.82rem", borderBottom:"1px solid #5a1c18" }}>{errorMsg}</p>}
+        {errorMsg && <p style={{ color:"#ff9a8a", background:"#2a0808", padding:"0.4rem 1rem", margin:0, fontSize:"0.82rem", borderBottom:"1px solid #5a1c18", flexShrink:0 }}>{errorMsg}</p>}
 
-        {/* body */}
-        <div style={{ display:"grid", gridTemplateColumns:"minmax(0,1fr) 280px", flex:1, overflow:"hidden" }}>
-          {/* LEFT */}
-          <div style={{ display:"flex", flexDirection:"column", borderRight:`1px solid ${RIM}`, overflow:"hidden" }}>
-            <div style={{ display:"flex", background:DARK2, borderBottom:`1px solid ${RIM}`, flexShrink:0 }}>
-              {(["presentation","students","chat"] as const).map((t) => (
-                <button key={t} type="button" onClick={() => setActiveTab(t)} style={{ flex:1, background:"transparent", border:"none", borderBottom:activeTab===t?`2px solid ${GOLDB}`:"2px solid transparent", color:activeTab===t?GOLD:MUTED, padding:"0.6rem 0.5rem", fontSize:"0.8rem", fontWeight:600, cursor:"pointer" }}>
-                  {t==="presentation" && "📊 Presentation"}
-                  {t==="students"     && `👥 Students (${studentCount})`}
-                  {t==="chat"         && "💬 Chat"}
+        {/* ── 3-COLUMN BODY ─────────────────────────────────────────── */}
+        <div style={{ flex:1, display:"grid", gridTemplateColumns:"260px minmax(0,1fr) 308px", overflow:"hidden", minHeight:0 }}>
+
+          {/* ── LEFT: Materials sidebar + class info ─────────────────── */}
+          <div style={{ background:"#1f2937", borderRight:"1px solid rgba(255,255,255,0.08)", display:"flex", flexDirection:"column", overflow:"hidden" }}>
+            {/* Materials header */}
+            <div style={{ padding:"0.75rem 0.85rem", borderBottom:"1px solid rgba(255,255,255,0.08)", display:"flex", alignItems:"center", justifyContent:"space-between", flexShrink:0 }}>
+              <span style={{ color:WHITE, fontWeight:700, fontSize:"0.85rem" }}>Materials</span>
+              <button style={{ background:`linear-gradient(135deg,${GOLDB},#d4af37)`, color:WHITE, border:"none", borderRadius:6, padding:"0.28rem 0.65rem", fontSize:"0.72rem", fontWeight:700, cursor:"pointer" }}>+ Upload</button>
+            </div>
+            {/* Filter chips */}
+            <div style={{ padding:"0.45rem 0.75rem", borderBottom:"1px solid rgba(255,255,255,0.08)", display:"flex", gap:"0.3rem", overflowX:"auto", flexShrink:0 }}>
+              {["All","PDF","PPT","DOC","Images"].map(f => (
+                <button key={f} type="button" style={{ background:f==="All"?"rgba(212,168,67,0.18)":"rgba(255,255,255,0.05)", border:f==="All"?`1px solid ${GOLDB}`:"1px solid rgba(255,255,255,0.1)", color:f==="All"?GOLD:"rgba(255,255,255,0.6)", borderRadius:5, padding:"0.2rem 0.55rem", fontSize:"0.65rem", fontWeight:600, cursor:"pointer", whiteSpace:"nowrap" }}>
+                  {f}
                 </button>
               ))}
             </div>
-            <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
-              <TabContent tab={activeTab}/>
+            {/* File list */}
+            <div style={{ flex:1, overflowY:"auto", padding:"0.4rem 0.5rem" }}>
+              {materials.length === 0 ? (
+                <p style={{ color:MUTED, fontSize:"0.8rem", textAlign:"center", padding:"1.5rem 0" }}>No materials uploaded yet.</p>
+              ) : materials.map((m) => {
+                const active = m.id === presState.materialId;
+                const badge  = fileTypeBadge(m.mimeType);
+                return (
+                  <button key={m.id} type="button" onClick={() => selectMaterial(m.id)} style={{ width:"100%", textAlign:"left", display:"flex", alignItems:"center", gap:"0.55rem", padding:"0.55rem 0.6rem", borderRadius:8, background:active?"rgba(212,168,67,0.1)":"transparent", border:active?`1px solid rgba(212,168,67,0.3)`:"1px solid transparent", cursor:"pointer", marginBottom:"0.2rem" }}>
+                    <div style={{ width:36, height:36, borderRadius:7, background:badge.bg, color:badge.color, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"0.55rem", fontWeight:800, letterSpacing:"0.02em", flexShrink:0 }}>
+                      {badge.label}
+                    </div>
+                    <div style={{ flex:1, overflow:"hidden" }}>
+                      <div style={{ color:WHITE, fontSize:"0.78rem", fontWeight:600, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{m.title}</div>
+                      <div style={{ color:MUTED, fontSize:"0.62rem" }}>{badge.label} · {fmtSz(m.sizeBytes)}</div>
+                    </div>
+                    {active && (
+                      <div style={{ background:GOLDB, color:WHITE, fontSize:"0.55rem", fontWeight:800, padding:"0.12rem 0.4rem", borderRadius:4, whiteSpace:"nowrap" }}>Presenting</div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Class information card */}
+            <div style={{ margin:"0 0.75rem 0.75rem", background:"#111827", border:"1px solid rgba(255,255,255,0.08)", borderRadius:10, overflow:"hidden", flexShrink:0 }}>
+              <div style={{ padding:"0.6rem 0.85rem", borderBottom:"1px solid rgba(255,255,255,0.08)", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+                <span style={{ color:WHITE, fontWeight:700, fontSize:"0.8rem" }}>Class Information</span>
+                <span style={{ color:GOLDB, fontSize:"0.7rem", cursor:"pointer" }}>Edit</span>
+              </div>
+              <div style={{ padding:"0.65rem 0.85rem", display:"flex", flexDirection:"column", gap:"0.4rem" }}>
+                {[
+                  ["Status", connectionStatus==="live" ? "● Live" : "● Connecting"],
+                  ["Students", `${studentCount} / —`],
+                  ["Duration", fmtT(elapsed)],
+                ].map(([k, v]) => (
+                  <div key={k} style={{ display:"flex", justifyContent:"space-between" }}>
+                    <span style={{ color:MUTED, fontSize:"0.72rem" }}>{k}</span>
+                    <span style={{ color:k==="Status" ? GREEN : WHITE, fontSize:"0.75rem", fontWeight:600 }}>{v}</span>
+                  </div>
+                ))}
+              </div>
+              <div style={{ padding:"0.6rem 0.85rem", borderTop:"1px solid rgba(255,255,255,0.08)" }}>
+                <button type="button" onClick={endBroadcast}
+                  style={{ width:"100%", background:"#dc2626", color:WHITE, border:"none", borderRadius:7, padding:"0.52rem", fontSize:"0.82rem", fontWeight:700, cursor:"pointer" }}>
+                  ⏹ End Class
+                </button>
+              </div>
             </div>
           </div>
 
-          {/* RIGHT */}
-          <div style={{ display:"flex", flexDirection:"column", gap:"0.75rem", padding:"0.85rem", background:DARK3, overflow:"auto" }}>
-            {/* self preview */}
-            <div style={{ display:"flex", flexDirection:"column", gap:"0.3rem" }}>
-              <div style={{ position:"relative", background:"#100707", border:`1px solid ${RIM}`, borderRadius:6, aspectRatio:"16/9", overflow:"hidden", display:"flex", alignItems:"center", justifyContent:"center" }}>
+          {/* ── CENTER: Presentation + controls + video grid ─────────── */}
+          <div style={{ display:"flex", flexDirection:"column", overflow:"hidden", background:"#111827" }}>
+            {/* Presentation toolbar */}
+            <div style={{ background:"#1f2937", borderBottom:"1px solid rgba(255,255,255,0.08)", padding:"0.4rem 1rem", display:"flex", alignItems:"center", gap:"0.6rem", flexShrink:0 }}>
+              {selectedMaterial ? (
+                <>
+                  <div style={{ display:"flex", alignItems:"center", gap:"0.4rem", background:"#374151", borderRadius:6, padding:"0.22rem 0.65rem" }}>
+                    <span style={{ fontSize:"0.75rem" }}>{selectedMaterial.mimeType==="application/pdf"?"📄":selectedMaterial.mimeType?.startsWith("image/")?"🖼️":"📁"}</span>
+                    <span style={{ color:WHITE, fontSize:"0.75rem", fontWeight:600, maxWidth:200, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{selectedMaterial.title}</span>
+                  </div>
+                  <div style={{ display:"flex", alignItems:"center", gap:"0.35rem", color:"rgba(255,255,255,0.6)", fontSize:"0.78rem" }}>
+                    <button type="button" onClick={() => changePage(-1)} disabled={presState.page<=1} style={{ background:"#374151", border:"1px solid rgba(255,255,255,0.12)", color:"rgba(255,255,255,0.7)", borderRadius:5, padding:"0.22rem 0.55rem", cursor:"pointer", fontSize:"0.72rem" }}>◄</button>
+                    <span style={{ fontWeight:700, color:WHITE, minWidth:40, textAlign:"center" }}>{presState.page} / —</span>
+                    <button type="button" onClick={() => changePage(1)} style={{ background:"#374151", border:"1px solid rgba(255,255,255,0.12)", color:"rgba(255,255,255,0.7)", borderRadius:5, padding:"0.22rem 0.55rem", cursor:"pointer", fontSize:"0.72rem" }}>►</button>
+                  </div>
+                </>
+              ) : (
+                <span style={{ color:"rgba(255,255,255,0.4)", fontSize:"0.78rem" }}>No material selected — pick one from the left panel</span>
+              )}
+              <div style={{ marginLeft:"auto", display:"flex", gap:"0.4rem" }}>
+                <button style={{ background:"#374151", border:"1px solid rgba(255,255,255,0.12)", color:"rgba(255,255,255,0.7)", borderRadius:5, padding:"0.22rem 0.5rem", cursor:"pointer", fontSize:"0.72rem" }}>100%</button>
+                <button style={{ background:"#374151", border:"1px solid rgba(255,255,255,0.12)", color:"rgba(255,255,255,0.7)", borderRadius:5, padding:"0.22rem 0.5rem", cursor:"pointer", fontSize:"0.75rem" }}>⛶</button>
+              </div>
+            </div>
+
+            {/* Slide iframe */}
+            <div style={{ flex:1, overflow:"hidden", background:"#f0ece6", position:"relative", minHeight:0 }}>
+              {selectedMaterial && previewable ? (
+                <iframe
+                  key={`${selectedMaterial.id}-p${presState.page}`}
+                  title={selectedMaterial.title}
+                  src={`/api/admin/learning/materials/preview?id=${selectedMaterial.id}&page=${presState.page}`}
+                  style={{ width:"100%", height:"100%", border:0, background:"#ffffff" }}
+                />
+              ) : (
+                <div style={{ display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", height:"100%", gap:"0.75rem" }}>
+                  <span style={{ fontSize:"3rem" }}>📊</span>
+                  <p style={{ margin:0, fontWeight:700, fontSize:"1rem", color:"#5c1d1d" }}>
+                    {selectedMaterial ? selectedMaterial.title : "Select a material to begin presenting"}
+                  </p>
+                  <p style={{ margin:0, fontSize:"0.82rem", color:"#8a7a72" }}>
+                    {selectedMaterial ? "This file cannot be previewed inline." : "Students will see the presentation in real-time."}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Presentation controls bar */}
+            <div style={{ background:"#1f2937", borderTop:"1px solid rgba(255,255,255,0.08)", padding:"0.4rem 1rem", display:"flex", alignItems:"center", gap:"0.5rem", flexShrink:0 }}>
+              <button type="button" onClick={() => changePage(-1)} disabled={presState.page<=1}
+                style={{ background:"#374151", border:"1px solid rgba(255,255,255,0.12)", color:"rgba(255,255,255,0.8)", borderRadius:6, padding:"0.32rem 0.85rem", fontSize:"0.78rem", fontWeight:600, cursor:"pointer", display:"flex", alignItems:"center", gap:"0.3rem" }}>
+                ◄ Previous
+              </button>
+              <button type="button" onClick={() => changePage(1)}
+                style={{ background:"#374151", border:"1px solid rgba(255,255,255,0.12)", color:"rgba(255,255,255,0.8)", borderRadius:6, padding:"0.32rem 0.85rem", fontSize:"0.78rem", fontWeight:600, cursor:"pointer", display:"flex", alignItems:"center", gap:"0.3rem" }}>
+                Next ►
+              </button>
+              <div style={{ width:1, height:20, background:"rgba(255,255,255,0.1)", margin:"0 0.25rem" }}/>
+              <button style={{ background:"#374151", border:"1px solid rgba(255,255,255,0.12)", color:"rgba(255,255,255,0.7)", borderRadius:6, padding:"0.32rem 0.75rem", fontSize:"0.75rem", cursor:"pointer" }}>🔍 Zoom -</button>
+              <button style={{ background:"#374151", border:"1px solid rgba(255,255,255,0.12)", color:"rgba(255,255,255,0.7)", borderRadius:6, padding:"0.32rem 0.75rem", fontSize:"0.75rem", cursor:"pointer" }}>🔍 Zoom +</button>
+              <button style={{ background:"#374151", border:"1px solid rgba(255,255,255,0.12)", color:"rgba(255,255,255,0.7)", borderRadius:6, padding:"0.32rem 0.75rem", fontSize:"0.75rem", cursor:"pointer" }}>⛶ Fullscreen</button>
+              <div style={{ marginLeft:"auto", display:"flex", gap:"0.4rem" }}>
+                <button type="button" onClick={toggleCamera}
+                  style={{ background:cameraOn?"rgba(212,168,67,0.15)":"rgba(255,255,255,0.06)", border:`1px solid ${cameraOn?GOLDB:"rgba(255,255,255,0.12)"}`, color:cameraOn?GOLD:"rgba(255,255,255,0.6)", borderRadius:6, padding:"0.3rem 0.7rem", fontSize:"0.75rem", fontWeight:600, cursor:"pointer" }}>
+                  📷 {cameraOn?"ON":"OFF"}
+                </button>
+                <button type="button" onClick={toggleMic}
+                  style={{ background:micOn?"rgba(34,197,94,0.15)":"rgba(255,255,255,0.06)", border:`1px solid ${micOn?"#22c55e":"rgba(255,255,255,0.12)"}`, color:micOn?"#22c55e":"rgba(255,255,255,0.6)", borderRadius:6, padding:"0.3rem 0.7rem", fontSize:"0.75rem", fontWeight:600, cursor:"pointer" }}>
+                  🎤 {micOn?"ON":"OFF"}
+                </button>
+                <button type="button" onClick={() => setShowPollModal(true)}
+                  style={{ background:GOLDB, border:"none", color:WHITE, borderRadius:6, padding:"0.3rem 0.75rem", fontSize:"0.75rem", fontWeight:700, cursor:"pointer" }}>
+                  📊 Poll
+                </button>
+              </div>
+            </div>
+
+            {/* Video grid — instructor + students */}
+            <div style={{ background:"#0f172a", borderTop:"1px solid rgba(255,255,255,0.08)", padding:"0.55rem 0.75rem", display:"flex", gap:"0.5rem", overflowX:"auto", flexShrink:0, alignItems:"stretch" }}>
+              {/* Instructor self-preview tile */}
+              <div style={{ width:160, flexShrink:0, position:"relative", borderRadius:10, overflow:"hidden", background:"#1e293b", border:`2px solid ${GOLD}`, aspectRatio:"16/9" }}>
                 <video ref={selfVideoCallbackRef} autoPlay playsInline muted style={{ width:"100%", height:"100%", objectFit:"cover" }}/>
                 {!cameraOn && (
-                  <div style={{ position:"absolute", inset:0, background:"#120a09", display:"flex", alignItems:"center", justifyContent:"center" }}>
-                    <p style={{ margin:0, color:MUTED, fontSize:"0.85rem" }}>Camera OFF</p>
+                  <div style={{ position:"absolute", inset:0, background:"#0f172a", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                    <div style={{ width:44, height:44, borderRadius:"50%", background:`linear-gradient(135deg,${GOLDB},#d4af37)`, color:WHITE, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800, fontSize:"1.1rem" }}>I</div>
                   </div>
                 )}
-                <span style={{ position:"absolute", top:"0.35rem", left:"0.35rem", background:"rgba(0,0,0,0.7)", color:connectionStatus==="live"?GREEN:GOLD, fontSize:"0.6rem", fontWeight:700, padding:"0.1rem 0.3rem", borderRadius:3 }}>
-                  {connectionStatus==="live" ? "● LIVE" : connectionStatus==="connecting" ? "◌ CONNECTING" : "✕ OFFLINE"}
-                </span>
+                <div style={{ position:"absolute", top:"0.3rem", left:"0.35rem", background:"rgba(0,0,0,0.65)", borderRadius:4, padding:"0.1rem 0.4rem", fontSize:"0.6rem", color:WHITE, fontWeight:600 }}>Instructor</div>
+                <div style={{ position:"absolute", bottom:0, left:0, right:0, background:"linear-gradient(to top,rgba(0,0,0,0.8),transparent)", padding:"0.8rem 0.45rem 0.3rem", display:"flex", justifyContent:"space-between", alignItems:"flex-end" }}>
+                  <span style={{ color:WHITE, fontSize:"0.65rem", fontWeight:700 }}>You (Instructor)</span>
+                  <div style={{ display:"flex", gap:"0.2rem" }}>
+                    <div style={{ width:18, height:18, borderRadius:"50%", background:micOn?"rgba(34,197,94,0.25)":"rgba(229,53,53,0.7)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                      <span style={{ fontSize:"0.55rem" }}>{micOn?"🎤":"🔇"}</span>
+                    </div>
+                    <div style={{ width:18, height:18, borderRadius:"50%", background:cameraOn?"rgba(34,197,94,0.25)":"rgba(229,53,53,0.7)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                      <span style={{ fontSize:"0.55rem" }}>{cameraOn?"📷":"📷"}</span>
+                    </div>
+                  </div>
+                </div>
+                <AudioLevelMeter track={micTrackForMeter}/>
               </div>
-              <p style={{ fontSize:"0.72rem", color:"#d4b684", textAlign:"center", margin:0 }}>You (Instructor)</p>
-            </div>
 
-            <AudioLevelMeter track={micTrackForMeter}/>
-
-            <div style={{ display:"flex", flexDirection:"column", gap:"0.4rem" }}>
-              <button type="button" onClick={toggleCamera} style={{ width:"100%", padding:"0.55rem", borderRadius:6, fontSize:"0.82rem", fontWeight:600, cursor:"pointer", border:"1px solid transparent", background:cameraOn?"#331614":DARK2, borderColor:cameraOn?GOLDB:RIM, color:cameraOn?GOLD:MUTED }}>
-                {cameraOn ? "📷 Camera ON" : "📷 Camera OFF"}
-              </button>
-              <button type="button" onClick={toggleMic} style={{ width:"100%", padding:"0.55rem", borderRadius:6, fontSize:"0.82rem", fontWeight:600, cursor:"pointer", border:"1px solid transparent", background:micOn?"#331614":DARK2, borderColor:micOn?GOLDB:RIM, color:micOn?GOLD:MUTED }}>
-                {micOn ? "🎤 Mic ON" : "🎤 Mic Muted"}
-              </button>
-              <button type="button" onClick={() => setShowPollModal(true)} style={{ width:"100%", padding:"0.55rem", borderRadius:6, fontSize:"0.82rem", fontWeight:600, cursor:"pointer", background:GOLDB, color:WHITE, border:`1px solid #b57d26` }}>
-                📊 Launch Poll
-              </button>
-            </div>
-
-            <div style={{ background:DARK2, border:`1px solid ${RIM}`, borderRadius:6, padding:"0.65rem", textAlign:"center", display:"flex", flexDirection:"column", gap:"0.2rem" }}>
-              <span style={{ fontSize:"0.65rem", fontWeight:700, letterSpacing:"0.05em", color:GOLDB }}>CONNECTED</span>
-              <span style={{ fontSize:"2rem", fontWeight:700, color:GOLD, lineHeight:1 }}>{studentCount}</span>
-              <span style={{ fontSize:"0.65rem", fontWeight:700, letterSpacing:"0.05em", color:GOLDB }}>students</span>
+              {/* Student tiles */}
+              {Object.values(studentTiles).slice(0, 5).map((tile) => (
+                <div key={tile.identity} style={{ width:160, flexShrink:0, position:"relative", borderRadius:10, overflow:"hidden", background:"#1e293b", border:"1px solid rgba(255,255,255,0.1)", aspectRatio:"16/9" }}>
+                  <StudentVideoTile
+                    tile={tile}
+                    rootVideoRefs={rootVideoRefs}
+                    onVideoRef={(el) => { if (el) tileVideoRefs.current.set(tile.identity, el); else tileVideoRefs.current.delete(tile.identity); }}
+                    onAudioRef={(el) => { if (el) tileAudioRefs.current.set(tile.identity, el);  else tileAudioRefs.current.delete(tile.identity); }}
+                  />
+                </div>
+              ))}
+              {Object.keys(studentTiles).length > 5 && (
+                <div style={{ width:160, flexShrink:0, borderRadius:10, background:"#1e293b", border:"1px dashed rgba(255,255,255,0.12)", aspectRatio:"16/9", display:"flex", alignItems:"center", justifyContent:"center", flexDirection:"column", gap:"0.3rem" }}>
+                  <span style={{ color:"rgba(255,255,255,0.5)", fontSize:"1.2rem" }}>👥</span>
+                  <span style={{ color:"rgba(255,255,255,0.5)", fontSize:"0.68rem" }}>+{Object.keys(studentTiles).length - 5} More Students</span>
+                </div>
+              )}
+              {Object.keys(studentTiles).length === 0 && (
+                <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", color:"rgba(255,255,255,0.25)", fontSize:"0.78rem" }}>
+                  Waiting for students to join…
+                </div>
+              )}
             </div>
           </div>
+
+          {/* ── RIGHT: Participants + Chat ───────────────────────────── */}
+          <div style={{ background:"#f9fafb", borderLeft:"1px solid rgba(255,255,255,0.08)", display:"flex", flexDirection:"column", overflow:"hidden" }}>
+            {/* Tab bar */}
+            <div style={{ display:"flex", background:"#ffffff", borderBottom:"1px solid #e5e7eb" }}>
+              {(["participants","chat"] as const).map(t => (
+                <button key={t} type="button" onClick={() => setRightTab(t)} style={{ flex:1, background:"transparent", border:"none", borderBottom:rightTab===t?`2px solid ${GOLDB}`:"2px solid transparent", color:rightTab===t?GOLDB:"#9ca3af", padding:"0.75rem 0.5rem", fontSize:"0.72rem", fontWeight:700, cursor:"pointer", display:"flex", flexDirection:"column", alignItems:"center", gap:"0.18rem" }}>
+                  <span style={{ fontSize:"0.9rem" }}>{t==="participants"?"👥":"💬"}</span>
+                  <span>{t==="participants"?`Participants (${studentCount+1})`:"Chat"}</span>
+                </button>
+              ))}
+              <button type="button" style={{ width:40, background:"transparent", border:"none", cursor:"pointer", color:"#9ca3af", fontSize:"0.8rem" }}>⋯</button>
+            </div>
+
+            {rightTab === "participants" && (
+              <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
+                <div style={{ padding:"0.6rem 0.85rem", borderBottom:"1px solid #e5e7eb", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                  <span style={{ fontWeight:700, fontSize:"0.82rem", color:"#111827" }}>Participants ({studentCount+1})</span>
+                  <span style={{ color:GOLDB, fontSize:"0.75rem", cursor:"pointer" }}>View All</span>
+                </div>
+                <div style={{ padding:"0.5rem 0.75rem", borderBottom:"1px solid #e5e7eb" }}>
+                  <div style={{ display:"flex", alignItems:"center", background:"#ffffff", border:"1px solid #e5e7eb", borderRadius:7, padding:"0.35rem 0.55rem", gap:"0.35rem" }}>
+                    <span style={{ color:"#9ca3af", fontSize:"0.8rem" }}>🔍</span>
+                    <input placeholder="Search participants…" style={{ flex:1, border:"none", outline:"none", fontSize:"0.75rem", color:"#111827", background:"transparent" }}/>
+                  </div>
+                </div>
+                <div style={{ flex:1, overflowY:"auto" }}>
+                  {/* Instructor self row */}
+                  <div style={{ display:"flex", alignItems:"center", gap:"0.6rem", padding:"0.5rem 0.85rem", borderBottom:"1px solid #f3f4f6" }}>
+                    <div style={{ width:36, height:36, borderRadius:"50%", background:`linear-gradient(135deg,${GOLDB},#d4af37)`, color:WHITE, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800, fontSize:"0.88rem", flexShrink:0, position:"relative" }}>
+                      I
+                      <span style={{ position:"absolute", bottom:0, right:0, width:9, height:9, borderRadius:"50%", background:"#22c55e", border:"1.5px solid #f9fafb" }}/>
+                    </div>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontWeight:700, fontSize:"0.8rem", color:"#111827" }}>You (Instructor)</div>
+                      <div style={{ display:"flex", alignItems:"center", gap:"0.3rem" }}>
+                        <div style={{ background:"rgba(212,168,67,0.2)", color:GOLDB, fontSize:"0.55rem", fontWeight:800, padding:"0.06rem 0.3rem", borderRadius:3 }}>HOST</div>
+                      </div>
+                    </div>
+                    <div style={{ display:"flex", gap:"0.25rem" }}>
+                      <span style={{ fontSize:"0.8rem" }}>{micOn?"🎤":"🔇"}</span>
+                      <span style={{ fontSize:"0.8rem" }}>{cameraOn?"📷":"📷"}</span>
+                      <span style={{ fontSize:"0.8rem", color:"#9ca3af" }}>⋮</span>
+                    </div>
+                  </div>
+                  {/* Students */}
+                  {Object.values(studentTiles).map((tile) => (
+                    <div key={tile.identity} style={{ display:"flex", alignItems:"center", gap:"0.6rem", padding:"0.5rem 0.85rem", borderBottom:"1px solid #f3f4f6" }}>
+                      <div style={{ width:36, height:36, borderRadius:"50%", background:"#ede8e2", color:"#374151", display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800, fontSize:"0.88rem", flexShrink:0, position:"relative" }}>
+                        {tile.name.charAt(0).toUpperCase()}
+                        <span style={{ position:"absolute", bottom:0, right:0, width:9, height:9, borderRadius:"50%", background:"#22c55e", border:"1.5px solid #f9fafb" }}/>
+                      </div>
+                      <div style={{ flex:1 }}>
+                        <div style={{ fontWeight:700, fontSize:"0.8rem", color:"#111827" }}>{tile.name}</div>
+                        <div style={{ fontSize:"0.62rem", color:"#9ca3af" }}>Student</div>
+                      </div>
+                      <div style={{ display:"flex", gap:"0.25rem" }}>
+                        <span style={{ fontSize:"0.8rem" }}>{tile.hasAudio?"🎤":"🔇"}</span>
+                        <span style={{ fontSize:"0.8rem" }}>{tile.hasVideo?"📷":"📷"}</span>
+                        <span style={{ fontSize:"0.8rem", color:"#9ca3af" }}>⋮</span>
+                      </div>
+                    </div>
+                  ))}
+                  {studentCount === 0 && (
+                    <div style={{ padding:"2rem", textAlign:"center", color:"#9ca3af", fontSize:"0.8rem" }}>
+                      No students connected yet.
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {rightTab === "chat" && (
+              <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
+                <div style={{ flex:1, overflowY:"auto", padding:"0.75rem 0.85rem" }}>
+                  <ClassroomChat classId={classId} room={roomRef.current} isInstructor userId="instructor-admin" userName="Instructor (Host)"/>
+                </div>
+              </div>
+            )}
+
+            {/* Quick actions */}
+            <div style={{ padding:"0.65rem 0.85rem", borderTop:"1px solid #e5e7eb", background:"#ffffff" }}>
+              <div style={{ fontSize:"0.72rem", fontWeight:700, color:"#374151", marginBottom:"0.5rem" }}>⚡ Quick Actions</div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:"0.4rem" }}>
+                {[["📤","Upload Material"],["🔗","Share Link"],["⏺","Record Session"]].map(([icon, label]) => (
+                  <button key={label as string} type="button" style={{ background:"#f3f4f6", border:"1px solid #e5e7eb", borderRadius:7, padding:"0.5rem 0.3rem", display:"flex", flexDirection:"column", alignItems:"center", gap:"0.2rem", cursor:"pointer" }}>
+                    <span style={{ fontSize:"1.1rem" }}>{icon}</span>
+                    <span style={{ fontSize:"0.58rem", color:"#374151", fontWeight:600, textAlign:"center", lineHeight:1.2 }}>{label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── BOTTOM CONTROL BAR ────────────────────────────────────── */}
+        <div style={{ background:"#1f2937", borderTop:"1px solid rgba(255,255,255,0.08)", padding:"0.45rem 1.5rem", display:"flex", alignItems:"center", justifyContent:"space-between", flexShrink:0 }}>
+          {/* Mode */}
+          <div style={{ display:"flex", alignItems:"center", gap:"0.5rem", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:8, padding:"0.38rem 0.85rem", cursor:"pointer" }}>
+            <span style={{ fontSize:"0.85rem" }}>🖥️</span>
+            <div>
+              <div style={{ color:"rgba(255,255,255,0.45)", fontSize:"0.58rem" }}>Classroom Mode</div>
+              <div style={{ color:WHITE, fontSize:"0.7rem", fontWeight:700 }}>Lecture Mode</div>
+            </div>
+            <span style={{ color:"rgba(255,255,255,0.3)", fontSize:"0.65rem" }}>▾</span>
+          </div>
+
+          {/* Controls */}
+          <div style={{ display:"flex", gap:"0.25rem" }}>
+            {[
+              { icon:"🎤", label:micOn?"Mute":"Unmute", onClick:toggleMic, active:micOn },
+              { icon:"📷", label:"Camera", onClick:toggleCamera, active:cameraOn },
+              { icon:"📤", label:"Present", gold:true },
+              { icon:"📁", label:"Materials" },
+              { icon:"👥", label:"Participants" },
+              { icon:"💬", label:"Chat" },
+              { icon:"❓", label:"Q&A" },
+              { icon:"⋯", label:"More" },
+            ].map(({ icon, label, onClick, active, gold }) => (
+              <button key={label} type="button" onClick={onClick} style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:"0.12rem", background:gold?GOLDB:active?"rgba(212,168,67,0.14)":"transparent", border:active?`1px solid ${GOLDB}`:"1px solid transparent", color:gold?WHITE:active?GOLD:"rgba(255,255,255,0.75)", borderRadius:8, padding:"0.4rem 0.6rem", cursor:"pointer", minWidth:48 }}>
+                <span style={{ fontSize:"1.1rem" }}>{icon}</span>
+                <span style={{ fontSize:"0.56rem", fontWeight:600 }}>{label}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* End Class */}
+          <button type="button" onClick={endBroadcast}
+            style={{ display:"flex", alignItems:"center", gap:"0.4rem", background:"#dc2626", color:WHITE, borderRadius:8, padding:"0.55rem 1.2rem", fontWeight:700, fontSize:"0.85rem", border:"none", cursor:"pointer", boxShadow:"0 2px 12px rgba(220,38,38,0.4)" }}>
+            ⏹ End Class
+          </button>
         </div>
       </div>
 
       {showPollModal && <PollModal/>}
     </div>
   );
+}
+
+/* ── Timer helper (shared) ─────────────────────────────────────────────────── */
+function fmtT(s: number) {
+  const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sc = s%60;
+  return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(sc).padStart(2,"0")}`;
 }
