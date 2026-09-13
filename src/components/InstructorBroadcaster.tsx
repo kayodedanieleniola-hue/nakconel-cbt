@@ -477,13 +477,13 @@ export default function InstructorBroadcaster({ classId, classTitle, materials, 
         {/* iframe */}
         <div style={{ flex:1, background:"#0c0605", overflow:"auto", display:"flex", alignItems:"center", justifyContent:"center", minHeight:0 }}>
           {selectedMaterial && previewable ? (
-            <iframe key={`${selectedMaterial.id}-p${presState.page}`} title={selectedMaterial.title} src={`/api/admin/learning/materials/preview?id=${selectedMaterial.id}&page=${presState.page}`} style={{ width:"100%", height:"100%", minHeight:"40vh", border:0, background:WHITE }}/>
+            <iframe key={`${selectedMaterial.id}-p${presState.page}`} title={selectedMaterial.title} sandbox="allow-same-origin allow-scripts" src={`/api/admin/learning/materials/preview?id=${selectedMaterial.id}&page=${presState.page}`} style={{ width:"100%", height:"100%", minHeight:"40vh", border:0, background:WHITE }}/>
           ) : selectedMaterial ? (
             <div style={{ textAlign:"center", color:MUTED, padding:"2rem", display:"flex", flexDirection:"column", alignItems:"center", gap:"0.5rem" }}>
               <span style={{ fontSize:"2.5rem" }}>📁</span>
               <p style={{ color:WHITE, margin:"0.5rem 0" }}>{selectedMaterial.title}</p>
               <p style={{ color:MUTED, fontSize:"0.85rem" }}>This format cannot be previewed inline.</p>
-              <a href={`/api/admin/learning/materials/preview?id=${selectedMaterial.id}`} style={{ display:"inline-block", background:GOLDB, color:WHITE, textDecoration:"none", padding:"0.45rem 0.9rem", borderRadius:4, fontSize:"0.82rem", fontWeight:600, marginTop:"0.5rem" }} download>↓ Download</a>
+              <a href={`/api/admin/learning/materials/preview?id=${selectedMaterial.id}`} style={{ display:"inline-block", background:GOLDB, color:WHITE, textDecoration:"none", padding:"0.45rem 0.9rem", borderRadius:4, fontSize:"0.82rem", fontWeight:600, marginTop:"0.5rem" }}>↓ Download</a>
             </div>
           ) : (
             <div style={{ textAlign:"center", color:MUTED, padding:"2rem" }}>
@@ -666,12 +666,12 @@ export default function InstructorBroadcaster({ classId, classTitle, materials, 
 
   // File type helpers for left sidebar
   function fileTypeBadge(mimeType: string) {
-    if (mimeType === "application/pdf") return { label:"PDF", bg:"#fee2e2", color:"#dc2626" };
-    if (mimeType.includes("presentation")||mimeType.includes("powerpoint")) return { label:"PPT", bg:"#ffedd5", color:"#ea580c" };
-    if (mimeType.includes("word")||mimeType.includes("document")) return { label:"DOC", bg:"#dbeafe", color:"#2563eb" };
-    if (mimeType.includes("excel")||mimeType.includes("spreadsheet")) return { label:"XLS", bg:"#dcfce7", color:"#16a34a" };
-    if (mimeType.startsWith("image/")) return { label:"IMG", bg:"#f3e8ff", color:"#9333ea" };
-    return { label:"FILE", bg:"#f3f4f6", color:"#6b7280" };
+    if (mimeType === "application/pdf") return { label:"PDF", bg:"#fee2e2", color:"#991b1b" };
+    if (mimeType.includes("presentation")||mimeType.includes("powerpoint")) return { label:"PPT", bg:"#fde8d4", color:"#c2410c" };
+    if (mimeType.includes("word")||mimeType.includes("document")) return { label:"DOC", bg:"#fde8e8", color:"#7f1d1d" };
+    if (mimeType.includes("excel")||mimeType.includes("spreadsheet")) return { label:"XLS", bg:"#dcfce7", color:"#15803d" };
+    if (mimeType.startsWith("image/")) return { label:"IMG", bg:"#fdf4ff", color:"#7e22ce" };
+    return { label:"FILE", bg:"#f3f4f6", color:"#4b5563" };
   }
   function fmtSz(bytes?: number) {
     if (!bytes) return "";
@@ -683,11 +683,11 @@ export default function InstructorBroadcaster({ classId, classTitle, materials, 
 
   return (
     <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.82)", backdropFilter:"blur(4px)", zIndex:9999, display:"flex", alignItems:"stretch", justifyContent:"center", padding:"0.5rem", overflowY:"auto" }}>
-      <div style={{ background:"#111827", width:"100%", maxWidth:1440, display:"flex", flexDirection:"column", borderRadius:12, overflow:"hidden", maxHeight:"98vh", boxShadow:"0 24px 80px rgba(0,0,0,0.7)" }}>
+      <div style={{ background:"#1a0505", width:"100%", maxWidth:1440, display:"flex", flexDirection:"column", borderRadius:12, overflow:"hidden", maxHeight:"98vh", boxShadow:"0 24px 80px rgba(0,0,0,0.7)" }}>
         <HiddenMedia/>
 
         {/* ── TOP BAR ───────────────────────────────────────────────── */}
-        <div style={{ background:"#1f2937", borderBottom:"1px solid rgba(255,255,255,0.08)", padding:"0 1.5rem", height:58, display:"flex", alignItems:"center", justifyContent:"space-between", gap:"1rem", flexShrink:0 }}>
+        <div style={{ background:"#280808", borderBottom:"1px solid rgba(255,255,255,0.09)", padding:"0 1.5rem", height:58, display:"flex", alignItems:"center", justifyContent:"space-between", gap:"1rem", flexShrink:0 }}>
           {/* Left: breadcrumb */}
           <div style={{ display:"flex", alignItems:"center", gap:"0.85rem", minWidth:0 }}>
             <div style={{ display:"flex", alignItems:"center", gap:"0.4rem" }}>
@@ -695,8 +695,8 @@ export default function InstructorBroadcaster({ classId, classTitle, materials, 
                 <span style={{ fontSize:"1rem" }}>✦</span>
               </div>
               <div>
-                <div style={{ color:WHITE, fontWeight:900, fontSize:"0.88rem", lineHeight:1 }}>NAK</div>
-                <div style={{ color:"rgba(255,255,255,0.4)", fontSize:"0.48rem", letterSpacing:"0.08em" }}>LEARNING CENTER</div>
+                <div style={{ color:WHITE, fontWeight:900, fontSize:"0.78rem", lineHeight:1 }}>NAKCONEL</div>
+                <div style={{ color:"rgba(255,255,255,0.4)", fontSize:"0.46rem", letterSpacing:"0.08em" }}>LEARNING CENTER</div>
               </div>
             </div>
             <div style={{ width:1, height:28, background:"rgba(255,255,255,0.1)" }}/>
@@ -758,14 +758,14 @@ export default function InstructorBroadcaster({ classId, classTitle, materials, 
         <div style={{ flex:1, display:"grid", gridTemplateColumns:"260px minmax(0,1fr) 308px", overflow:"hidden", minHeight:0 }}>
 
           {/* ── LEFT: Materials sidebar + class info ─────────────────── */}
-          <div style={{ background:"#1f2937", borderRight:"1px solid rgba(255,255,255,0.08)", display:"flex", flexDirection:"column", overflow:"hidden" }}>
+          <div style={{ background:"#280808", borderRight:"1px solid rgba(255,255,255,0.09)", display:"flex", flexDirection:"column", overflow:"hidden" }}>
             {/* Materials header */}
-            <div style={{ padding:"0.75rem 0.85rem", borderBottom:"1px solid rgba(255,255,255,0.08)", display:"flex", alignItems:"center", justifyContent:"space-between", flexShrink:0 }}>
+            <div style={{ padding:"0.75rem 0.85rem", borderBottom:"1px solid rgba(255,255,255,0.09)", display:"flex", alignItems:"center", justifyContent:"space-between", flexShrink:0 }}>
               <span style={{ color:WHITE, fontWeight:700, fontSize:"0.85rem" }}>Materials</span>
               <button style={{ background:`linear-gradient(135deg,${GOLDB},#d4af37)`, color:WHITE, border:"none", borderRadius:6, padding:"0.28rem 0.65rem", fontSize:"0.72rem", fontWeight:700, cursor:"pointer" }}>+ Upload</button>
             </div>
             {/* Filter chips */}
-            <div style={{ padding:"0.45rem 0.75rem", borderBottom:"1px solid rgba(255,255,255,0.08)", display:"flex", gap:"0.3rem", overflowX:"auto", flexShrink:0 }}>
+            <div style={{ padding:"0.45rem 0.75rem", borderBottom:"1px solid rgba(255,255,255,0.09)", display:"flex", gap:"0.3rem", overflowX:"auto", flexShrink:0 }}>
               {["All","PDF","PPT","DOC","Images"].map(f => (
                 <button key={f} type="button" style={{ background:f==="All"?"rgba(212,168,67,0.18)":"rgba(255,255,255,0.05)", border:f==="All"?`1px solid ${GOLDB}`:"1px solid rgba(255,255,255,0.1)", color:f==="All"?GOLD:"rgba(255,255,255,0.6)", borderRadius:5, padding:"0.2rem 0.55rem", fontSize:"0.65rem", fontWeight:600, cursor:"pointer", whiteSpace:"nowrap" }}>
                   {f}
@@ -797,8 +797,8 @@ export default function InstructorBroadcaster({ classId, classTitle, materials, 
             </div>
 
             {/* Class information card */}
-            <div style={{ margin:"0 0.75rem 0.75rem", background:"#111827", border:"1px solid rgba(255,255,255,0.08)", borderRadius:10, overflow:"hidden", flexShrink:0 }}>
-              <div style={{ padding:"0.6rem 0.85rem", borderBottom:"1px solid rgba(255,255,255,0.08)", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+            <div style={{ margin:"0 0.75rem 0.75rem", background:"#1a0505", border:"1px solid rgba(255,255,255,0.09)", borderRadius:10, overflow:"hidden", flexShrink:0 }}>
+              <div style={{ padding:"0.6rem 0.85rem", borderBottom:"1px solid rgba(255,255,255,0.09)", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
                 <span style={{ color:WHITE, fontWeight:700, fontSize:"0.8rem" }}>Class Information</span>
                 <span style={{ color:GOLDB, fontSize:"0.7rem", cursor:"pointer" }}>Edit</span>
               </div>
@@ -824,9 +824,9 @@ export default function InstructorBroadcaster({ classId, classTitle, materials, 
           </div>
 
           {/* ── CENTER: Presentation + controls + video grid ─────────── */}
-          <div style={{ display:"flex", flexDirection:"column", overflow:"hidden", background:"#111827" }}>
+          <div style={{ display:"flex", flexDirection:"column", overflow:"hidden", background:"#1a0505" }}>
             {/* Presentation toolbar */}
-            <div style={{ background:"#1f2937", borderBottom:"1px solid rgba(255,255,255,0.08)", padding:"0.4rem 1rem", display:"flex", alignItems:"center", gap:"0.6rem", flexShrink:0 }}>
+            <div style={{ background:"#280808", borderBottom:"1px solid rgba(255,255,255,0.09)", padding:"0.4rem 1rem", display:"flex", alignItems:"center", gap:"0.6rem", flexShrink:0 }}>
               {selectedMaterial ? (
                 <>
                   <div style={{ display:"flex", alignItems:"center", gap:"0.4rem", background:"#374151", borderRadius:6, padding:"0.22rem 0.65rem" }}>
@@ -834,17 +834,17 @@ export default function InstructorBroadcaster({ classId, classTitle, materials, 
                     <span style={{ color:WHITE, fontSize:"0.75rem", fontWeight:600, maxWidth:200, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{selectedMaterial.title}</span>
                   </div>
                   <div style={{ display:"flex", alignItems:"center", gap:"0.35rem", color:"rgba(255,255,255,0.6)", fontSize:"0.78rem" }}>
-                    <button type="button" onClick={() => changePage(-1)} disabled={presState.page<=1} style={{ background:"#374151", border:"1px solid rgba(255,255,255,0.12)", color:"rgba(255,255,255,0.7)", borderRadius:5, padding:"0.22rem 0.55rem", cursor:"pointer", fontSize:"0.72rem" }}>◄</button>
+                    <button type="button" onClick={() => changePage(-1)} disabled={presState.page<=1} style={{ background:"#3d1010", border:"1px solid rgba(255,255,255,0.12)", color:"rgba(255,255,255,0.7)", borderRadius:5, padding:"0.22rem 0.55rem", cursor:"pointer", fontSize:"0.72rem" }}>◄</button>
                     <span style={{ fontWeight:700, color:WHITE, minWidth:40, textAlign:"center" }}>{presState.page} / —</span>
-                    <button type="button" onClick={() => changePage(1)} style={{ background:"#374151", border:"1px solid rgba(255,255,255,0.12)", color:"rgba(255,255,255,0.7)", borderRadius:5, padding:"0.22rem 0.55rem", cursor:"pointer", fontSize:"0.72rem" }}>►</button>
+                    <button type="button" onClick={() => changePage(1)} style={{ background:"#3d1010", border:"1px solid rgba(255,255,255,0.12)", color:"rgba(255,255,255,0.7)", borderRadius:5, padding:"0.22rem 0.55rem", cursor:"pointer", fontSize:"0.72rem" }}>►</button>
                   </div>
                 </>
               ) : (
                 <span style={{ color:"rgba(255,255,255,0.4)", fontSize:"0.78rem" }}>No material selected — pick one from the left panel</span>
               )}
               <div style={{ marginLeft:"auto", display:"flex", gap:"0.4rem" }}>
-                <button style={{ background:"#374151", border:"1px solid rgba(255,255,255,0.12)", color:"rgba(255,255,255,0.7)", borderRadius:5, padding:"0.22rem 0.5rem", cursor:"pointer", fontSize:"0.72rem" }}>100%</button>
-                <button style={{ background:"#374151", border:"1px solid rgba(255,255,255,0.12)", color:"rgba(255,255,255,0.7)", borderRadius:5, padding:"0.22rem 0.5rem", cursor:"pointer", fontSize:"0.75rem" }}>⛶</button>
+                <button style={{ background:"#3d1010", border:"1px solid rgba(255,255,255,0.12)", color:"rgba(255,255,255,0.7)", borderRadius:5, padding:"0.22rem 0.5rem", cursor:"pointer", fontSize:"0.72rem" }}>100%</button>
+                <button style={{ background:"#3d1010", border:"1px solid rgba(255,255,255,0.12)", color:"rgba(255,255,255,0.7)", borderRadius:5, padding:"0.22rem 0.5rem", cursor:"pointer", fontSize:"0.75rem" }}>⛶</button>
               </div>
             </div>
 
@@ -854,6 +854,7 @@ export default function InstructorBroadcaster({ classId, classTitle, materials, 
                 <iframe
                   key={`${selectedMaterial.id}-p${presState.page}`}
                   title={selectedMaterial.title}
+                  sandbox="allow-same-origin allow-scripts"
                   src={`/api/admin/learning/materials/preview?id=${selectedMaterial.id}&page=${presState.page}`}
                   style={{ width:"100%", height:"100%", border:0, background:"#ffffff" }}
                 />
@@ -871,19 +872,19 @@ export default function InstructorBroadcaster({ classId, classTitle, materials, 
             </div>
 
             {/* Presentation controls bar */}
-            <div style={{ background:"#1f2937", borderTop:"1px solid rgba(255,255,255,0.08)", padding:"0.4rem 1rem", display:"flex", alignItems:"center", gap:"0.5rem", flexShrink:0 }}>
+            <div style={{ background:"#280808", borderTop:"1px solid rgba(255,255,255,0.09)", padding:"0.4rem 1rem", display:"flex", alignItems:"center", gap:"0.5rem", flexShrink:0 }}>
               <button type="button" onClick={() => changePage(-1)} disabled={presState.page<=1}
-                style={{ background:"#374151", border:"1px solid rgba(255,255,255,0.12)", color:"rgba(255,255,255,0.8)", borderRadius:6, padding:"0.32rem 0.85rem", fontSize:"0.78rem", fontWeight:600, cursor:"pointer", display:"flex", alignItems:"center", gap:"0.3rem" }}>
+                style={{ background:"#3d1010", border:"1px solid rgba(255,255,255,0.12)", color:"rgba(255,255,255,0.8)", borderRadius:6, padding:"0.32rem 0.85rem", fontSize:"0.78rem", fontWeight:600, cursor:"pointer", display:"flex", alignItems:"center", gap:"0.3rem" }}>
                 ◄ Previous
               </button>
               <button type="button" onClick={() => changePage(1)}
-                style={{ background:"#374151", border:"1px solid rgba(255,255,255,0.12)", color:"rgba(255,255,255,0.8)", borderRadius:6, padding:"0.32rem 0.85rem", fontSize:"0.78rem", fontWeight:600, cursor:"pointer", display:"flex", alignItems:"center", gap:"0.3rem" }}>
+                style={{ background:"#3d1010", border:"1px solid rgba(255,255,255,0.12)", color:"rgba(255,255,255,0.8)", borderRadius:6, padding:"0.32rem 0.85rem", fontSize:"0.78rem", fontWeight:600, cursor:"pointer", display:"flex", alignItems:"center", gap:"0.3rem" }}>
                 Next ►
               </button>
               <div style={{ width:1, height:20, background:"rgba(255,255,255,0.1)", margin:"0 0.25rem" }}/>
-              <button style={{ background:"#374151", border:"1px solid rgba(255,255,255,0.12)", color:"rgba(255,255,255,0.7)", borderRadius:6, padding:"0.32rem 0.75rem", fontSize:"0.75rem", cursor:"pointer" }}>🔍 Zoom -</button>
-              <button style={{ background:"#374151", border:"1px solid rgba(255,255,255,0.12)", color:"rgba(255,255,255,0.7)", borderRadius:6, padding:"0.32rem 0.75rem", fontSize:"0.75rem", cursor:"pointer" }}>🔍 Zoom +</button>
-              <button style={{ background:"#374151", border:"1px solid rgba(255,255,255,0.12)", color:"rgba(255,255,255,0.7)", borderRadius:6, padding:"0.32rem 0.75rem", fontSize:"0.75rem", cursor:"pointer" }}>⛶ Fullscreen</button>
+              <button style={{ background:"#3d1010", border:"1px solid rgba(255,255,255,0.12)", color:"rgba(255,255,255,0.7)", borderRadius:6, padding:"0.32rem 0.75rem", fontSize:"0.75rem", cursor:"pointer" }}>🔍 Zoom -</button>
+              <button style={{ background:"#3d1010", border:"1px solid rgba(255,255,255,0.12)", color:"rgba(255,255,255,0.7)", borderRadius:6, padding:"0.32rem 0.75rem", fontSize:"0.75rem", cursor:"pointer" }}>🔍 Zoom +</button>
+              <button style={{ background:"#3d1010", border:"1px solid rgba(255,255,255,0.12)", color:"rgba(255,255,255,0.7)", borderRadius:6, padding:"0.32rem 0.75rem", fontSize:"0.75rem", cursor:"pointer" }}>⛶ Fullscreen</button>
               <div style={{ marginLeft:"auto", display:"flex", gap:"0.4rem" }}>
                 <button type="button" onClick={toggleCamera}
                   style={{ background:cameraOn?"rgba(212,168,67,0.15)":"rgba(255,255,255,0.06)", border:`1px solid ${cameraOn?GOLDB:"rgba(255,255,255,0.12)"}`, color:cameraOn?GOLD:"rgba(255,255,255,0.6)", borderRadius:6, padding:"0.3rem 0.7rem", fontSize:"0.75rem", fontWeight:600, cursor:"pointer" }}>
@@ -901,9 +902,9 @@ export default function InstructorBroadcaster({ classId, classTitle, materials, 
             </div>
 
             {/* Video grid — instructor + students */}
-            <div style={{ background:"#0f172a", borderTop:"1px solid rgba(255,255,255,0.08)", padding:"0.55rem 0.75rem", display:"flex", gap:"0.5rem", overflowX:"auto", flexShrink:0, alignItems:"stretch" }}>
+            <div style={{ background:"#110303", borderTop:"1px solid rgba(255,255,255,0.08)", padding:"0.55rem 0.75rem", display:"flex", gap:"0.5rem", overflowX:"auto", flexShrink:0, alignItems:"stretch" }}>
               {/* Instructor self-preview tile */}
-              <div style={{ width:160, flexShrink:0, position:"relative", borderRadius:10, overflow:"hidden", background:"#1e293b", border:`2px solid ${GOLD}`, aspectRatio:"16/9" }}>
+              <div style={{ width:160, flexShrink:0, position:"relative", borderRadius:10, overflow:"hidden", background:"#200505", border:`2px solid ${GOLD}`, aspectRatio:"16/9" }}>
                 <video ref={selfVideoCallbackRef} autoPlay playsInline muted style={{ width:"100%", height:"100%", objectFit:"cover" }}/>
                 {!cameraOn && (
                   <div style={{ position:"absolute", inset:0, background:"#0f172a", display:"flex", alignItems:"center", justifyContent:"center" }}>
@@ -927,7 +928,7 @@ export default function InstructorBroadcaster({ classId, classTitle, materials, 
 
               {/* Student tiles */}
               {Object.values(studentTiles).slice(0, 5).map((tile) => (
-                <div key={tile.identity} style={{ width:160, flexShrink:0, position:"relative", borderRadius:10, overflow:"hidden", background:"#1e293b", border:"1px solid rgba(255,255,255,0.1)", aspectRatio:"16/9" }}>
+                <div key={tile.identity} style={{ width:160, flexShrink:0, position:"relative", borderRadius:10, overflow:"hidden", background:"#200505", border:"1px solid rgba(255,255,255,0.1)", aspectRatio:"16/9" }}>
                   <StudentVideoTile
                     tile={tile}
                     rootVideoRefs={rootVideoRefs}
@@ -937,7 +938,7 @@ export default function InstructorBroadcaster({ classId, classTitle, materials, 
                 </div>
               ))}
               {Object.keys(studentTiles).length > 5 && (
-                <div style={{ width:160, flexShrink:0, borderRadius:10, background:"#1e293b", border:"1px dashed rgba(255,255,255,0.12)", aspectRatio:"16/9", display:"flex", alignItems:"center", justifyContent:"center", flexDirection:"column", gap:"0.3rem" }}>
+                <div style={{ width:160, flexShrink:0, borderRadius:10, background:"#200505", border:"1px dashed rgba(255,255,255,0.15)", aspectRatio:"16/9", display:"flex", alignItems:"center", justifyContent:"center", flexDirection:"column", gap:"0.3rem" }}>
                   <span style={{ color:"rgba(255,255,255,0.5)", fontSize:"1.2rem" }}>👥</span>
                   <span style={{ color:"rgba(255,255,255,0.5)", fontSize:"0.68rem" }}>+{Object.keys(studentTiles).length - 5} More Students</span>
                 </div>
@@ -951,69 +952,69 @@ export default function InstructorBroadcaster({ classId, classTitle, materials, 
           </div>
 
           {/* ── RIGHT: Participants + Chat ───────────────────────────── */}
-          <div style={{ background:"#f9fafb", borderLeft:"1px solid rgba(255,255,255,0.08)", display:"flex", flexDirection:"column", overflow:"hidden" }}>
+          <div style={{ background:"#280808", borderLeft:"1px solid rgba(255,255,255,0.09)", display:"flex", flexDirection:"column", overflow:"hidden" }}>
             {/* Tab bar */}
-            <div style={{ display:"flex", background:"#ffffff", borderBottom:"1px solid #e5e7eb" }}>
+            <div style={{ display:"flex", background:"#200505", borderBottom:"1px solid rgba(255,255,255,0.09)" }}>
               {(["participants","chat"] as const).map(t => (
-                <button key={t} type="button" onClick={() => setRightTab(t)} style={{ flex:1, background:"transparent", border:"none", borderBottom:rightTab===t?`2px solid ${GOLDB}`:"2px solid transparent", color:rightTab===t?GOLDB:"#9ca3af", padding:"0.75rem 0.5rem", fontSize:"0.72rem", fontWeight:700, cursor:"pointer", display:"flex", flexDirection:"column", alignItems:"center", gap:"0.18rem" }}>
+                <button key={t} type="button" onClick={() => setRightTab(t)} style={{ flex:1, background:"transparent", border:"none", borderBottom:rightTab===t?`2px solid ${GOLDB}`:"2px solid transparent", color:rightTab===t?GOLD:"rgba(255,255,255,0.45)", padding:"0.75rem 0.5rem", fontSize:"0.72rem", fontWeight:700, cursor:"pointer", display:"flex", flexDirection:"column", alignItems:"center", gap:"0.18rem" }}>
                   <span style={{ fontSize:"0.9rem" }}>{t==="participants"?"👥":"💬"}</span>
                   <span>{t==="participants"?`Participants (${studentCount+1})`:"Chat"}</span>
                 </button>
               ))}
-              <button type="button" style={{ width:40, background:"transparent", border:"none", cursor:"pointer", color:"#9ca3af", fontSize:"0.8rem" }}>⋯</button>
+              <button type="button" style={{ width:40, background:"transparent", border:"none", cursor:"pointer", color:"rgba(255,255,255,0.4)", fontSize:"0.8rem" }}>⋯</button>
             </div>
 
             {rightTab === "participants" && (
               <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
-                <div style={{ padding:"0.6rem 0.85rem", borderBottom:"1px solid #e5e7eb", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                  <span style={{ fontWeight:700, fontSize:"0.82rem", color:"#111827" }}>Participants ({studentCount+1})</span>
-                  <span style={{ color:GOLDB, fontSize:"0.75rem", cursor:"pointer" }}>View All</span>
+                <div style={{ padding:"0.6rem 0.85rem", borderBottom:"1px solid rgba(255,255,255,0.08)", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                  <span style={{ fontWeight:700, fontSize:"0.82rem", color:WHITE }}>Participants ({studentCount+1})</span>
+                  <span style={{ color:GOLD, fontSize:"0.75rem", cursor:"pointer" }}>View All</span>
                 </div>
-                <div style={{ padding:"0.5rem 0.75rem", borderBottom:"1px solid #e5e7eb" }}>
-                  <div style={{ display:"flex", alignItems:"center", background:"#ffffff", border:"1px solid #e5e7eb", borderRadius:7, padding:"0.35rem 0.55rem", gap:"0.35rem" }}>
-                    <span style={{ color:"#9ca3af", fontSize:"0.8rem" }}>🔍</span>
-                    <input placeholder="Search participants…" style={{ flex:1, border:"none", outline:"none", fontSize:"0.75rem", color:"#111827", background:"transparent" }}/>
+                <div style={{ padding:"0.5rem 0.75rem", borderBottom:"1px solid rgba(255,255,255,0.08)" }}>
+                  <div style={{ display:"flex", alignItems:"center", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:7, padding:"0.35rem 0.55rem", gap:"0.35rem" }}>
+                    <span style={{ color:"rgba(255,255,255,0.4)", fontSize:"0.8rem" }}>🔍</span>
+                    <input placeholder="Search participants…" style={{ flex:1, border:"none", outline:"none", fontSize:"0.75rem", color:WHITE, background:"transparent" }}/>
                   </div>
                 </div>
                 <div style={{ flex:1, overflowY:"auto" }}>
                   {/* Instructor self row */}
-                  <div style={{ display:"flex", alignItems:"center", gap:"0.6rem", padding:"0.5rem 0.85rem", borderBottom:"1px solid #f3f4f6" }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:"0.6rem", padding:"0.5rem 0.85rem", borderBottom:"1px solid rgba(255,255,255,0.06)" }}>
                     <div style={{ width:36, height:36, borderRadius:"50%", background:`linear-gradient(135deg,${GOLDB},#d4af37)`, color:WHITE, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800, fontSize:"0.88rem", flexShrink:0, position:"relative" }}>
                       I
-                      <span style={{ position:"absolute", bottom:0, right:0, width:9, height:9, borderRadius:"50%", background:"#22c55e", border:"1.5px solid #f9fafb" }}/>
+                      <span style={{ position:"absolute", bottom:0, right:0, width:9, height:9, borderRadius:"50%", background:"#22c55e", border:"1.5px solid #280808" }}/>
                     </div>
                     <div style={{ flex:1 }}>
-                      <div style={{ fontWeight:700, fontSize:"0.8rem", color:"#111827" }}>You (Instructor)</div>
+                      <div style={{ fontWeight:700, fontSize:"0.8rem", color:WHITE }}>You (Instructor)</div>
                       <div style={{ display:"flex", alignItems:"center", gap:"0.3rem" }}>
                         <div style={{ background:"rgba(212,168,67,0.2)", color:GOLDB, fontSize:"0.55rem", fontWeight:800, padding:"0.06rem 0.3rem", borderRadius:3 }}>HOST</div>
                       </div>
                     </div>
                     <div style={{ display:"flex", gap:"0.25rem" }}>
                       <span style={{ fontSize:"0.8rem" }}>{micOn?"🎤":"🔇"}</span>
-                      <span style={{ fontSize:"0.8rem" }}>{cameraOn?"📷":"📷"}</span>
-                      <span style={{ fontSize:"0.8rem", color:"#9ca3af" }}>⋮</span>
+                      <span style={{ fontSize:"0.8rem" }}>{cameraOn?"📷":"🚫"}</span>
+                      <span style={{ fontSize:"0.8rem", color:"rgba(255,255,255,0.3)" }}>⋮</span>
                     </div>
                   </div>
                   {/* Students */}
                   {Object.values(studentTiles).map((tile) => (
-                    <div key={tile.identity} style={{ display:"flex", alignItems:"center", gap:"0.6rem", padding:"0.5rem 0.85rem", borderBottom:"1px solid #f3f4f6" }}>
-                      <div style={{ width:36, height:36, borderRadius:"50%", background:"#ede8e2", color:"#374151", display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800, fontSize:"0.88rem", flexShrink:0, position:"relative" }}>
+                    <div key={tile.identity} style={{ display:"flex", alignItems:"center", gap:"0.6rem", padding:"0.5rem 0.85rem", borderBottom:"1px solid rgba(255,255,255,0.06)" }}>
+                      <div style={{ width:36, height:36, borderRadius:"50%", background:"rgba(255,255,255,0.12)", color:WHITE, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800, fontSize:"0.88rem", flexShrink:0, position:"relative" }}>
                         {tile.name.charAt(0).toUpperCase()}
-                        <span style={{ position:"absolute", bottom:0, right:0, width:9, height:9, borderRadius:"50%", background:"#22c55e", border:"1.5px solid #f9fafb" }}/>
+                        <span style={{ position:"absolute", bottom:0, right:0, width:9, height:9, borderRadius:"50%", background:"#22c55e", border:"1.5px solid #280808" }}/>
                       </div>
                       <div style={{ flex:1 }}>
-                        <div style={{ fontWeight:700, fontSize:"0.8rem", color:"#111827" }}>{tile.name}</div>
-                        <div style={{ fontSize:"0.62rem", color:"#9ca3af" }}>Student</div>
+                        <div style={{ fontWeight:700, fontSize:"0.8rem", color:WHITE }}>{tile.name}</div>
+                        <div style={{ fontSize:"0.62rem", color:"rgba(255,255,255,0.45)" }}>Student</div>
                       </div>
                       <div style={{ display:"flex", gap:"0.25rem" }}>
                         <span style={{ fontSize:"0.8rem" }}>{tile.hasAudio?"🎤":"🔇"}</span>
-                        <span style={{ fontSize:"0.8rem" }}>{tile.hasVideo?"📷":"📷"}</span>
-                        <span style={{ fontSize:"0.8rem", color:"#9ca3af" }}>⋮</span>
+                        <span style={{ fontSize:"0.8rem" }}>{tile.hasVideo?"📷":"🚫"}</span>
+                        <span style={{ fontSize:"0.8rem", color:"rgba(255,255,255,0.3)" }}>⋮</span>
                       </div>
                     </div>
                   ))}
                   {studentCount === 0 && (
-                    <div style={{ padding:"2rem", textAlign:"center", color:"#9ca3af", fontSize:"0.8rem" }}>
+                    <div style={{ padding:"2rem", textAlign:"center", color:"rgba(255,255,255,0.35)", fontSize:"0.8rem" }}>
                       No students connected yet.
                     </div>
                   )}
@@ -1030,13 +1031,13 @@ export default function InstructorBroadcaster({ classId, classTitle, materials, 
             )}
 
             {/* Quick actions */}
-            <div style={{ padding:"0.65rem 0.85rem", borderTop:"1px solid #e5e7eb", background:"#ffffff" }}>
-              <div style={{ fontSize:"0.72rem", fontWeight:700, color:"#374151", marginBottom:"0.5rem" }}>⚡ Quick Actions</div>
+            <div style={{ padding:"0.65rem 0.85rem", borderTop:"1px solid rgba(255,255,255,0.08)", background:"#200505" }}>
+              <div style={{ fontSize:"0.72rem", fontWeight:700, color:GOLD, marginBottom:"0.5rem" }}>⚡ Quick Actions</div>
               <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:"0.4rem" }}>
-                {[["📤","Upload Material"],["🔗","Share Link"],["⏺","Record Session"]].map(([icon, label]) => (
-                  <button key={label as string} type="button" style={{ background:"#f3f4f6", border:"1px solid #e5e7eb", borderRadius:7, padding:"0.5rem 0.3rem", display:"flex", flexDirection:"column", alignItems:"center", gap:"0.2rem", cursor:"pointer" }}>
+                {[["📤","Upload"],["🔗","Share"],["⏺","Record"]].map(([icon, label]) => (
+                  <button key={label as string} type="button" style={{ background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:7, padding:"0.5rem 0.3rem", display:"flex", flexDirection:"column", alignItems:"center", gap:"0.2rem", cursor:"pointer" }}>
                     <span style={{ fontSize:"1.1rem" }}>{icon}</span>
-                    <span style={{ fontSize:"0.58rem", color:"#374151", fontWeight:600, textAlign:"center", lineHeight:1.2 }}>{label}</span>
+                    <span style={{ fontSize:"0.58rem", color:"rgba(255,255,255,0.7)", fontWeight:600, textAlign:"center", lineHeight:1.2 }}>{label}</span>
                   </button>
                 ))}
               </div>
@@ -1045,7 +1046,7 @@ export default function InstructorBroadcaster({ classId, classTitle, materials, 
         </div>
 
         {/* ── BOTTOM CONTROL BAR ────────────────────────────────────── */}
-        <div style={{ background:"#1f2937", borderTop:"1px solid rgba(255,255,255,0.08)", padding:"0.45rem 1.5rem", display:"flex", alignItems:"center", justifyContent:"space-between", flexShrink:0 }}>
+        <div style={{ background:"#280808", borderTop:"1px solid rgba(255,255,255,0.09)", padding:"0.45rem 1.5rem", display:"flex", alignItems:"center", justifyContent:"space-between", flexShrink:0 }}>
           {/* Mode */}
           <div style={{ display:"flex", alignItems:"center", gap:"0.5rem", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:8, padding:"0.38rem 0.85rem", cursor:"pointer" }}>
             <span style={{ fontSize:"0.85rem" }}>🖥️</span>

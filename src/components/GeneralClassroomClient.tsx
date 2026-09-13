@@ -157,8 +157,8 @@ function NakLogo({ light=false, compact=false }: { light?: boolean; compact?: bo
         </svg>
       </div>
       <div style={{ lineHeight:1.1 }}>
-        <div style={{ color:light?WHITE:INK, fontWeight:900, fontSize:compact?"0.78rem":"0.9rem", letterSpacing:"0.04em" }}>NAK</div>
-        <div style={{ color:light?"rgba(255,255,255,0.45)":MUTED_TXT, fontSize:"0.48rem", letterSpacing:"0.08em", textTransform:"uppercase" }}>Learning Center</div>
+        <div style={{ color:light?WHITE:INK, fontWeight:900, fontSize:compact?"0.72rem":"0.88rem", letterSpacing:"0.04em" }}>NAKCONEL</div>
+        <div style={{ color:light?"rgba(255,255,255,0.45)":MUTED_TXT, fontSize:"0.46rem", letterSpacing:"0.08em", textTransform:"uppercase" }}>Learning Center</div>
       </div>
     </div>
   );
