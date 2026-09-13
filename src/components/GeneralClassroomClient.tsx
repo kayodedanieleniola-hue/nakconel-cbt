@@ -1,9 +1,10 @@
 "use client";
 
 /**
- * GeneralClassroomClient — open meeting room (Nalconel brand redesign).
- * No presentation. Full video gallery — everyone sees everyone.
- * All LiveKit logic unchanged; only visual layer redesigned.
+ * GeneralClassroomClient — NAK Learning Center brand redesign.
+ * Matches the mockup: dark wine background, white right panel, gold accents,
+ * large speaking tile + grid layout, bottom control bar with icon+label.
+ * No left sidebar. All LiveKit logic unchanged.
  */
 
 import { useEffect, useRef, useState, useCallback } from "react";
@@ -18,16 +19,19 @@ import {
   type LocalTrack,
 } from "livekit-client";
 
-// ── Brand tokens ─────────────────────────────────────────────────────────────
-const WINE   = "#5c1d1d";
-const WINE2  = "#7a2424";
-const WINE3  = "#3a1010";
-const WINE4  = "#2a0c0c";
-const GOLD   = "#c8943a";
-const GOLD2  = "#e8b86d";
-const INK    = "#f3eee7";
-const MUTED  = "#b09080";
-const LINE   = "#7a3030";
+// ── Brand tokens ──────────────────────────────────────────────────────────────
+const BG       = "#1a0808";   // darkest wine background
+const BG2      = "#2d1010";   // card/tile background
+const BG3      = "#3d1515";   // hover/lighter wine
+const WINE     = "#5c1d1d";   // header wine
+const GOLD     = "#d4a843";   // gold accent
+const GOLDD    = "#b8922f";   // darker gold
+const WHITE    = "#ffffff";
+const OFF_W    = "#f8f5f2";   // off-white panel
+const GRAY     = "#e5e0db";   // panel borders
+const GRAY2    = "#8a7a72";   // muted text
+const INK      = "#1a1210";   // dark text on light bg
+const RED_BTN  = "#dc2626";
 
 type Meeting = {
   id: string; title: string; instructor: string | null;
@@ -38,14 +42,40 @@ type ParticipantTile = {
   identity: string; name: string;
   videoPub: RemoteTrackPublication | null;
   audioPub: RemoteTrackPublication | null;
-  isHost?: boolean;
 };
 
-// ── Remote participant tile ───────────────────────────────────────────────────
+// ── NAK Logo ──────────────────────────────────────────────────────────────────
+function NakLogo({ light = false }: { light?: boolean }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+      <div style={{
+        width: 32, height: 32, borderRadius: 8,
+        background: `linear-gradient(135deg, ${GOLD} 0%, #e8c878 100%)`,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        flexShrink: 0,
+      }}>
+        <span style={{ fontSize: "1rem" }}>✦</span>
+      </div>
+      <div>
+        <div style={{ color: light ? WHITE : INK, fontWeight: 900, fontSize: "1rem", lineHeight: 1 }}>NAK</div>
+        <div style={{ color: light ? "rgba(255,255,255,0.7)" : GRAY2, fontSize: "0.58rem", letterSpacing: "0.06em", lineHeight: 1.2 }}>
+          Learning Center
+        </div>
+      </div>
+    </div>
+  );
+}
 
-function RemoteTile({ tile }: { tile: ParticipantTile }) {
+// ── Remote participant video tile ─────────────────────────────────────────────
+function RemoteTile({
+  tile, large = false,
+}: {
+  tile: ParticipantTile; large?: boolean;
+}) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const isHost   = tile.identity.startsWith("instructor-");
+  const micOn    = !!tile.audioPub?.track;
 
   useEffect(() => {
     const vp = tile.videoPub;
@@ -63,31 +93,77 @@ function RemoteTile({ tile }: { tile: ParticipantTile }) {
     return () => { if (audioRef.current) ap.track?.detach(audioRef.current); };
   }, [tile.audioPub]);
 
-  const isHost = tile.identity.startsWith("instructor-");
-
   return (
-    <div style={tileCard}>
-      <div style={{ ...tileWrap, ...(isHost ? tileWrapHost : {}) }}>
-        <video ref={videoRef} autoPlay playsInline muted
-          style={{ ...tileVid, display: tile.videoPub?.track ? "block" : "none" }} />
-        {!tile.videoPub?.track && (
-          <div style={tileAvatar}>
-            <div style={{ ...avatarCircle, ...(isHost ? avatarHost : {}) }}>
-              {tile.name.charAt(0).toUpperCase()}
-            </div>
+    <div style={{
+      position: "relative", borderRadius: 12,
+      overflow: "hidden", background: BG2,
+      border: isHost ? `2px solid ${GOLD}` : "1px solid rgba(255,255,255,0.08)",
+      aspectRatio: large ? "4/3" : "16/9",
+      width: "100%",
+    }}>
+      <video ref={videoRef} autoPlay playsInline muted
+        style={{ width: "100%", height: "100%", objectFit: "cover",
+          display: tile.videoPub?.track ? "block" : "none" }} />
+      {!tile.videoPub?.track && (
+        <div style={{
+          position: "absolute", inset: 0,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          background: `linear-gradient(160deg, ${BG3} 0%, ${BG2} 100%)`,
+        }}>
+          <div style={{
+            width: 64, height: 64, borderRadius: "50%",
+            background: isHost ? GOLD : BG3,
+            color: isHost ? INK : WHITE,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: "1.6rem", fontWeight: 800,
+          }}>
+            {tile.name.charAt(0).toUpperCase()}
           </div>
-        )}
-        <audio ref={audioRef} autoPlay style={{ position: "absolute", width: 0, height: 0, opacity: 0, pointerEvents: "none" }} />
-        {isHost && <div style={hostBadge}>HOST</div>}
-        <div style={micBadge}>🎤</div>
+        </div>
+      )}
+      <audio ref={audioRef} autoPlay style={{ position: "absolute", width: 0, height: 0, opacity: 0, pointerEvents: "none" }} />
+
+      {/* Speaking badge */}
+      {isHost && (
+        <div style={{
+          position: "absolute", top: "0.6rem", left: "0.6rem",
+          background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)",
+          border: "1px solid rgba(255,255,255,0.2)",
+          color: WHITE, fontSize: "0.68rem", fontWeight: 600,
+          padding: "0.2rem 0.5rem", borderRadius: 99,
+          display: "flex", alignItems: "center", gap: "0.3rem",
+        }}>
+          🎤 Speaking
+        </div>
+      )}
+
+      {/* Name + role bar at bottom */}
+      <div style={{
+        position: "absolute", bottom: 0, left: 0, right: 0,
+        background: "linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 100%)",
+        padding: "1.5rem 0.65rem 0.5rem",
+        display: "flex", justifyContent: "space-between", alignItems: "flex-end",
+      }}>
+        <div>
+          <div style={{ color: WHITE, fontSize: "0.82rem", fontWeight: 700, lineHeight: 1.2 }}>{tile.name}</div>
+          <div style={{ color: "rgba(255,255,255,0.65)", fontSize: "0.65rem" }}>
+            {isHost ? "Host" : "Participant"}
+          </div>
+        </div>
+        <div style={{
+          width: 28, height: 28, borderRadius: "50%",
+          background: micOn ? "rgba(255,255,255,0.2)" : "rgba(220,38,38,0.75)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: "0.75rem",
+        }}>
+          {micOn ? "🎤" : "🔇"}
+        </div>
       </div>
-      <span style={tileName}>{isHost ? `${tile.name} (Host)` : tile.name}</span>
     </div>
   );
 }
 
-// ── Main ─────────────────────────────────────────────────────────────────────
-
+// ── Main ──────────────────────────────────────────────────────────────────────
 export default function GeneralClassroomClient({
   meeting,
   studentName,
@@ -101,27 +177,28 @@ export default function GeneralClassroomClient({
   const pendingTrack = useRef<LocalTrack | null>(null);
 
   const [connStatus,   setConnStatus]   = useState<"connecting"|"live"|"error">("connecting");
-  const [statusMsg,    setStatusMsg]    = useState("Connecting…");
   const [cameraReady,  setCameraReady]  = useState(false);
   const [cameraError,  setCameraError]  = useState("");
   const [micOn,        setMicOn]        = useState(true);
   const [camOn,        setCamOn]        = useState(true);
-  const [activeTab,    setActiveTab]    = useState<"participants"|"chat">("participants");
+  const [activeTab,    setActiveTab]    = useState<"participants"|"chat"|"qa">("participants");
   const [participants, setParticipants] = useState<Record<string, ParticipantTile>>({});
+  const [chatInput,    setChatInput]    = useState("");
   const [elapsed,      setElapsed]      = useState(0);
 
   const localVideoTrack = useRef<LocalTrack | null>(null);
   const localAudioTrack = useRef<LocalTrack | null>(null);
 
-  // Timer
   useEffect(() => {
     const id = setInterval(() => setElapsed((s) => s + 1), 1000);
     return () => clearInterval(id);
   }, []);
 
   const fmtTime = (s: number) => {
-    const m = Math.floor(s / 60), sec = s % 60;
-    return `${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sc = s % 60;
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(sc).padStart(2, "0")}`;
   };
 
   const selfVideoRef = useCallback((el: HTMLVideoElement | null) => {
@@ -133,6 +210,7 @@ export default function GeneralClassroomClient({
     }
   }, []);
 
+  // ── LiveKit connection (unchanged logic) ───────────────────────────────────
   useEffect(() => {
     activeRef.current = true;
 
@@ -165,17 +243,16 @@ export default function GeneralClassroomClient({
         url   = (data.url as string).replace(/^https:\/\//, "wss://").replace(/^http:\/\//, "ws://");
         token = data.token as string;
       } catch (err) {
-        if (activeRef.current) { setConnStatus("error"); setStatusMsg(err instanceof Error ? err.message : "Connection failed"); }
+        if (activeRef.current) setConnStatus("error");
         return;
       }
-
       if (!activeRef.current) return;
 
       const room = new Room({ adaptiveStream: true, dynacast: true, disconnectOnPageLeave: false });
       roomRef.current = room;
 
-      room.on(RoomEvent.Connected, () => { if (activeRef.current) { setConnStatus("live"); setStatusMsg("Connected"); } });
-      room.on(RoomEvent.Disconnected, () => { if (activeRef.current) { setConnStatus("error"); setStatusMsg("Disconnected"); } });
+      room.on(RoomEvent.Connected,    () => { if (activeRef.current) setConnStatus("live"); });
+      room.on(RoomEvent.Disconnected, () => { if (activeRef.current) setConnStatus("error"); });
 
       room.on(RoomEvent.ParticipantConnected, (rp: RemoteParticipant) => {
         if (!activeRef.current) return;
@@ -184,12 +261,10 @@ export default function GeneralClassroomClient({
           [rp.identity]: { identity: rp.identity, name: rp.name || rp.identity, videoPub: null, audioPub: null },
         }));
       });
-
       room.on(RoomEvent.ParticipantDisconnected, (rp: RemoteParticipant) => {
         if (!activeRef.current) return;
         setParticipants((prev) => { const n = { ...prev }; delete n[rp.identity]; return n; });
       });
-
       room.on(RoomEvent.TrackSubscribed, (track, pub, rp: RemoteParticipant) => {
         if (!activeRef.current) return;
         setParticipants((prev) => {
@@ -199,7 +274,6 @@ export default function GeneralClassroomClient({
           return prev;
         });
       });
-
       room.on(RoomEvent.TrackUnsubscribed, (track, _pub, rp: RemoteParticipant) => {
         if (!activeRef.current) return;
         setParticipants((prev) => {
@@ -212,10 +286,9 @@ export default function GeneralClassroomClient({
       });
 
       try { await room.connect(url, token); }
-      catch (err) { if (activeRef.current) { setConnStatus("error"); setStatusMsg(err instanceof Error ? err.message : "Failed"); } return; }
+      catch { if (activeRef.current) setConnStatus("error"); return; }
       if (!activeRef.current) { void room.disconnect(); return; }
 
-      // Seed existing participants
       const tiles: Record<string, ParticipantTile> = {};
       for (const [id, rp] of Array.from(room.remoteParticipants.entries())) {
         let vp: RemoteTrackPublication | null = null, ap: RemoteTrackPublication | null = null;
@@ -236,7 +309,6 @@ export default function GeneralClassroomClient({
     }
 
     void connect();
-
     return () => {
       activeRef.current = false;
       localVideoTrack.current?.stop();
@@ -257,353 +329,340 @@ export default function GeneralClassroomClient({
     if (camOn) { void vt.mute(); setCamOn(false); } else { void vt.unmute(); setCamOn(true); }
   };
 
-  const remoteList = Object.values(participants);
-  const totalCount = remoteList.length + 1;
+  const remoteList  = Object.values(participants);
+  const totalCount  = remoteList.length + 1;
+  // Find the "speaking" / host participant for the large tile
+  const hostTile    = remoteList.find((t) => t.identity.startsWith("instructor-"));
+  const otherTiles  = remoteList.filter((t) => !t.identity.startsWith("instructor-"));
 
   return (
-    <div style={shell}>
+    <div style={{ minHeight: "100dvh", background: BG, color: WHITE, fontFamily: "system-ui, -apple-system, 'Segoe UI', sans-serif", display: "flex", flexDirection: "column" }}>
 
-      {/* TOP BAR */}
-      <header style={topBar}>
-        <div style={topLeft}>
-          <div style={logoWrap}>
-            <div style={logoMark}>N</div>
+      {/* ── TOP BAR ─────────────────────────────────────────────────────── */}
+      <header style={{
+        background: BG, borderBottom: "1px solid rgba(255,255,255,0.08)",
+        height: 56, padding: "0 1.5rem",
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        gap: "1rem", flexShrink: 0,
+      }}>
+        {/* Left: logo + divider + meeting info */}
+        <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+          <NakLogo light />
+          <div style={{ width: 1, height: 32, background: "rgba(255,255,255,0.15)" }} />
+          <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: 8, background: BG3,
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1rem",
+            }}>👥</div>
             <div>
-              <div style={logoName}>Nalconel</div>
-              <div style={logoSub}>Learning Center</div>
+              <div style={{ color: WHITE, fontWeight: 700, fontSize: "0.9rem", lineHeight: 1.2 }}>General Meeting</div>
+              <div style={{ color: "rgba(255,255,255,0.5)", fontSize: "0.65rem" }}>NAK Learning Center Community</div>
             </div>
           </div>
-          <div style={vDivider} />
-          <span style={meetingTitle}>{meeting.title}</span>
         </div>
-        <div style={topRight}>
-          <div style={liveChip}>
-            <span style={liveDot} /> LIVE
+
+        {/* Center: LIVE + timer + count */}
+        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+          <div style={{
+            background: RED_BTN, color: WHITE, fontWeight: 800, fontSize: "0.7rem",
+            padding: "0.3rem 0.7rem", borderRadius: 99, letterSpacing: "0.06em",
+            display: "flex", alignItems: "center", gap: "0.3rem",
+          }}>
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: WHITE, display: "inline-block" }} />
+            LIVE
           </div>
-          <div style={timerChip}>{fmtTime(elapsed)}</div>
-          <div style={countChip}>👥 {totalCount}</div>
-          <div style={{ ...connChip, ...(connStatus === "live" ? connLive : connStatus === "error" ? connErr : connWait) }}>
-            {connStatus === "live" ? "● Connected" : connStatus === "error" ? "✕ " + statusMsg : "◌ Connecting…"}
+          <div style={{ color: WHITE, fontWeight: 700, fontSize: "0.92rem", fontVariantNumeric: "tabular-nums" }}>
+            {fmtTime(elapsed)}
           </div>
-          <Link href="/learning" style={leaveBtn}>Leave</Link>
+          <div style={{
+            display: "flex", alignItems: "center", gap: "0.35rem",
+            color: "rgba(255,255,255,0.75)", fontSize: "0.8rem",
+          }}>
+            👥 {totalCount} participants
+          </div>
+        </div>
+
+        {/* Right: bell + profile */}
+        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+          <div style={{
+            position: "relative", width: 36, height: 36,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            cursor: "pointer",
+          }}>
+            <span style={{ fontSize: "1.2rem" }}>🔔</span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: "50%",
+              background: GOLD, color: INK,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontWeight: 800, fontSize: "0.9rem",
+            }}>
+              {studentName.charAt(0).toUpperCase()}
+            </div>
+            <div>
+              <div style={{ color: WHITE, fontSize: "0.8rem", fontWeight: 700 }}>{studentName}</div>
+              <div style={{ color: GOLD, fontSize: "0.62rem" }}>
+                {typeof window !== "undefined" && window.location.pathname.includes("/admin/") ? "Host" : "Participant"}
+              </div>
+            </div>
+            <span style={{ color: "rgba(255,255,255,0.4)", fontSize: "0.7rem" }}>▾</span>
+          </div>
         </div>
       </header>
 
-      {/* BODY: video gallery + right panel */}
-      <div style={body}>
+      {/* ── BODY ────────────────────────────────────────────────────────── */}
+      <div style={{ flex: 1, display: "flex", overflow: "hidden", minHeight: 0 }}>
 
-        {/* Video gallery */}
-        <div style={gallery}>
-          {/* Self tile */}
-          <div style={tileCard}>
-            <div style={{ ...tileWrap, border: `2px solid ${GOLD}` }}>
-              <video ref={selfVideoRef} autoPlay playsInline muted
-                style={{ ...tileVid, display: cameraReady && camOn ? "block" : "none" }} />
-              {(!cameraReady || !camOn) && (
-                <div style={tileAvatar}>
-                  <div style={{ ...avatarCircle, background: GOLD, color: WINE }}>
-                    {studentName.charAt(0).toUpperCase()}
+        {/* Video gallery — left + center */}
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", padding: "1rem", gap: "0.75rem" }}>
+
+          {/* Top row: large speaking tile + 2 stacked */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 0.48fr", gap: "0.75rem", flex: hostTile ? "0 0 auto" : 1 }}>
+            {/* Large / speaking tile */}
+            <div style={{ position: "relative", borderRadius: 12, overflow: "hidden", background: BG2, aspectRatio: "4/3", border: `2px solid ${GOLD}` }}>
+              {hostTile ? (
+                <>
+                  <RemoteTile tile={hostTile} large />
+                </>
+              ) : (
+                /* self tile as large when no host */
+                <div style={{ position: "relative", width: "100%", height: "100%" }}>
+                  <video ref={selfVideoRef} autoPlay playsInline muted
+                    style={{ width: "100%", height: "100%", objectFit: "cover", display: cameraReady && camOn ? "block" : "none" }} />
+                  {(!cameraReady || !camOn) && (
+                    <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: `linear-gradient(160deg, ${BG3}, ${BG2})` }}>
+                      <div style={{ width: 80, height: 80, borderRadius: "50%", background: GOLD, color: INK, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "2rem", fontWeight: 800 }}>
+                        {studentName.charAt(0).toUpperCase()}
+                      </div>
+                    </div>
+                  )}
+                  <div style={{ position: "absolute", top: "0.6rem", left: "0.6rem", background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", border: "1px solid rgba(255,255,255,0.2)", color: WHITE, fontSize: "0.68rem", fontWeight: 600, padding: "0.2rem 0.5rem", borderRadius: 99, display: "flex", alignItems: "center", gap: "0.3rem" }}>
+                    🎤 Speaking
+                  </div>
+                  <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 100%)", padding: "1.5rem 0.65rem 0.5rem", display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+                    <div>
+                      <div style={{ color: WHITE, fontSize: "0.88rem", fontWeight: 700 }}>{studentName}</div>
+                      <div style={{ color: "rgba(255,255,255,0.65)", fontSize: "0.65rem" }}>You (Participant)</div>
+                    </div>
+                    <div style={{ width: 28, height: 28, borderRadius: "50%", background: micOn ? "rgba(255,255,255,0.2)" : "rgba(220,38,38,0.75)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.75rem" }}>
+                      {micOn ? "🎤" : "🔇"}
+                    </div>
                   </div>
                 </div>
               )}
-              <div style={youBadge}>You</div>
-              <div style={micBadge}>{micOn ? "🎤" : "🔇"}</div>
             </div>
-            <span style={tileName}>{studentName}</span>
-            {cameraError && <p style={camErrStyle}>{cameraError}</p>}
+
+            {/* 2 stacked small tiles (first 2 non-host remote or self) */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+              {/* Self tile when there's a host */}
+              {hostTile && (
+                <div style={{ position: "relative", borderRadius: 12, overflow: "hidden", background: BG2, flex: 1, border: `2px solid ${GOLD}` }}>
+                  <video ref={selfVideoRef} autoPlay playsInline muted
+                    style={{ width: "100%", height: "100%", objectFit: "cover", display: cameraReady && camOn ? "block" : "none" }} />
+                  {(!cameraReady || !camOn) && (
+                    <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: `linear-gradient(160deg, ${BG3}, ${BG2})` }}>
+                      <div style={{ width: 48, height: 48, borderRadius: "50%", background: GOLD, color: INK, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.2rem", fontWeight: 800 }}>
+                        {studentName.charAt(0).toUpperCase()}
+                      </div>
+                    </div>
+                  )}
+                  <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 100%)", padding: "1rem 0.5rem 0.4rem", display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+                    <div>
+                      <div style={{ color: WHITE, fontSize: "0.72rem", fontWeight: 700 }}>{studentName}</div>
+                      <div style={{ color: "rgba(255,255,255,0.65)", fontSize: "0.6rem" }}>You</div>
+                    </div>
+                    <div style={{ width: 22, height: 22, borderRadius: "50%", background: micOn ? "rgba(255,255,255,0.2)" : "rgba(220,38,38,0.75)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.65rem" }}>
+                      {micOn ? "🎤" : "🔇"}
+                    </div>
+                  </div>
+                </div>
+              )}
+              {/* First other tile */}
+              {otherTiles[0] && (
+                <div style={{ flex: 1 }}><RemoteTile tile={otherTiles[0]} /></div>
+              )}
+              {/* Waiting placeholder if no second tile */}
+              {!otherTiles[0] && !hostTile && (
+                <div style={{ flex: 1, borderRadius: 12, background: BG2, border: "1px dashed rgba(255,255,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: "0.35rem" }}>
+                  <span style={{ fontSize: "1.5rem" }}>👥</span>
+                  <span style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.4)" }}>Waiting…</span>
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Remote tiles */}
-          {remoteList.map((tile) => (
-            <RemoteTile key={tile.identity} tile={tile} />
-          ))}
+          {/* Bottom row: remaining tiles */}
+          {(hostTile ? otherTiles : otherTiles.slice(1)).length > 0 && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: "0.75rem" }}>
+              {(hostTile ? otherTiles : otherTiles.slice(1)).map((tile) => (
+                <RemoteTile key={tile.identity} tile={tile} />
+              ))}
+            </div>
+          )}
 
-          {/* Waiting placeholder */}
+          {/* Waiting state */}
           {remoteList.length === 0 && (
-            <div style={waitTile}>
-              <div style={{ fontSize: "2.5rem" }}>👥</div>
-              <p style={{ margin: "0.5rem 0 0.2rem", color: INK, fontWeight: 700 }}>
-                Waiting for others…
-              </p>
-              <p style={{ margin: 0, fontSize: "0.75rem", color: MUTED }}>
-                Share the meeting link to invite participants
-              </p>
+            <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: "0.75rem", opacity: 0.6 }}>
+              <span style={{ fontSize: "3rem" }}>👥</span>
+              <p style={{ margin: 0, fontWeight: 700, color: WHITE }}>Waiting for others to join…</p>
+              <p style={{ margin: 0, fontSize: "0.8rem", color: "rgba(255,255,255,0.5)" }}>Share the meeting link to invite participants</p>
             </div>
           )}
         </div>
 
-        {/* Right panel */}
-        <div style={rightPanel}>
-          <div style={rpTabBar}>
-            {(["participants", "chat"] as const).map((t) => (
-              <button key={t} type="button"
-                onClick={() => setActiveTab(t)}
-                style={{ ...rpTab, ...(activeTab === t ? rpTabActive : {}) }}>
-                {t === "participants" ? `👥 Participants (${totalCount})` : "💬 Chat"}
+        {/* ── RIGHT PANEL (white card) ─────────────────────────────────── */}
+        <div style={{ width: 320, borderLeft: "1px solid rgba(255,255,255,0.08)", background: OFF_W, display: "flex", flexDirection: "column", flexShrink: 0 }}>
+          {/* Tab header */}
+          <div style={{ display: "flex", background: WHITE, borderBottom: `1px solid ${GRAY}`, padding: "0 0.5rem" }}>
+            {(["participants", "chat", "qa"] as const).map((t) => (
+              <button key={t} type="button" onClick={() => setActiveTab(t)} style={{
+                flex: 1, background: "transparent", border: "none",
+                borderBottom: activeTab === t ? `2px solid ${GOLDD}` : "2px solid transparent",
+                color: activeTab === t ? GOLDD : GRAY2,
+                padding: "0.75rem 0.3rem", fontSize: "0.75rem", fontWeight: 700,
+                cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: "0.2rem",
+              }}>
+                {t === "participants" && <><span>👥</span><span>Participants ({totalCount})</span></>}
+                {t === "chat" && <><span>💬</span><span>Chat</span></>}
+                {t === "qa" && <><span>❓</span><span>Q&A</span></>}
               </button>
             ))}
           </div>
-          <div style={rpBody}>
-            {activeTab === "participants" && (
-              <div style={participantList}>
+
+          {/* Participants tab */}
+          {activeTab === "participants" && (
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+              {/* Search */}
+              <div style={{ padding: "0.75rem", borderBottom: `1px solid ${GRAY}` }}>
+                <div style={{ display: "flex", alignItems: "center", background: WHITE, border: `1px solid ${GRAY}`, borderRadius: 8, padding: "0.4rem 0.65rem", gap: "0.4rem" }}>
+                  <span style={{ color: GRAY2, fontSize: "0.85rem" }}>🔍</span>
+                  <input placeholder="Search participants…" style={{ flex: 1, border: "none", outline: "none", fontSize: "0.8rem", color: INK, background: "transparent" }} />
+                </div>
+              </div>
+              {/* List */}
+              <div style={{ flex: 1, overflowY: "auto", padding: "0.5rem 0" }}>
                 {/* Self */}
-                <div style={participantRow}>
-                  <div style={{ ...participantAvatar, background: GOLD, color: WINE }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.65rem", padding: "0.5rem 0.9rem" }}>
+                  <div style={{ width: 36, height: 36, borderRadius: "50%", background: GOLD, color: INK, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: "0.9rem", flexShrink: 0 }}>
                     {studentName.charAt(0).toUpperCase()}
                   </div>
-                  <div style={participantInfo}>
-                    <span style={participantName}>{studentName}</span>
-                    <span style={participantRole}>You · Participant</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 700, fontSize: "0.82rem", color: INK }}>{studentName}</div>
+                    <div style={{ fontSize: "0.65rem", color: GRAY2 }}>Participant</div>
                   </div>
-                  <span style={micIcon}>{micOn ? "🎤" : "🔇"}</span>
+                  <span style={{ fontSize: "0.85rem", color: micOn ? GRAY2 : RED_BTN }}>{micOn ? "🎤" : "🔇"}</span>
+                  <span style={{ fontSize: "0.75rem", color: GRAY2 }}>⋯</span>
                 </div>
                 {remoteList.map((tile) => {
                   const isHost = tile.identity.startsWith("instructor-");
                   return (
-                    <div key={tile.identity} style={participantRow}>
-                      <div style={{ ...participantAvatar, ...(isHost ? { background: WINE2, color: GOLD2 } : {}) }}>
+                    <div key={tile.identity} style={{ display: "flex", alignItems: "center", gap: "0.65rem", padding: "0.5rem 0.9rem" }}>
+                      <div style={{ width: 36, height: 36, borderRadius: "50%", background: isHost ? WINE : GRAY, color: isHost ? WHITE : INK, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: "0.9rem", flexShrink: 0 }}>
                         {tile.name.charAt(0).toUpperCase()}
                       </div>
-                      <div style={participantInfo}>
-                        <span style={participantName}>{tile.name}</span>
-                        <span style={participantRole}>{isHost ? "Host" : "Participant"}</span>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 700, fontSize: "0.82rem", color: INK }}>{tile.name}</div>
+                        <div style={{ fontSize: "0.65rem", color: GRAY2 }}>{isHost ? "Host" : "Participant"}</div>
                       </div>
-                      <span style={micIcon}>{tile.audioPub?.track ? "🎤" : "🔇"}</span>
+                      <span style={{ fontSize: "0.85rem", color: tile.audioPub?.track ? GRAY2 : RED_BTN }}>
+                        {tile.audioPub?.track ? "🎤" : "🔇"}
+                      </span>
+                      <span style={{ fontSize: "0.75rem", color: GRAY2 }}>⋯</span>
                     </div>
                   );
                 })}
+                <button style={{ display: "flex", alignItems: "center", gap: "0.5rem", width: "100%", background: "transparent", border: "none", padding: "0.6rem 0.9rem", cursor: "pointer", color: WINE, fontSize: "0.8rem", fontWeight: 600 }}>
+                  👥 View all participants <span style={{ marginLeft: "auto" }}>›</span>
+                </button>
               </div>
-            )}
-            {activeTab === "chat" && (
-              <div style={{ padding: "0.75rem", color: MUTED, fontSize: "0.82rem" }}>
-                <p>Chat is available in the Class view.</p>
+            </div>
+          )}
+
+          {/* Chat tab */}
+          {activeTab === "chat" && (
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+              <div style={{ padding: "0.65rem 0.9rem", borderBottom: `1px solid ${GRAY}` }}>
+                <span style={{ fontWeight: 700, fontSize: "0.85rem", color: INK }}>Meeting Chat</span>
               </div>
-            )}
-          </div>
+              <div style={{ flex: 1, overflowY: "auto", padding: "0.75rem 0.9rem", display: "flex", flexDirection: "column", gap: "0.85rem" }}>
+                <p style={{ margin: 0, fontSize: "0.8rem", color: GRAY2, textAlign: "center" }}>Chat messages will appear here.</p>
+              </div>
+              <div style={{ padding: "0.65rem", borderTop: `1px solid ${GRAY}`, display: "flex", gap: "0.5rem" }}>
+                <input
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  placeholder="Type a message…"
+                  style={{ flex: 1, border: `1px solid ${GRAY}`, borderRadius: 8, padding: "0.5rem 0.75rem", fontSize: "0.8rem", color: INK, outline: "none" }}
+                />
+                <button style={{ width: 36, height: 36, borderRadius: 8, background: GOLDD, border: "none", color: WHITE, cursor: "pointer", fontSize: "1rem" }}>
+                  ➤
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Q&A tab */}
+          {activeTab === "qa" && (
+            <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "2rem" }}>
+              <p style={{ color: GRAY2, fontSize: "0.85rem", textAlign: "center" }}>No questions yet. Be the first to ask!</p>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* BOTTOM CONTROL BAR */}
-      <div style={ctrlBar}>
-        <div style={ctrlBarCenter}>
-          <button type="button" onClick={toggleMic}
-            style={{ ...ctrlBtn, ...(micOn ? ctrlOn : ctrlOff) }}>
-            <span style={ctrlIcon}>{micOn ? "🎤" : "🔇"}</span>
-            <span style={ctrlLabel}>{micOn ? "Mute" : "Unmute"}</span>
-          </button>
-          <button type="button" onClick={toggleCam}
-            style={{ ...ctrlBtn, ...(camOn ? ctrlOn : ctrlOff) }}>
-            <span style={ctrlIcon}>{camOn ? "📷" : "🚫"}</span>
-            <span style={ctrlLabel}>{camOn ? "Stop Video" : "Start Video"}</span>
-          </button>
-          <button type="button"
-            onClick={() => setActiveTab(activeTab === "participants" ? "chat" : "participants")}
-            style={{ ...ctrlBtn, ...ctrlOn }}>
-            <span style={ctrlIcon}>👥</span>
-            <span style={ctrlLabel}>Participants</span>
-          </button>
-          <button type="button"
-            onClick={() => setActiveTab("chat")}
-            style={{ ...ctrlBtn, ...ctrlOn }}>
-            <span style={ctrlIcon}>💬</span>
-            <span style={ctrlLabel}>Chat</span>
-          </button>
+      {/* ── BOTTOM CONTROL BAR ──────────────────────────────────────────── */}
+      <div style={{ background: BG, borderTop: "1px solid rgba(255,255,255,0.08)", padding: "0.5rem 1.5rem", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+        {/* Meeting name pill */}
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", background: BG2, border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "0.4rem 0.8rem", cursor: "pointer" }}>
+          <span style={{ fontSize: "0.85rem" }}>👥</span>
+          <div>
+            <div style={{ color: WHITE, fontSize: "0.75rem", fontWeight: 700 }}>General Meeting</div>
+            <div style={{ color: "rgba(255,255,255,0.5)", fontSize: "0.6rem" }}>NAK Learning Center Community</div>
+          </div>
+          <span style={{ color: "rgba(255,255,255,0.4)", fontSize: "0.7rem", marginLeft: "0.3rem" }}>▾</span>
         </div>
-        <Link href="/learning" style={leaveCtrl}>
-          <span>Leave Meeting</span>
+
+        {/* Controls */}
+        <div style={{ display: "flex", gap: "0.25rem", alignItems: "center" }}>
+          {[
+            { icon: micOn ? "🎤" : "🔇",  label: "Mic",          action: toggleMic,    active: micOn },
+            { icon: camOn ? "📷" : "🚫",  label: "Camera",       action: toggleCam,    active: camOn },
+            { icon: "📤",                  label: "Share",        action: () => {},     active: false },
+            { icon: "👥",                  label: "Participants", action: () => setActiveTab("participants"), active: activeTab === "participants" },
+            { icon: "💬",                  label: "Chat",         action: () => setActiveTab("chat"), active: activeTab === "chat" },
+            { icon: "⋯",                   label: "More",         action: () => {},     active: false },
+          ].map(({ icon, label, action, active }) => (
+            <button key={label} type="button" onClick={action} style={{
+              display: "flex", flexDirection: "column", alignItems: "center", gap: "0.15rem",
+              background: active ? BG3 : "transparent",
+              border: active ? "1px solid rgba(255,255,255,0.15)" : "1px solid transparent",
+              color: WHITE, borderRadius: 8,
+              padding: "0.45rem 0.7rem", cursor: "pointer", minWidth: 52,
+            }}>
+              <span style={{ fontSize: "1.15rem" }}>{icon}</span>
+              <span style={{ fontSize: "0.58rem", fontWeight: 600, color: "rgba(255,255,255,0.65)", letterSpacing: "0.02em" }}>{label}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Leave button */}
+        <Link href="/learning" style={{
+          display: "flex", alignItems: "center", gap: "0.4rem",
+          background: RED_BTN, color: WHITE,
+          borderRadius: 8, padding: "0.55rem 1.2rem",
+          fontWeight: 700, fontSize: "0.85rem", textDecoration: "none",
+          border: "none",
+        }}>
+          📞 Leave Meeting
         </Link>
       </div>
 
+      {cameraError && (
+        <div style={{ position: "fixed", bottom: 80, left: "50%", transform: "translateX(-50%)", background: "#fee2e2", color: "#991b1b", padding: "0.5rem 1rem", borderRadius: 8, fontSize: "0.8rem", zIndex: 100 }}>
+          {cameraError}
+        </div>
+      )}
     </div>
   );
 }
-
-// ── Styles ────────────────────────────────────────────────────────────────────
-
-const shell: React.CSSProperties = {
-  minHeight: "100dvh", background: WINE4, color: INK,
-  fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-  display: "flex", flexDirection: "column",
-};
-const topBar: React.CSSProperties = {
-  background: WINE, height: 52, padding: "0 1rem",
-  display: "flex", justifyContent: "space-between", alignItems: "center",
-  boxShadow: "0 2px 10px rgba(0,0,0,0.4)", flexShrink: 0,
-  gap: "0.5rem", flexWrap: "wrap",
-};
-const topLeft: React.CSSProperties = { display: "flex", alignItems: "center", gap: "0.75rem" };
-const topRight: React.CSSProperties = { display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" };
-const logoWrap: React.CSSProperties = { display: "flex", alignItems: "center", gap: "0.45rem" };
-const logoMark: React.CSSProperties = {
-  width: 32, height: 32, borderRadius: 8,
-  background: `linear-gradient(135deg, ${GOLD}, ${GOLD2})`,
-  color: WINE, fontWeight: 900, fontSize: "1.1rem",
-  display: "flex", alignItems: "center", justifyContent: "center",
-};
-const logoName: React.CSSProperties = { color: "#fff", fontWeight: 800, fontSize: "0.95rem", lineHeight: 1.1 };
-const logoSub: React.CSSProperties = { color: GOLD2, fontSize: "0.58rem", letterSpacing: "0.04em" };
-const vDivider: React.CSSProperties = { width: 1, height: 26, background: LINE };
-const meetingTitle: React.CSSProperties = {
-  color: GOLD2, fontWeight: 700, fontSize: "0.85rem",
-  maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-};
-const liveChip: React.CSSProperties = {
-  display: "flex", alignItems: "center", gap: "0.3rem",
-  background: "rgba(220,30,30,0.25)", border: "1px solid #e05050",
-  color: "#ff7070", padding: "0.18rem 0.5rem", borderRadius: 99,
-  fontSize: "0.65rem", fontWeight: 800,
-};
-const liveDot: React.CSSProperties = {
-  width: 6, height: 6, borderRadius: "50%",
-  background: "#ff5555", boxShadow: "0 0 5px #ff5555", display: "inline-block",
-};
-const timerChip: React.CSSProperties = {
-  background: WINE2, color: GOLD2, padding: "0.18rem 0.55rem",
-  borderRadius: 99, fontSize: "0.7rem", fontWeight: 700, fontVariantNumeric: "tabular-nums",
-};
-const countChip: React.CSSProperties = {
-  background: WINE2, color: INK, padding: "0.18rem 0.55rem",
-  borderRadius: 99, fontSize: "0.7rem", fontWeight: 600,
-};
-const connChip: React.CSSProperties = {
-  padding: "0.18rem 0.55rem", borderRadius: 99, fontSize: "0.65rem", fontWeight: 700,
-};
-const connLive: React.CSSProperties = { background: "rgba(77,255,136,0.15)", color: "#4dff88" };
-const connErr:  React.CSSProperties = { background: "rgba(255,80,80,0.15)", color: "#ff8080" };
-const connWait: React.CSSProperties = { background: WINE2, color: MUTED };
-const leaveBtn: React.CSSProperties = {
-  background: "#8b1a1a", border: "1px solid #cc3333",
-  color: "#fff", borderRadius: 6,
-  padding: "0.3rem 0.75rem", fontSize: "0.78rem", fontWeight: 700,
-  textDecoration: "none",
-};
-
-// Body
-const body: React.CSSProperties = {
-  flex: 1, display: "flex", overflow: "hidden",
-  minHeight: 0,
-};
-
-// Gallery
-const gallery: React.CSSProperties = {
-  flex: 1, padding: "0.85rem",
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fill, minmax(clamp(140px, 28vw, 260px), 1fr))",
-  gap: "0.75rem",
-  alignContent: "start",
-  overflowY: "auto",
-};
-
-// Tiles
-const tileCard: React.CSSProperties = {
-  display: "flex", flexDirection: "column", alignItems: "center", gap: "0.3rem",
-};
-const tileWrap: React.CSSProperties = {
-  position: "relative", width: "100%", aspectRatio: "16/9",
-  background: WINE3, border: `1px solid ${LINE}`,
-  borderRadius: 10, overflow: "hidden",
-  display: "flex", alignItems: "center", justifyContent: "center",
-};
-const tileWrapHost: React.CSSProperties = { border: `2px solid ${GOLD}` };
-const tileVid: React.CSSProperties = { width: "100%", height: "100%", objectFit: "cover" };
-const tileAvatar: React.CSSProperties = {
-  display: "flex", alignItems: "center", justifyContent: "center",
-  position: "absolute", inset: 0,
-};
-const avatarCircle: React.CSSProperties = {
-  width: "45%", aspectRatio: "1",
-  maxWidth: 72, borderRadius: "50%",
-  background: WINE2, color: GOLD2,
-  display: "flex", alignItems: "center", justifyContent: "center",
-  fontSize: "clamp(1.2rem, 4vw, 2rem)", fontWeight: 800,
-};
-const avatarHost: React.CSSProperties = { background: GOLD, color: WINE };
-const hostBadge: React.CSSProperties = {
-  position: "absolute", top: "0.3rem", left: "0.3rem",
-  background: GOLD, color: WINE,
-  fontSize: "0.55rem", fontWeight: 800, letterSpacing: "0.05em",
-  padding: "0.1rem 0.35rem", borderRadius: 3,
-};
-const youBadge: React.CSSProperties = {
-  position: "absolute", top: "0.3rem", left: "0.3rem",
-  background: `rgba(200,148,58,0.9)`, color: WINE,
-  fontSize: "0.55rem", fontWeight: 800,
-  padding: "0.1rem 0.35rem", borderRadius: 3,
-};
-const micBadge: React.CSSProperties = {
-  position: "absolute", bottom: "0.3rem", right: "0.3rem",
-  background: "rgba(0,0,0,0.55)", borderRadius: 3,
-  fontSize: "0.7rem", padding: "0.1rem 0.2rem",
-};
-const tileName: React.CSSProperties = {
-  fontSize: "0.75rem", fontWeight: 600, color: INK,
-  textAlign: "center", maxWidth: "100%",
-  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-};
-const camErrStyle: React.CSSProperties = { fontSize: "0.65rem", color: "#ff9a8a", margin: 0, textAlign: "center" };
-const waitTile: React.CSSProperties = {
-  display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-  background: WINE3, border: `1px dashed ${LINE}`,
-  borderRadius: 10, padding: "1.5rem", aspectRatio: "16/9", textAlign: "center",
-};
-
-// Right panel
-const rightPanel: React.CSSProperties = {
-  width: "clamp(200px, 28vw, 300px)", borderLeft: `1px solid ${LINE}`,
-  background: WINE3, display: "flex", flexDirection: "column",
-  flexShrink: 0,
-};
-const rpTabBar: React.CSSProperties = {
-  display: "flex", background: WINE, borderBottom: `1px solid ${LINE}`,
-};
-const rpTab: React.CSSProperties = {
-  flex: 1, background: "transparent", border: "none",
-  borderBottom: "2px solid transparent",
-  color: MUTED, padding: "0.6rem 0.4rem",
-  fontSize: "0.72rem", fontWeight: 600, cursor: "pointer",
-};
-const rpTabActive: React.CSSProperties = { color: GOLD2, borderBottomColor: GOLD, background: WINE3 };
-const rpBody: React.CSSProperties = { flex: 1, overflowY: "auto" };
-
-// Participants list
-const participantList: React.CSSProperties = { display: "flex", flexDirection: "column", gap: "0.1rem", padding: "0.5rem" };
-const participantRow: React.CSSProperties = {
-  display: "flex", alignItems: "center", gap: "0.6rem",
-  padding: "0.45rem 0.5rem", borderRadius: 6,
-  background: "rgba(255,255,255,0.04)",
-};
-const participantAvatar: React.CSSProperties = {
-  width: 32, height: 32, borderRadius: "50%",
-  background: WINE2, color: GOLD2,
-  display: "flex", alignItems: "center", justifyContent: "center",
-  fontSize: "0.9rem", fontWeight: 700, flexShrink: 0,
-};
-const participantInfo: React.CSSProperties = { flex: 1, display: "flex", flexDirection: "column", gap: 0, overflow: "hidden" };
-const participantName: React.CSSProperties = { fontSize: "0.78rem", fontWeight: 600, color: INK, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
-const participantRole: React.CSSProperties = { fontSize: "0.62rem", color: MUTED };
-const micIcon: React.CSSProperties = { fontSize: "0.8rem", flexShrink: 0 };
-
-// Control bar
-const ctrlBar: React.CSSProperties = {
-  background: WINE, borderTop: `1px solid ${LINE}`,
-  padding: "0.5rem 1rem", flexShrink: 0,
-  display: "flex", justifyContent: "space-between", alignItems: "center",
-  gap: "0.75rem",
-};
-const ctrlBarCenter: React.CSSProperties = { display: "flex", gap: "0.5rem", flexWrap: "wrap" };
-const ctrlBtn: React.CSSProperties = {
-  display: "flex", flexDirection: "column", alignItems: "center", gap: "0.1rem",
-  background: WINE2, border: `1px solid ${LINE}`,
-  color: INK, borderRadius: 8,
-  padding: "0.35rem 0.65rem", cursor: "pointer", minWidth: 52,
-};
-const ctrlOn: React.CSSProperties = { background: WINE2, borderColor: LINE, color: INK };
-const ctrlOff: React.CSSProperties = { background: "rgba(0,0,0,0.3)", borderColor: "#555", color: "#888" };
-const ctrlIcon: React.CSSProperties = { fontSize: "1rem" };
-const ctrlLabel: React.CSSProperties = { fontSize: "0.56rem", fontWeight: 600, color: GOLD2, letterSpacing: "0.03em" };
-const leaveCtrl: React.CSSProperties = {
-  background: "#8b1a1a", border: "1px solid #cc3333",
-  color: "#fff", borderRadius: 8,
-  padding: "0.5rem 1.2rem", fontWeight: 700, fontSize: "0.85rem",
-  textDecoration: "none", display: "flex", alignItems: "center",
-};
