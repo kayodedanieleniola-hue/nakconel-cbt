@@ -2,9 +2,12 @@
 
 /**
  * GeneralClassroomClient — NAKCONEL Learning Center
- * Dark wine + crisp gold palette. Real SVG icons, no emojis in controls.
- * Share button removed. Mic green when live, red when muted.
- * All LiveKit logic unchanged.
+ * Mobile layout matches the design mockup:
+ *   top bar → video grid (instructor large + student tiles) →
+ *   inline tab panel (Participants / Chat / Q&A / Materials) →
+ *   bottom control bar
+ * Desktop keeps the original side-panel layout.
+ * All LiveKit logic is unchanged.
  */
 
 import { useEffect, useRef, useState, useCallback } from "react";
@@ -15,10 +18,11 @@ import {
   createLocalTracks, type LocalTrack,
 } from "livekit-client";
 
-/* ─── Colour tokens ──────────────────────────────────────────────────────── */
+/* ─── tokens ─────────────────────────────────────────────────────────────── */
 const BG        = "#110505";
 const SURFACE   = "#1c0808";
 const CARD      = "#250d0d";
+const CARD2     = "#1a1a1a";   // mockup dark tile bg
 const RIM       = "#341414";
 const WINE      = "#6b1f1f";
 const GOLD      = "#e8b84b";
@@ -27,14 +31,15 @@ const GOLD_GLOW = "rgba(232,184,75,0.20)";
 const WHITE     = "#ffffff";
 const OFF_WHITE = "#f8f5f2";
 const PANEL_BDR = "#e5e0db";
-const PANEL_TXT = "#5c4a40";
 const MUTED_TXT = "#9a8070";
 const INK       = "#180808";
 const RED       = "#e53535";
-const MIC_ON    = "#22c55e";   // green — mic is live
-const MIC_OFF   = "#e53535";   // red   — mic muted
+const MIC_ON    = "#22c55e";
+const MIC_OFF   = "#e53535";
+const PANEL_BG  = "#141414";   // mockup bottom panel bg
+const PANEL_HDR = "#1e1e1e";   // mockup tab-bar bg
 
-/* ─── SVG icons — all real glyphs, no emoji ─────────────────────────────── */
+/* ─── SVG icons ──────────────────────────────────────────────────────────── */
 const Mic = ({ s=18, c="currentColor" }: { s?: number; c?: string }) => (
   <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <rect x="9" y="2" width="6" height="12" rx="3"/>
@@ -74,9 +79,25 @@ const People = ({ s=18, c="currentColor" }: { s?: number; c?: string }) => (
     <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
   </svg>
 );
-const Chat = ({ s=18, c="currentColor" }: { s?: number; c?: string }) => (
+const ChatIcon = ({ s=18, c="currentColor" }: { s?: number; c?: string }) => (
   <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+  </svg>
+);
+const QAIcon = ({ s=18, c="currentColor" }: { s?: number; c?: string }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10"/>
+    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+    <line x1="12" y1="17" x2="12.01" y2="17"/>
+  </svg>
+);
+const Materials = ({ s=18, c="currentColor" }: { s?: number; c?: string }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+    <polyline points="14 2 14 8 20 8"/>
+    <line x1="16" y1="13" x2="8" y2="13"/>
+    <line x1="16" y1="17" x2="8" y2="17"/>
+    <polyline points="10 9 9 9 8 9"/>
   </svg>
 );
 const More = ({ s=18, c="currentColor" }: { s?: number; c?: string }) => (
@@ -89,6 +110,13 @@ const PhoneOff = ({ s=18, c="currentColor" }: { s?: number; c?: string }) => (
     <path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07"/>
     <path d="M14.5 2.23a19.79 19.79 0 0 0-8.63-3.07A2 2 0 0 0 3.69 1.15"/>
     <line x1="2" y1="2" x2="22" y2="22"/>
+  </svg>
+);
+const Present = ({ s=18, c="currentColor" }: { s?: number; c?: string }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="2" y="3" width="20" height="14" rx="2"/>
+    <line x1="8" y1="21" x2="16" y2="21"/>
+    <line x1="12" y1="17" x2="12" y2="21"/>
   </svg>
 );
 const Bell = ({ s=18, c="currentColor" }: { s?: number; c?: string }) => (
@@ -107,44 +135,57 @@ const Send = ({ s=15, c="currentColor" }: { s?: number; c?: string }) => (
     <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
   </svg>
 );
+const ChevronUp = ({ s=16, c="currentColor" }: { s?: number; c?: string }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="18 15 12 9 6 15"/>
+  </svg>
+);
+const ChevronDown2 = ({ s=16, c="currentColor" }: { s?: number; c?: string }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="6 9 12 15 18 9"/>
+  </svg>
+);
+const BackArrow = ({ s=20, c="currentColor" }: { s?: number; c?: string }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="15 18 9 12 15 6"/>
+  </svg>
+);
+const ExpandIcon = ({ s=14, c="currentColor" }: { s?: number; c?: string }) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/>
+    <line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>
+  </svg>
+);
 
-/* ─── NAKCONEL logo ──────────────────────────────────────────────────────── */
-function NakLogo({ light = false }: { light?: boolean }) {
+/* ─── Logo ───────────────────────────────────────────────────────────────── */
+function NakLogo({ light=false, compact=false }: { light?: boolean; compact?: boolean }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-      <div style={{
-        width: 34, height: 34, borderRadius: 9, flexShrink: 0,
-        background: `linear-gradient(135deg, ${GOLD} 0%, #f6de88 100%)`,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        boxShadow: `0 2px 12px ${GOLD_GLOW}`,
-      }}>
-        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+    <div style={{ display:"flex", alignItems:"center", gap:"0.4rem" }}>
+      <div style={{ width:compact?26:34, height:compact?26:34, borderRadius:8, flexShrink:0, background:`linear-gradient(135deg,${GOLD} 0%,#f6de88 100%)`, display:"flex", alignItems:"center", justifyContent:"center", boxShadow:`0 2px 10px ${GOLD_GLOW}` }}>
+        <svg width={compact?13:17} height={compact?13:17} viewBox="0 0 18 18" fill="none">
           <path d="M3 14V4l5 7V4" stroke={WINE} strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"/>
           <line x1="15" y1="4" x2="15" y2="14" stroke={WINE} strokeWidth="2.3" strokeLinecap="round"/>
         </svg>
       </div>
-      <div style={{ lineHeight: 1.1 }}>
-        <div style={{ color: light ? WHITE : INK, fontWeight: 900, fontSize: "0.9rem", letterSpacing: "0.04em" }}>
-          NAKCONEL
-        </div>
-        <div style={{ color: light ? "rgba(255,255,255,0.45)" : MUTED_TXT, fontSize: "0.52rem", letterSpacing: "0.09em", textTransform: "uppercase" }}>
-          Learning Center
-        </div>
+      <div style={{ lineHeight:1.1 }}>
+        <div style={{ color:light?WHITE:INK, fontWeight:900, fontSize:compact?"0.78rem":"0.9rem", letterSpacing:"0.04em" }}>NAK</div>
+        <div style={{ color:light?"rgba(255,255,255,0.45)":MUTED_TXT, fontSize:"0.48rem", letterSpacing:"0.08em", textTransform:"uppercase" }}>Learning Center</div>
       </div>
     </div>
   );
 }
 
 /* ─── Types ──────────────────────────────────────────────────────────────── */
-type Meeting = { id: string; title: string; instructor: string | null; description: string | null; status: string };
-type PTile   = { identity: string; name: string; videoPub: RemoteTrackPublication | null; audioPub: RemoteTrackPublication | null };
+type Meeting = { id: string; title: string; instructor: string|null; description: string|null; status: string };
+type PTile   = { identity: string; name: string; videoPub: RemoteTrackPublication|null; audioPub: RemoteTrackPublication|null };
 
 /* ─── Remote video tile ──────────────────────────────────────────────────── */
-function RemoteTile({ tile, large = false }: { tile: PTile; large?: boolean }) {
+function RemoteTile({ tile, large=false, compact=false }: { tile: PTile; large?: boolean; compact?: boolean }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const isHost   = tile.identity.startsWith("instructor-");
   const micLive  = !!tile.audioPub?.track;
+  const camLive  = !!tile.videoPub?.track;
 
   useEffect(() => {
     const vp = tile.videoPub;
@@ -162,88 +203,77 @@ function RemoteTile({ tile, large = false }: { tile: PTile; large?: boolean }) {
     return () => { if (audioRef.current) ap.track?.detach(audioRef.current); };
   }, [tile.audioPub]);
 
+  const nameFontSize = large ? "0.82rem" : compact ? "0.6rem" : "0.72rem";
+  const avatarSize   = large ? 56 : compact ? 28 : 38;
+
   return (
-    <div style={{
-      position: "relative", borderRadius: large ? 14 : 10, overflow: "hidden",
-      background: `linear-gradient(160deg, ${RIM} 0%, ${CARD} 100%)`,
-      border: isHost ? `2px solid ${GOLD}` : "1px solid rgba(255,255,255,0.07)",
-      aspectRatio: large ? "4/3" : "16/9", width: "100%",
-      boxShadow: isHost ? `0 0 28px ${GOLD_GLOW}, 0 6px 24px rgba(0,0,0,0.55)` : "0 4px 16px rgba(0,0,0,0.45)",
-    }}>
-      <video ref={videoRef} autoPlay playsInline muted
-        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: tile.videoPub?.track ? "block" : "none" }} />
+    <div style={{ position:"relative", borderRadius:large?12:8, overflow:"hidden", background:CARD2, border:isHost?`2px solid ${GOLD}`:"1px solid rgba(255,255,255,0.08)", width:"100%", height:"100%", display:"flex", alignItems:"center", justifyContent:"center" }}>
+      <video ref={videoRef} autoPlay playsInline muted style={{ position:"absolute", inset:0, width:"100%", height:"100%", objectFit:"cover", display:tile.videoPub?.track?"block":"none" }}/>
       {!tile.videoPub?.track && (
-        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div style={{
-            width: large ? 72 : 48, height: large ? 72 : 48, borderRadius: "50%",
-            background: isHost ? `linear-gradient(135deg, ${GOLD}, #f6de88)` : `linear-gradient(135deg, ${WINE}, ${RIM})`,
-            color: isHost ? INK : WHITE,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: large ? "1.8rem" : "1.2rem", fontWeight: 800,
-            boxShadow: isHost ? `0 0 20px ${GOLD_GLOW}` : "none",
-          }}>
-            {tile.name.charAt(0).toUpperCase()}
-          </div>
+        <div style={{ width:avatarSize, height:avatarSize, borderRadius:"50%", background:isHost?`linear-gradient(135deg,${GOLD},#f6de88)`:`linear-gradient(135deg,#2a2a2a,#3a3a3a)`, color:isHost?INK:WHITE, display:"flex", alignItems:"center", justifyContent:"center", fontSize:large?"1.5rem":compact?"0.85rem":"1.1rem", fontWeight:800, flexShrink:0 }}>
+          {tile.name.charAt(0).toUpperCase()}
         </div>
       )}
-      <audio ref={audioRef} autoPlay style={{ position: "absolute", width: 0, height: 0, opacity: 0, pointerEvents: "none" }} />
+      <audio ref={audioRef} autoPlay style={{ position:"absolute", width:0, height:0, opacity:0, pointerEvents:"none" }}/>
 
-      {/* Speaking pill */}
-      {isHost && (
-        <div style={{
-          position: "absolute", top: "0.55rem", left: "0.55rem",
-          background: "rgba(0,0,0,0.65)", backdropFilter: "blur(6px)",
-          border: "1px solid rgba(255,255,255,0.15)", borderRadius: 99,
-          padding: "0.18rem 0.5rem",
-          display: "flex", alignItems: "center", gap: "0.3rem",
-          color: WHITE, fontSize: "0.65rem", fontWeight: 600,
-        }}>
-          <Mic s={10} c={MIC_ON}/> Speaking
+      {/* Instructor label top-left */}
+      {isHost && large && (
+        <div style={{ position:"absolute", top:"0.4rem", left:"0.4rem", background:"rgba(0,0,0,0.6)", backdropFilter:"blur(4px)", borderRadius:5, padding:"0.15rem 0.45rem", fontSize:"0.62rem", color:WHITE, fontWeight:600 }}>
+          Instructor
+        </div>
+      )}
+      {/* Expand icon top-right on large */}
+      {large && (
+        <div style={{ position:"absolute", top:"0.4rem", right:"0.4rem", background:"rgba(0,0,0,0.5)", borderRadius:5, padding:"0.2rem", display:"flex", alignItems:"center", justifyContent:"center" }}>
+          <ExpandIcon s={13} c={WHITE}/>
         </div>
       )}
 
       {/* Bottom name bar */}
-      <div style={{
-        position: "absolute", bottom: 0, left: 0, right: 0,
-        background: "linear-gradient(to top, rgba(0,0,0,0.82) 0%, transparent 100%)",
-        padding: large ? "2rem 0.8rem 0.65rem" : "1.3rem 0.55rem 0.45rem",
-        display: "flex", justifyContent: "space-between", alignItems: "flex-end",
-      }}>
-        <div>
-          <div style={{ color: WHITE, fontSize: large ? "0.88rem" : "0.75rem", fontWeight: 700, lineHeight: 1.2 }}>{tile.name}</div>
-          <div style={{ color: "rgba(255,255,255,0.55)", fontSize: "0.6rem" }}>{isHost ? "Host" : "Participant"}</div>
-        </div>
-        <div style={{
-          width: large ? 30 : 24, height: large ? 30 : 24, borderRadius: "50%",
-          background: micLive ? "rgba(34,197,94,0.22)" : "rgba(229,53,53,0.70)",
-          border: micLive ? `1px solid ${MIC_ON}` : `1px solid ${MIC_OFF}`,
-          display: "flex", alignItems: "center", justifyContent: "center",
-        }}>
-          {micLive ? <Mic s={large ? 14 : 11} c={MIC_ON}/> : <MicOff s={large ? 14 : 11} c={WHITE}/>}
+      <div style={{ position:"absolute", bottom:0, left:0, right:0, background:"linear-gradient(to top,rgba(0,0,0,0.75) 0%,transparent 100%)", padding:large?"1.5rem 0.6rem 0.45rem":compact?"0.6rem 0.35rem 0.25rem":"0.9rem 0.45rem 0.3rem", display:"flex", justifyContent:"space-between", alignItems:"flex-end" }}>
+        <span style={{ color:WHITE, fontSize:nameFontSize, fontWeight:700, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", maxWidth:"70%" }}>{tile.name}</span>
+        <div style={{ display:"flex", alignItems:"center", gap:"0.2rem" }}>
+          <div style={{ width:large?24:compact?16:20, height:large?24:compact?16:20, borderRadius:"50%", background:micLive?"rgba(34,197,94,0.25)":"rgba(229,53,53,0.7)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+            {micLive ? <Mic s={large?12:compact?8:10} c={MIC_ON}/> : <MicOff s={large?12:compact?8:10} c={WHITE}/>}
+          </div>
+          {large && (
+            <div style={{ width:24, height:24, borderRadius:"50%", background:camLive?"rgba(34,197,94,0.25)":"rgba(255,255,255,0.1)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+              {camLive ? <Cam s={12} c={MIC_ON}/> : <CamOff s={12} c="rgba(255,255,255,0.5)"/>}
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-/* ─── Main component ─────────────────────────────────────────────────────── */
+/* ─── Main ───────────────────────────────────────────────────────────────── */
 export default function GeneralClassroomClient({ meeting, studentName }: { meeting: Meeting; studentName: string }) {
-  const roomRef      = useRef<Room | null>(null);
+  const roomRef      = useRef<Room|null>(null);
   const activeRef    = useRef(true);
-  const selfVidRef   = useRef<HTMLVideoElement | null>(null);
-  const pendingTrack = useRef<LocalTrack | null>(null);
+  const selfVidRef   = useRef<HTMLVideoElement|null>(null);
+  const pendingTrack = useRef<LocalTrack|null>(null);
 
   const [connStatus,   setConnStatus]   = useState<"connecting"|"live"|"error">("connecting");
   const [cameraReady,  setCameraReady]  = useState(false);
   const [cameraError,  setCameraError]  = useState("");
   const [micOn,        setMicOn]        = useState(true);
   const [camOn,        setCamOn]        = useState(true);
-  const [activeTab,    setActiveTab]    = useState<"participants"|"chat"|"qa">("participants");
+  const [activeTab,    setActiveTab]    = useState<"participants"|"chat"|"qa"|"materials">("participants");
+  const [panelOpen,    setPanelOpen]    = useState(true);
   const [participants, setParticipants] = useState<Record<string, PTile>>({});
   const [chatInput,    setChatInput]    = useState("");
   const [elapsed,      setElapsed]      = useState(0);
-  const localVideoTrack = useRef<LocalTrack | null>(null);
-  const localAudioTrack = useRef<LocalTrack | null>(null);
+  const [isMobile,     setIsMobile]     = useState(false);
+  const localVideoTrack = useRef<LocalTrack|null>(null);
+  const localAudioTrack = useRef<LocalTrack|null>(null);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 700);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   useEffect(() => {
     const id = setInterval(() => setElapsed(s => s + 1), 1000);
@@ -251,11 +281,11 @@ export default function GeneralClassroomClient({ meeting, studentName }: { meeti
   }, []);
 
   const fmt = (s: number) => {
-    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sc = s % 60;
+    const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sc = s%60;
     return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(sc).padStart(2,"0")}`;
   };
 
-  const selfVideoRef = useCallback((el: HTMLVideoElement | null) => {
+  const selfVideoRef = useCallback((el: HTMLVideoElement|null) => {
     selfVidRef.current = el;
     if (el && pendingTrack.current) {
       pendingTrack.current.attach(el);
@@ -264,13 +294,13 @@ export default function GeneralClassroomClient({ meeting, studentName }: { meeti
     }
   }, []);
 
-  /* LiveKit — logic unchanged */
+  /* LiveKit — unchanged ─────────────────────────────────────────────────── */
   useEffect(() => {
     activeRef.current = true;
     async function connect() {
       const camP = (async () => {
         try {
-          const tracks = await createLocalTracks({ audio: true, video: { facingMode: "user" } });
+          const tracks = await createLocalTracks({ audio:true, video:{ facingMode:"user" } });
           if (!activeRef.current) { tracks.forEach(t => t.stop()); return; }
           const vid = tracks.find(t => t.kind === Track.Kind.Video) ?? null;
           const aud = tracks.find(t => t.kind === Track.Kind.Audio) ?? null;
@@ -281,7 +311,7 @@ export default function GeneralClassroomClient({ meeting, studentName }: { meeti
           }
           if (activeRef.current) setCameraReady(true);
           return { vid, aud };
-        } catch { if (activeRef.current) setCameraError("Camera access denied."); return { vid: null, aud: null }; }
+        } catch { if (activeRef.current) setCameraError("Camera access denied."); return { vid:null, aud:null }; }
       })();
 
       let url: string, token: string;
@@ -289,18 +319,18 @@ export default function GeneralClassroomClient({ meeting, studentName }: { meeti
         const res = await fetch(`/api/learning/livekit/token?classId=${encodeURIComponent(meeting.id)}`);
         const d   = await res.json();
         if (!res.ok || !d.url || !d.token) throw new Error(d.error ?? "Token unavailable");
-        url   = (d.url as string).replace(/^https:\/\//, "wss://").replace(/^http:\/\//, "ws://");
+        url   = (d.url as string).replace(/^https:\/\//,"wss://").replace(/^http:\/\//,"ws://");
         token = d.token as string;
       } catch { if (activeRef.current) setConnStatus("error"); return; }
       if (!activeRef.current) return;
 
-      const room = new Room({ adaptiveStream: true, dynacast: true, disconnectOnPageLeave: false });
+      const room = new Room({ adaptiveStream:true, dynacast:true, disconnectOnPageLeave:false });
       roomRef.current = room;
       room.on(RoomEvent.Connected,    () => { if (activeRef.current) setConnStatus("live"); });
       room.on(RoomEvent.Disconnected, () => { if (activeRef.current) setConnStatus("error"); });
       room.on(RoomEvent.ParticipantConnected, (rp: RemoteParticipant) => {
         if (!activeRef.current) return;
-        setParticipants(p => ({ ...p, [rp.identity]: { identity: rp.identity, name: rp.name || rp.identity, videoPub: null, audioPub: null } }));
+        setParticipants(p => ({ ...p, [rp.identity]:{ identity:rp.identity, name:rp.name||rp.identity, videoPub:null, audioPub:null } }));
       });
       room.on(RoomEvent.ParticipantDisconnected, (rp: RemoteParticipant) => {
         if (!activeRef.current) return;
@@ -309,9 +339,9 @@ export default function GeneralClassroomClient({ meeting, studentName }: { meeti
       room.on(RoomEvent.TrackSubscribed, (track, pub, rp: RemoteParticipant) => {
         if (!activeRef.current) return;
         setParticipants(p => {
-          const ex = p[rp.identity] ?? { identity: rp.identity, name: rp.name || rp.identity, videoPub: null, audioPub: null };
-          if (track.kind === Track.Kind.Video) return { ...p, [rp.identity]: { ...ex, videoPub: pub } };
-          if (track.kind === Track.Kind.Audio) return { ...p, [rp.identity]: { ...ex, audioPub: pub } };
+          const ex = p[rp.identity] ?? { identity:rp.identity, name:rp.name||rp.identity, videoPub:null, audioPub:null };
+          if (track.kind === Track.Kind.Video) return { ...p, [rp.identity]:{ ...ex, videoPub:pub } };
+          if (track.kind === Track.Kind.Audio) return { ...p, [rp.identity]:{ ...ex, audioPub:pub } };
           return p;
         });
       });
@@ -319,8 +349,8 @@ export default function GeneralClassroomClient({ meeting, studentName }: { meeti
         if (!activeRef.current) return;
         setParticipants(p => {
           const ex = p[rp.identity]; if (!ex) return p;
-          if (track.kind === Track.Kind.Video) return { ...p, [rp.identity]: { ...ex, videoPub: null } };
-          if (track.kind === Track.Kind.Audio) return { ...p, [rp.identity]: { ...ex, audioPub: null } };
+          if (track.kind === Track.Kind.Video) return { ...p, [rp.identity]:{ ...ex, videoPub:null } };
+          if (track.kind === Track.Kind.Audio) return { ...p, [rp.identity]:{ ...ex, audioPub:null } };
           return p;
         });
       });
@@ -331,12 +361,12 @@ export default function GeneralClassroomClient({ meeting, studentName }: { meeti
 
       const tiles: Record<string, PTile> = {};
       for (const [id, rp] of Array.from(room.remoteParticipants.entries())) {
-        let vp: RemoteTrackPublication | null = null, ap: RemoteTrackPublication | null = null;
+        let vp: RemoteTrackPublication|null = null, ap: RemoteTrackPublication|null = null;
         for (const pub of Array.from(rp.trackPublications.values())) {
           if (pub.kind === Track.Kind.Video && pub.isSubscribed && pub.track) vp = pub;
           if (pub.kind === Track.Kind.Audio && pub.isSubscribed && pub.track) ap = pub;
         }
-        tiles[id] = { identity: id, name: rp.name || id, videoPub: vp, audioPub: ap };
+        tiles[id] = { identity:id, name:rp.name||id, videoPub:vp, audioPub:ap };
       }
       if (Object.keys(tiles).length > 0) setParticipants(tiles);
 
@@ -360,325 +390,488 @@ export default function GeneralClassroomClient({ meeting, studentName }: { meeti
     if (camOn) { void vt.mute(); setCamOn(false); } else { void vt.unmute(); setCamOn(true); }
   };
 
-  const remoteList = Object.values(participants);
-  const totalCount = remoteList.length + 1;
-  const hostTile   = remoteList.find(t => t.identity.startsWith("instructor-"));
-  const otherTiles = remoteList.filter(t => !t.identity.startsWith("instructor-"));
+  const remoteList  = Object.values(participants);
+  const totalCount  = remoteList.length + 1;
+  const hostTile    = remoteList.find(t => t.identity.startsWith("instructor-"));
+  const otherTiles  = remoteList.filter(t => !t.identity.startsWith("instructor-"));
+  const connColor   = connStatus === "live" ? MIC_ON : connStatus === "error" ? RED : GOLD;
 
-  const connColor = connStatus === "live" ? MIC_ON : connStatus === "error" ? RED : GOLD;
-
-  /* ─── control button helper ─────────────────────────────────────────── */
-  function CtrlBtn({ icon, label, onClick, active, danger, color }:
-    { icon: React.ReactNode; label: string; onClick?: () => void; active?: boolean; danger?: boolean; color?: string }) {
+  /* ── Self video tile helper ────────────────────────────────────────────── */
+  function SelfTileContent({ compact=false }: { compact?: boolean }) {
+    const avatarSize = compact ? 26 : 44;
+    const camLive    = cameraReady && camOn;
     return (
-      <button type="button" onClick={onClick} style={{
-        display: "flex", flexDirection: "column", alignItems: "center", gap: "0.22rem",
-        background: danger ? RED : active ? "rgba(232,184,75,0.14)" : "rgba(255,255,255,0.05)",
-        border: active ? `1px solid ${GOLD_DIM}` : danger ? "none" : "1px solid rgba(255,255,255,0.08)",
-        color: color ?? (danger ? WHITE : active ? GOLD : "rgba(255,255,255,0.82)"),
-        borderRadius: 10, padding: "0.5rem 0.85rem",
-        cursor: "pointer", minWidth: 56,
-        transition: "background 0.15s, border-color 0.15s",
-      }}>
-        {icon}
-        <span style={{ fontSize: "0.59rem", fontWeight: 700, letterSpacing: "0.04em", whiteSpace: "nowrap", marginTop: 1 }}>
-          {label}
-        </span>
-      </button>
+      <>
+        <video ref={selfVideoRef} autoPlay playsInline muted style={{ position:"absolute", inset:0, width:"100%", height:"100%", objectFit:"cover", display:camLive?"block":"none" }}/>
+        {!camLive && (
+          <div style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center" }}>
+            <div style={{ width:avatarSize, height:avatarSize, borderRadius:"50%", background:`linear-gradient(135deg,${GOLD},#f6de88)`, color:INK, display:"flex", alignItems:"center", justifyContent:"center", fontSize:compact?"0.8rem":"1.1rem", fontWeight:800 }}>
+              {studentName.charAt(0).toUpperCase()}
+            </div>
+          </div>
+        )}
+        <div style={{ position:"absolute", bottom:0, left:0, right:0, background:"linear-gradient(to top,rgba(0,0,0,0.75) 0%,transparent 100%)", padding:compact?"0.6rem 0.35rem 0.25rem":"0.9rem 0.5rem 0.3rem", display:"flex", justifyContent:"space-between", alignItems:"flex-end" }}>
+          <span style={{ color:WHITE, fontSize:compact?"0.6rem":"0.72rem", fontWeight:700 }}>{compact?"You":studentName}</span>
+          <div style={{ width:compact?16:20, height:compact?16:20, borderRadius:"50%", background:micOn?"rgba(34,197,94,0.25)":"rgba(229,53,53,0.7)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+            {micOn ? <Mic s={compact?8:10} c={MIC_ON}/> : <MicOff s={compact?8:10} c={WHITE}/>}
+          </div>
+        </div>
+      </>
     );
   }
 
-  /* ─── render ─────────────────────────────────────────────────────────── */
-  return (
-    <div style={{ minHeight: "100dvh", background: BG, color: WHITE, fontFamily: "system-ui,-apple-system,'Segoe UI',sans-serif", display: "flex", flexDirection: "column" }}>
+  /* ════════════════════════════════════════════════════════════════════════ */
+  /* MOBILE LAYOUT — matches the design mockup                                */
+  /* ════════════════════════════════════════════════════════════════════════ */
+  if (isMobile) {
+    /* Build the grid tiles:
+       - Slot 0 (large left): host if present, else self
+       - Slots 1-4 (2x2 right): students (first 4), self goes in first empty spot */
+    const gridStudents = otherTiles.slice(0, 4);
 
-      {/* ── TOP BAR ─────────────────────────────────────────────────── */}
-      <header style={{
-        height: 58, padding: "0 1.5rem", flexShrink: 0,
-        background: `linear-gradient(180deg, ${SURFACE} 0%, rgba(28,8,8,0.97) 100%)`,
-        borderBottom: "1px solid rgba(255,255,255,0.07)",
-        display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem",
-        backdropFilter: "blur(10px)",
-      }}>
-        {/* left */}
-        <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-          <NakLogo light />
-          <div style={{ width: 1, height: 30, background: "rgba(255,255,255,0.12)" }} />
-          <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-            <div style={{ width: 34, height: 34, borderRadius: 8, background: RIM, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <People s={16} c={GOLD} />
+    return (
+      <div style={{ height:"100dvh", background:"#0d0d0d", color:WHITE, fontFamily:"system-ui,-apple-system,'Segoe UI',sans-serif", display:"flex", flexDirection:"column", overflow:"hidden" }}>
+
+        {/* ── TOP BAR (matches mockup) ─────────────────────────────────── */}
+        <div style={{ height:56, padding:"0 0.75rem", display:"flex", alignItems:"center", gap:"0.5rem", background:"#111111", borderBottom:"1px solid rgba(255,255,255,0.06)", flexShrink:0 }}>
+          {/* Back */}
+          <Link href="/learning" style={{ display:"flex", alignItems:"center", justifyContent:"center", width:34, height:34, borderRadius:8, background:"rgba(255,255,255,0.07)", color:"rgba(255,255,255,0.7)", textDecoration:"none", flexShrink:0 }}>
+            <BackArrow s={18} c="rgba(255,255,255,0.8)"/>
+          </Link>
+
+          {/* Logo */}
+          <NakLogo light compact/>
+
+          {/* Title block */}
+          <div style={{ flex:1, minWidth:0, padding:"0 0.25rem" }}>
+            <div style={{ color:WHITE, fontWeight:700, fontSize:"0.82rem", lineHeight:1.2, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+              {meeting.title || "General Meeting"}
             </div>
-            <div>
-              <div style={{ color: WHITE, fontWeight: 700, fontSize: "0.88rem", lineHeight: 1.2 }}>General Meeting</div>
-              <div style={{ color: "rgba(255,255,255,0.42)", fontSize: "0.62rem" }}>NAKCONEL Learning Center Community</div>
+            <div style={{ display:"flex", alignItems:"center", gap:"0.35rem" }}>
+              <span style={{ color:"rgba(255,255,255,0.45)", fontSize:"0.58rem" }}>General Meeting</span>
+              <span style={{ background:RED, color:WHITE, fontWeight:800, fontSize:"0.52rem", padding:"0.08rem 0.38rem", borderRadius:3, letterSpacing:"0.06em" }}>LIVE</span>
             </div>
+          </div>
+
+          {/* Timer */}
+          <div style={{ display:"flex", alignItems:"center", gap:"0.25rem", background:"rgba(255,255,255,0.07)", border:"1px solid rgba(255,255,255,0.09)", borderRadius:7, padding:"0.22rem 0.5rem", flexShrink:0 }}>
+            <span style={{ fontSize:"0.62rem", color:"rgba(255,255,255,0.5)" }}>⏱</span>
+            <span style={{ fontWeight:700, fontSize:"0.72rem", fontVariantNumeric:"tabular-nums", color:WHITE }}>{fmt(elapsed)}</span>
+          </div>
+
+          {/* Participants count */}
+          <div style={{ width:34, height:34, borderRadius:8, background:"rgba(255,255,255,0.07)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, position:"relative" }}>
+            <People s={16} c="rgba(255,255,255,0.7)"/>
+            <span style={{ position:"absolute", top:-3, right:-3, background:GOLD, color:INK, borderRadius:"50%", width:15, height:15, fontSize:"0.48rem", fontWeight:800, display:"flex", alignItems:"center", justifyContent:"center" }}>
+              {totalCount > 9 ? "9+" : totalCount}
+            </span>
           </div>
         </div>
 
-        {/* center */}
-        <div style={{ display: "flex", alignItems: "center", gap: "0.65rem" }}>
-          <div style={{ background: RED, color: WHITE, fontWeight: 800, fontSize: "0.68rem", padding: "0.25rem 0.7rem", borderRadius: 99, letterSpacing: "0.08em", display: "flex", alignItems: "center", gap: "0.3rem" }}>
-            <span style={{ width: 6, height: 6, borderRadius: "50%", background: WHITE, display: "inline-block", boxShadow: `0 0 5px ${WHITE}` }}/>
-            LIVE
+        {/* ── SCROLLABLE CONTENT ─────────────────────────────────────────── */}
+        <div style={{ flex:1, overflowY:"auto", display:"flex", flexDirection:"column", minHeight:0 }}>
+
+          {/* ── VIDEO GRID ───────────────────────────────────────────────── */}
+          <div style={{ padding:"0.55rem 0.55rem 0", flexShrink:0 }}>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gridTemplateRows:"auto auto", gap:"0.4rem" }}>
+
+              {/* Left column: large instructor tile spanning 2 rows */}
+              <div style={{ gridColumn:"1", gridRow:"1 / 3", position:"relative", borderRadius:12, overflow:"hidden", background:CARD2, border:`2px solid ${GOLD}`, aspectRatio:"3/4", minHeight:0 }}>
+                {hostTile ? (
+                  <RemoteTile tile={hostTile} large/>
+                ) : (
+                  <div style={{ position:"absolute", inset:0 }}>
+                    {/* self in large slot when no host */}
+                    <SelfTileContent/>
+                    <div style={{ position:"absolute", top:"0.4rem", left:"0.4rem", background:"rgba(0,0,0,0.6)", backdropFilter:"blur(4px)", borderRadius:5, padding:"0.15rem 0.45rem", fontSize:"0.6rem", color:WHITE, fontWeight:600 }}>You</div>
+                    <div style={{ position:"absolute", top:"0.4rem", right:"0.4rem", background:"rgba(0,0,0,0.5)", borderRadius:5, padding:"0.2rem", display:"flex" }}><ExpandIcon s={12} c={WHITE}/></div>
+                  </div>
+                )}
+              </div>
+
+              {/* Right column: 2x2 student tiles */}
+              {[0, 1, 2, 3].map((i) => {
+                // If host is present, show students in right slots + self in last empty
+                const allRight: Array<"self" | PTile> = [];
+                if (hostTile) {
+                  for (const t of gridStudents) allRight.push(t);
+                  // Fill with self if needed
+                  while (allRight.length < 4) allRight.push("self");
+                } else {
+                  // No host: students fill right, self was already in large left
+                  for (const t of gridStudents) allRight.push(t);
+                  while (allRight.length < 4) allRight.push("self");
+                }
+                const slot = allRight[i];
+                if (!slot) return <div key={i} style={{ borderRadius:8, background:"rgba(255,255,255,0.04)", border:"1px dashed rgba(255,255,255,0.08)", aspectRatio:"4/3" }}/>;
+
+                return (
+                  <div key={i} style={{ borderRadius:8, overflow:"hidden", background:CARD2, border:"1px solid rgba(255,255,255,0.08)", aspectRatio:"4/3", position:"relative" }}>
+                    {slot === "self" ? (
+                      <SelfTileContent compact/>
+                    ) : (
+                      <RemoteTile tile={slot} compact/>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
-          <div style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "0.22rem 0.75rem", fontWeight: 700, fontSize: "0.9rem", fontVariantNumeric: "tabular-nums", color: WHITE }}>
+
+          {/* ── INLINE PANEL (tab bar + content) ─────────────────────────── */}
+          <div style={{ flex:1, background:PANEL_BG, marginTop:"0.55rem", display:"flex", flexDirection:"column", minHeight:0 }}>
+
+            {/* Tab bar + collapse toggle */}
+            <div style={{ display:"flex", alignItems:"center", background:PANEL_HDR, borderBottom:"1px solid rgba(255,255,255,0.07)", flexShrink:0 }}>
+              {(["participants","chat","qa","materials"] as const).map(t => {
+                const icons = { participants: <People s={13} c={activeTab===t?GOLD:"rgba(255,255,255,0.5)"}/>, chat: <ChatIcon s={13} c={activeTab===t?GOLD:"rgba(255,255,255,0.5)"}/>, qa: <QAIcon s={13} c={activeTab===t?GOLD:"rgba(255,255,255,0.5)"}/>, materials: <Materials s={13} c={activeTab===t?GOLD:"rgba(255,255,255,0.5)"}/>  };
+                const labels = { participants:"Participants", chat:"Chat", qa:"Q&A", materials:"Materials" };
+                return (
+                  <button key={t} type="button" onClick={() => { setActiveTab(t); setPanelOpen(true); }} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:"0.15rem", background:"transparent", border:"none", borderBottom:activeTab===t?`2px solid ${GOLD}`:"2px solid transparent", padding:"0.6rem 0.1rem", cursor:"pointer", WebkitTapHighlightColor:"transparent" }}>
+                    {icons[t]}
+                    <span style={{ fontSize:"0.58rem", fontWeight:600, color:activeTab===t?GOLD:"rgba(255,255,255,0.5)" }}>{labels[t]}</span>
+                  </button>
+                );
+              })}
+              {/* Collapse toggle */}
+              <button type="button" onClick={() => setPanelOpen(v => !v)} style={{ width:40, display:"flex", alignItems:"center", justifyContent:"center", background:"transparent", border:"none", cursor:"pointer", padding:"0.6rem 0.3rem", flexShrink:0, WebkitTapHighlightColor:"transparent" }}>
+                {panelOpen ? <ChevronDown2 s={15} c="rgba(255,255,255,0.4)"/> : <ChevronUp s={15} c="rgba(255,255,255,0.4)"/>}
+              </button>
+            </div>
+
+            {/* Panel content */}
+            {panelOpen && (
+              <div style={{ flex:1, overflow:"hidden", display:"flex", flexDirection:"column", minHeight:180 }}>
+
+                {/* Participants */}
+                {activeTab === "participants" && (
+                  <div style={{ display:"flex", flexDirection:"column", overflow:"hidden", flex:1 }}>
+                    <div style={{ padding:"0.6rem 0.75rem", borderBottom:"1px solid rgba(255,255,255,0.06)", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+                      <span style={{ fontWeight:700, fontSize:"0.82rem", color:WHITE }}>{totalCount} Participants</span>
+                      <div style={{ display:"flex", alignItems:"center", gap:"0.3rem", background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:7, padding:"0.28rem 0.55rem" }}>
+                        <Search s={12} c="rgba(255,255,255,0.4)"/>
+                        <input placeholder="Search participants..." style={{ background:"transparent", border:"none", outline:"none", fontSize:"0.72rem", color:WHITE, width:120 }}/>
+                      </div>
+                    </div>
+                    <div style={{ flex:1, overflowY:"auto" }}>
+                      {/* Self row */}
+                      <ParticipantRow name={studentName} role="Student" micOn={micOn} camOn={camOn} isHost={false} isSelf/>
+                      {/* Host row */}
+                      {hostTile && <ParticipantRow name={hostTile.name} role="Instructor" micOn={!!hostTile.audioPub?.track} camOn={!!hostTile.videoPub?.track} isHost isSelf={false}/>}
+                      {/* Others */}
+                      {otherTiles.map(t => (
+                        <ParticipantRow key={t.identity} name={t.name} role="Student" micOn={!!t.audioPub?.track} camOn={!!t.videoPub?.track} isHost={false} isSelf={false}/>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Chat */}
+                {activeTab === "chat" && (
+                  <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
+                    <div style={{ flex:1, overflowY:"auto", padding:"0.75rem" }}>
+                      <p style={{ margin:0, fontSize:"0.78rem", color:"rgba(255,255,255,0.35)", textAlign:"center" }}>Chat messages will appear here.</p>
+                    </div>
+                    <div style={{ padding:"0.55rem", borderTop:"1px solid rgba(255,255,255,0.07)", display:"flex", gap:"0.4rem" }}>
+                      <input value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder="Type a message…" style={{ flex:1, border:"1px solid rgba(255,255,255,0.1)", borderRadius:8, padding:"0.55rem 0.7rem", fontSize:"0.82rem", color:WHITE, outline:"none", background:"rgba(255,255,255,0.06)" }}/>
+                      <button style={{ width:38, height:38, borderRadius:8, background:GOLD_DIM, border:"none", color:WHITE, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                        <Send s={14} c={WHITE}/>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Q&A */}
+                {activeTab === "qa" && (
+                  <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", padding:"1.5rem" }}>
+                    <div style={{ textAlign:"center" }}>
+                      <div style={{ fontSize:"2rem", marginBottom:"0.4rem" }}>❓</div>
+                      <p style={{ color:"rgba(255,255,255,0.35)", fontSize:"0.8rem", margin:0 }}>No questions yet. Be the first to ask!</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Materials */}
+                {activeTab === "materials" && (
+                  <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", padding:"1.5rem" }}>
+                    <div style={{ textAlign:"center" }}>
+                      <div style={{ fontSize:"2rem", marginBottom:"0.4rem" }}>📁</div>
+                      <p style={{ color:"rgba(255,255,255,0.35)", fontSize:"0.8rem", margin:0 }}>No materials shared yet.</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── BOTTOM CONTROL BAR (matches mockup) ──────────────────────── */}
+        <div style={{ background:"#111111", borderTop:"1px solid rgba(255,255,255,0.07)", padding:"0.45rem 0.3rem calc(0.5rem + env(safe-area-inset-bottom,0px))", display:"flex", alignItems:"center", justifyContent:"space-around", flexShrink:0 }}>
+          <MobileCtrlBtn icon={<Mic s={20} c={micOn?MIC_ON:"rgba(255,255,255,0.7)"}/>} label="Mic" onClick={toggleMic} active={micOn} activeColor={MIC_ON}/>
+          <MobileCtrlBtn icon={<Cam s={20} c={camOn?WHITE:"rgba(255,255,255,0.4)"}/>} label="Camera" onClick={toggleCam} active={camOn}/>
+          <MobileCtrlBtn icon={<Present s={20} c={WHITE}/>} label="Present" highlight/>
+          <MobileCtrlBtn icon={<Materials s={20} c="rgba(255,255,255,0.7)"/>} label="Materials" onClick={() => { setActiveTab("materials"); setPanelOpen(true); }}/>
+          <MobileCtrlBtn icon={<ChatIcon s={20} c={activeTab==="chat"&&panelOpen?GOLD:"rgba(255,255,255,0.7)"}/>} label="Chat" onClick={() => { setActiveTab("chat"); setPanelOpen(true); }} active={activeTab==="chat"&&panelOpen}/>
+          <MobileCtrlBtn icon={<QAIcon s={20} c={activeTab==="qa"&&panelOpen?GOLD:"rgba(255,255,255,0.7)"}/>} label="Q&A" onClick={() => { setActiveTab("qa"); setPanelOpen(true); }} active={activeTab==="qa"&&panelOpen}/>
+          <MobileCtrlBtn icon={<More s={20} c="rgba(255,255,255,0.7)"/>} label="More"/>
+          {/* Leave — red pill */}
+          <Link href="/learning" style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:"0.22rem", background:RED, color:WHITE, borderRadius:14, padding:"0.55rem 0.65rem", textDecoration:"none", minWidth:52, WebkitTapHighlightColor:"transparent" }}>
+            <PhoneOff s={20} c={WHITE}/>
+            <span style={{ fontSize:"0.58rem", fontWeight:700 }}>Leave</span>
+          </Link>
+        </div>
+
+        {cameraError && (
+          <div style={{ position:"fixed", bottom:90, left:"1rem", right:"1rem", background:"#fee2e2", color:"#991b1b", padding:"0.65rem 1rem", borderRadius:10, fontSize:"0.8rem", zIndex:100, textAlign:"center" }}>
+            {cameraError}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  /* ════════════════════════════════════════════════════════════════════════ */
+  /* DESKTOP LAYOUT — unchanged                                               */
+  /* ════════════════════════════════════════════════════════════════════════ */
+  return (
+    <div style={{ minHeight:"100dvh", background:BG, color:WHITE, fontFamily:"system-ui,-apple-system,'Segoe UI',sans-serif", display:"flex", flexDirection:"column" }}>
+      {/* top bar */}
+      <header style={{ height:58, padding:"0 1.5rem", flexShrink:0, background:`linear-gradient(180deg,${SURFACE} 0%,rgba(28,8,8,0.97) 100%)`, borderBottom:"1px solid rgba(255,255,255,0.07)", display:"flex", alignItems:"center", justifyContent:"space-between", gap:"1rem", backdropFilter:"blur(10px)" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:"1rem" }}>
+          <NakLogo light/>
+          <div style={{ width:1, height:30, background:"rgba(255,255,255,0.12)" }}/>
+          <div style={{ display:"flex", alignItems:"center", gap:"0.6rem" }}>
+            <div style={{ width:34, height:34, borderRadius:8, background:RIM, display:"flex", alignItems:"center", justifyContent:"center" }}>
+              <People s={16} c={GOLD}/>
+            </div>
+            <div>
+              <div style={{ color:WHITE, fontWeight:700, fontSize:"0.88rem", lineHeight:1.2 }}>General Meeting</div>
+              <div style={{ color:"rgba(255,255,255,0.42)", fontSize:"0.62rem" }}>NAKCONEL Learning Center Community</div>
+            </div>
+          </div>
+        </div>
+        <div style={{ display:"flex", alignItems:"center", gap:"0.65rem" }}>
+          <div style={{ background:RED, color:WHITE, fontWeight:800, fontSize:"0.68rem", padding:"0.25rem 0.7rem", borderRadius:99, letterSpacing:"0.08em", display:"flex", alignItems:"center", gap:"0.3rem" }}>
+            <span style={{ width:6, height:6, borderRadius:"50%", background:WHITE, display:"inline-block", boxShadow:`0 0 5px ${WHITE}` }}/>LIVE
+          </div>
+          <div style={{ background:"rgba(255,255,255,0.07)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:8, padding:"0.22rem 0.75rem", fontWeight:700, fontSize:"0.9rem", fontVariantNumeric:"tabular-nums", color:WHITE }}>
             {fmt(elapsed)}
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.3rem", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: "0.22rem 0.7rem", fontSize: "0.78rem", color: "rgba(255,255,255,0.75)" }}>
+          <div style={{ display:"flex", alignItems:"center", gap:"0.3rem", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:8, padding:"0.22rem 0.7rem", fontSize:"0.78rem", color:"rgba(255,255,255,0.75)" }}>
             <People s={13} c="rgba(255,255,255,0.6)"/> {totalCount}
           </div>
         </div>
-
-        {/* right */}
-        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.3rem" }}>
-            <div style={{ width: 7, height: 7, borderRadius: "50%", background: connColor, boxShadow: `0 0 6px ${connColor}` }}/>
-            <span style={{ color: connColor, fontSize: "0.68rem", fontWeight: 600 }}>
+        <div style={{ display:"flex", alignItems:"center", gap:"0.75rem" }}>
+          <div style={{ display:"flex", alignItems:"center", gap:"0.3rem" }}>
+            <div style={{ width:7, height:7, borderRadius:"50%", background:connColor, boxShadow:`0 0 6px ${connColor}` }}/>
+            <span style={{ color:connColor, fontSize:"0.68rem", fontWeight:600 }}>
               {connStatus === "live" ? "Connected" : connStatus === "error" ? "Disconnected" : "Connecting…"}
             </span>
           </div>
-          <div style={{ width: 1, height: 24, background: "rgba(255,255,255,0.1)" }}/>
-          <button style={{ background: "transparent", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.6)", padding: "0.3rem" }}>
+          <div style={{ width:1, height:24, background:"rgba(255,255,255,0.1)" }}/>
+          <button style={{ background:"transparent", border:"none", cursor:"pointer", padding:"0.3rem" }}>
             <Bell s={18} c="rgba(255,255,255,0.65)"/>
           </button>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
-            <div style={{ width: 34, height: 34, borderRadius: "50%", background: `linear-gradient(135deg, ${GOLD}, #f6de88)`, color: INK, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: "0.9rem", boxShadow: `0 0 10px ${GOLD_GLOW}` }}>
+          <div style={{ display:"flex", alignItems:"center", gap:"0.45rem" }}>
+            <div style={{ width:34, height:34, borderRadius:"50%", background:`linear-gradient(135deg,${GOLD},#f6de88)`, color:INK, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800, fontSize:"0.9rem", boxShadow:`0 0 10px ${GOLD_GLOW}` }}>
               {studentName.charAt(0).toUpperCase()}
             </div>
             <div>
-              <div style={{ color: WHITE, fontSize: "0.78rem", fontWeight: 700, lineHeight: 1.2 }}>{studentName}</div>
-              <div style={{ color: GOLD, fontSize: "0.6rem" }}>Participant</div>
+              <div style={{ color:WHITE, fontSize:"0.78rem", fontWeight:700, lineHeight:1.2 }}>{studentName}</div>
+              <div style={{ color:GOLD, fontSize:"0.6rem" }}>Participant</div>
             </div>
           </div>
         </div>
       </header>
 
-      {/* ── BODY ─────────────────────────────────────────────────────── */}
-      <div style={{ flex: 1, display: "flex", overflow: "hidden", minHeight: 0 }}>
-
-        {/* Video gallery */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", padding: "0.9rem", gap: "0.75rem" }}>
-
-          {/* Top: large + stacked */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 0.48fr", gap: "0.75rem" }}>
-            {/* Large tile */}
-            <div style={{ position: "relative", borderRadius: 14, overflow: "hidden", background: `linear-gradient(160deg, ${RIM}, ${CARD})`, aspectRatio: "4/3", border: `2px solid ${GOLD}`, boxShadow: `0 0 28px ${GOLD_GLOW}, 0 6px 24px rgba(0,0,0,0.55)` }}>
-              {hostTile ? (
-                <RemoteTile tile={hostTile} large />
-              ) : (
-                <>
-                  <video ref={selfVideoRef} autoPlay playsInline muted
-                    style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: cameraReady && camOn ? "block" : "none" }} />
-                  {(!cameraReady || !camOn) && (
-                    <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      <div style={{ width: 80, height: 80, borderRadius: "50%", background: `linear-gradient(135deg, ${GOLD}, #f6de88)`, color: INK, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "2rem", fontWeight: 800, boxShadow: `0 0 20px ${GOLD_GLOW}` }}>
-                        {studentName.charAt(0).toUpperCase()}
-                      </div>
-                    </div>
-                  )}
-                  <div style={{ position: "absolute", top: "0.55rem", left: "0.55rem", background: "rgba(0,0,0,0.65)", backdropFilter: "blur(6px)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 99, padding: "0.18rem 0.5rem", display: "flex", alignItems: "center", gap: "0.3rem", color: WHITE, fontSize: "0.65rem", fontWeight: 600 }}>
-                    <Mic s={10} c={MIC_ON}/> Speaking
-                  </div>
-                  <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "linear-gradient(to top, rgba(0,0,0,0.82) 0%, transparent 100%)", padding: "2rem 0.8rem 0.65rem", display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
-                    <div>
-                      <div style={{ color: WHITE, fontSize: "0.88rem", fontWeight: 700 }}>{studentName}</div>
-                      <div style={{ color: "rgba(255,255,255,0.55)", fontSize: "0.62rem" }}>You · Participant</div>
-                    </div>
-                    <div style={{ width: 30, height: 30, borderRadius: "50%", background: micOn ? "rgba(34,197,94,0.22)" : "rgba(229,53,53,0.7)", border: micOn ? `1px solid ${MIC_ON}` : `1px solid ${MIC_OFF}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      {micOn ? <Mic s={14} c={MIC_ON}/> : <MicOff s={14} c={WHITE}/>}
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-
-            {/* Right stack */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-              {hostTile && (
-                <div style={{ flex: 1, position: "relative", borderRadius: 10, overflow: "hidden", background: `linear-gradient(160deg,${RIM},${CARD})`, border: `2px solid ${GOLD}`, boxShadow: `0 0 18px ${GOLD_GLOW}` }}>
-                  <video ref={selfVideoRef} autoPlay playsInline muted
-                    style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: cameraReady && camOn ? "block" : "none" }} />
-                  {(!cameraReady || !camOn) && (
-                    <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      <div style={{ width: 48, height: 48, borderRadius: "50%", background: `linear-gradient(135deg,${GOLD},#f6de88)`, color: INK, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.2rem", fontWeight: 800 }}>
-                        {studentName.charAt(0).toUpperCase()}
-                      </div>
-                    </div>
-                  )}
-                  <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "linear-gradient(to top,rgba(0,0,0,0.82) 0%,transparent 100%)", padding: "1rem 0.55rem 0.45rem", display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
-                    <div>
-                      <div style={{ color: WHITE, fontSize: "0.72rem", fontWeight: 700 }}>{studentName}</div>
-                      <div style={{ color: "rgba(255,255,255,0.55)", fontSize: "0.58rem" }}>You</div>
-                    </div>
-                    <div style={{ width: 24, height: 24, borderRadius: "50%", background: micOn ? "rgba(34,197,94,0.22)" : "rgba(229,53,53,0.7)", border: micOn ? `1px solid ${MIC_ON}` : `1px solid ${MIC_OFF}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      {micOn ? <Mic s={11} c={MIC_ON}/> : <MicOff s={11} c={WHITE}/>}
-                    </div>
-                  </div>
+      {/* body */}
+      <div style={{ flex:1, display:"flex", overflow:"hidden", minHeight:0 }}>
+        {/* gallery */}
+        <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden", padding:"0.9rem", gap:"0.75rem" }}>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 0.48fr", gap:"0.75rem" }}>
+            <div style={{ position:"relative", borderRadius:14, overflow:"hidden", background:`linear-gradient(160deg,${RIM},${CARD})`, aspectRatio:"4/3", border:`2px solid ${GOLD}`, boxShadow:`0 0 28px ${GOLD_GLOW},0 6px 24px rgba(0,0,0,0.55)` }}>
+              {hostTile ? <RemoteTile tile={hostTile} large/> : (
+                <div style={{ position:"absolute", inset:0 }}>
+                  <SelfTileContent/>
                 </div>
               )}
-              {otherTiles[0] && <div style={{ flex: 1 }}><RemoteTile tile={otherTiles[0]} /></div>}
+            </div>
+            <div style={{ display:"flex", flexDirection:"column", gap:"0.75rem" }}>
+              {hostTile && (
+                <div style={{ flex:1, position:"relative", borderRadius:10, overflow:"hidden", background:`linear-gradient(160deg,${RIM},${CARD})`, border:`2px solid ${GOLD}` }}>
+                  <SelfTileContent compact/>
+                </div>
+              )}
+              {otherTiles[0] && <div style={{ flex:1, position:"relative" }}><RemoteTile tile={otherTiles[0]}/></div>}
               {!otherTiles[0] && !hostTile && (
-                <div style={{ flex: 1, borderRadius: 10, background: CARD, border: "1px dashed rgba(255,255,255,0.12)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: "0.35rem" }}>
+                <div style={{ flex:1, borderRadius:10, background:CARD, border:"1px dashed rgba(255,255,255,0.12)", display:"flex", alignItems:"center", justifyContent:"center", flexDirection:"column", gap:"0.35rem" }}>
                   <People s={20} c="rgba(255,255,255,0.18)"/>
-                  <span style={{ fontSize: "0.68rem", color: "rgba(255,255,255,0.3)" }}>Waiting…</span>
+                  <span style={{ fontSize:"0.68rem", color:"rgba(255,255,255,0.3)" }}>Waiting…</span>
                 </div>
               )}
             </div>
           </div>
-
-          {/* Bottom row */}
           {(hostTile ? otherTiles : otherTiles.slice(1)).length > 0 && (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(180px,1fr))", gap: "0.75rem" }}>
-              {(hostTile ? otherTiles : otherTiles.slice(1)).map(t => <RemoteTile key={t.identity} tile={t}/>)}
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(180px,1fr))", gap:"0.75rem" }}>
+              {(hostTile ? otherTiles : otherTiles.slice(1)).map(t => (
+                <div key={t.identity} style={{ position:"relative", aspectRatio:"16/9" }}>
+                  <RemoteTile tile={t}/>
+                </div>
+              ))}
             </div>
           )}
-
           {remoteList.length === 0 && (
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "0.9rem", opacity: 0.55 }}>
+            <div style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:"0.9rem", opacity:0.55 }}>
               <People s={48} c="rgba(255,255,255,0.3)"/>
-              <div style={{ fontWeight: 700, fontSize: "1rem" }}>Waiting for others to join…</div>
-              <div style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.45)" }}>Share the meeting link to invite participants</div>
+              <div style={{ fontWeight:700, fontSize:"1rem" }}>Waiting for others to join…</div>
+              <div style={{ fontSize:"0.78rem", color:"rgba(255,255,255,0.45)" }}>Share the meeting link to invite participants</div>
             </div>
           )}
         </div>
 
-        {/* ── Right panel ───────────────────────────────────────────── */}
-        <div style={{ width: 308, flexShrink: 0, background: OFF_WHITE, borderLeft: `1px solid ${PANEL_BDR}`, display: "flex", flexDirection: "column", boxShadow: "-4px 0 28px rgba(0,0,0,0.3)" }}>
-          {/* Tabs */}
-          <div style={{ display: "flex", background: WHITE, borderBottom: `1px solid ${PANEL_BDR}`, padding: "0 0.3rem" }}>
+        {/* right panel */}
+        <div style={{ width:308, flexShrink:0, background:OFF_WHITE, borderLeft:`1px solid ${PANEL_BDR}`, display:"flex", flexDirection:"column" }}>
+          <div style={{ display:"flex", background:"white", borderBottom:`1px solid ${PANEL_BDR}`, padding:"0 0.3rem" }}>
             {(["participants","chat","qa"] as const).map(t => (
-              <button key={t} type="button" onClick={() => setActiveTab(t)} style={{
-                flex: 1, background: "transparent", border: "none",
-                borderBottom: activeTab === t ? `2px solid ${GOLD_DIM}` : "2px solid transparent",
-                color: activeTab === t ? GOLD_DIM : MUTED_TXT,
-                padding: "0.72rem 0.2rem", fontSize: "0.68rem", fontWeight: 700,
-                cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: "0.2rem",
-              }}>
-                {t === "participants" && <><People s={14} c={activeTab==="participants"?GOLD_DIM:MUTED_TXT}/><span>Participants ({totalCount})</span></>}
-                {t === "chat"         && <><Chat   s={14} c={activeTab==="chat"?GOLD_DIM:MUTED_TXT}/><span>Chat</span></>}
-                {t === "qa"           && <><span style={{ fontSize:"0.85rem", lineHeight:1 }}>?</span><span>Q&A</span></>}
+              <button key={t} type="button" onClick={() => setActiveTab(t)} style={{ flex:1, background:"transparent", border:"none", borderBottom:activeTab===t?`2px solid ${GOLD_DIM}`:"2px solid transparent", color:activeTab===t?GOLD_DIM:MUTED_TXT, padding:"0.72rem 0.2rem", fontSize:"0.68rem", fontWeight:700, cursor:"pointer", display:"flex", flexDirection:"column", alignItems:"center", gap:"0.2rem" }}>
+                {t==="participants" && <><People s={14} c={activeTab==="participants"?GOLD_DIM:MUTED_TXT}/><span>Participants ({totalCount})</span></>}
+                {t==="chat"         && <><ChatIcon s={14} c={activeTab==="chat"?GOLD_DIM:MUTED_TXT}/><span>Chat</span></>}
+                {t==="qa"           && <><span style={{ fontSize:"0.85rem", lineHeight:1 }}>?</span><span>Q&amp;A</span></>}
               </button>
             ))}
           </div>
-
           {activeTab === "participants" && (
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-              <div style={{ padding: "0.65rem", borderBottom: `1px solid ${PANEL_BDR}` }}>
-                <div style={{ display: "flex", alignItems: "center", background: WHITE, border: `1px solid ${PANEL_BDR}`, borderRadius: 8, padding: "0.38rem 0.6rem", gap: "0.35rem" }}>
-                  <Search s={14} c={MUTED_TXT}/>
-                  <input placeholder="Search participants…" style={{ flex: 1, border: "none", outline: "none", fontSize: "0.78rem", color: INK, background: "transparent" }}/>
+            <div style={{ flex:1, overflowY:"auto" }}>
+              <div style={{ display:"flex", alignItems:"center", gap:"0.6rem", padding:"0.52rem 0.85rem", borderBottom:`1px solid ${PANEL_BDR}` }}>
+                <div style={{ width:38, height:38, borderRadius:"50%", background:`linear-gradient(135deg,${GOLD},#f6de88)`, color:INK, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800, fontSize:"0.9rem", flexShrink:0 }}>{studentName.charAt(0).toUpperCase()}</div>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontWeight:700, fontSize:"0.8rem", color:INK }}>{studentName}</div>
+                  <div style={{ fontSize:"0.62rem", color:MUTED_TXT }}>You · Participant</div>
                 </div>
+                {micOn ? <Mic s={15} c={MIC_ON}/> : <MicOff s={15} c={MIC_OFF}/>}
               </div>
-              <div style={{ flex: 1, overflowY: "auto" }}>
-                {/* self */}
-                <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", padding: "0.52rem 0.85rem", borderBottom: `1px solid ${PANEL_BDR}` }}>
-                  <div style={{ width: 36, height: 36, borderRadius: "50%", background: `linear-gradient(135deg,${GOLD},#f6de88)`, color: INK, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: "0.88rem", flexShrink: 0 }}>
-                    {studentName.charAt(0).toUpperCase()}
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 700, fontSize: "0.8rem", color: INK }}>{studentName}</div>
-                    <div style={{ fontSize: "0.62rem", color: MUTED_TXT }}>Participant</div>
-                  </div>
-                  <div title={micOn?"Mic on":"Muted"}>
-                    {micOn ? <Mic s={15} c={MIC_ON}/> : <MicOff s={15} c={MIC_OFF}/>}
-                  </div>
-                  <More s={14} c={MUTED_TXT}/>
-                </div>
-                {remoteList.map(tile => {
-                  const isHost = tile.identity.startsWith("instructor-");
-                  const micLive = !!tile.audioPub?.track;
-                  return (
-                    <div key={tile.identity} style={{ display: "flex", alignItems: "center", gap: "0.6rem", padding: "0.52rem 0.85rem", borderBottom: `1px solid ${PANEL_BDR}` }}>
-                      <div style={{ width: 36, height: 36, borderRadius: "50%", background: isHost ? `linear-gradient(135deg,${WINE},#8b3030)` : "#ede8e2", color: isHost ? WHITE : INK, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: "0.88rem", flexShrink: 0 }}>
-                        {tile.name.charAt(0).toUpperCase()}
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 700, fontSize: "0.8rem", color: INK }}>{tile.name}</div>
-                        <div style={{ fontSize: "0.62rem", color: MUTED_TXT }}>{isHost ? "Host" : "Participant"}</div>
-                      </div>
-                      <div title={micLive?"Mic on":"Muted"}>
-                        {micLive ? <Mic s={15} c={MIC_ON}/> : <MicOff s={15} c={MIC_OFF}/>}
-                      </div>
-                      <More s={14} c={MUTED_TXT}/>
+              {remoteList.map(tile => {
+                const isHost = tile.identity.startsWith("instructor-");
+                return (
+                  <div key={tile.identity} style={{ display:"flex", alignItems:"center", gap:"0.6rem", padding:"0.52rem 0.85rem", borderBottom:`1px solid ${PANEL_BDR}` }}>
+                    <div style={{ width:38, height:38, borderRadius:"50%", background:isHost?`linear-gradient(135deg,${WINE},#8b3030)`:"#ede8e2", color:isHost?WHITE:INK, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800, fontSize:"0.88rem", flexShrink:0 }}>{tile.name.charAt(0).toUpperCase()}</div>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontWeight:700, fontSize:"0.8rem", color:INK }}>{tile.name}</div>
+                      <div style={{ fontSize:"0.62rem", color:MUTED_TXT }}>{isHost?"Host":"Participant"}</div>
                     </div>
-                  );
-                })}
-                <button style={{ display: "flex", alignItems: "center", gap: "0.5rem", width: "100%", background: "transparent", border: "none", padding: "0.65rem 0.85rem", cursor: "pointer", color: WINE, fontSize: "0.78rem", fontWeight: 600 }}>
-                  <People s={13} c={WINE}/> View all participants <span style={{ marginLeft: "auto" }}>›</span>
-                </button>
-              </div>
+                    {!!tile.audioPub?.track ? <Mic s={15} c={MIC_ON}/> : <MicOff s={15} c={MIC_OFF}/>}
+                  </div>
+                );
+              })}
             </div>
           )}
-
           {activeTab === "chat" && (
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-              <div style={{ padding: "0.6rem 0.85rem", borderBottom: `1px solid ${PANEL_BDR}` }}>
-                <span style={{ fontWeight: 700, fontSize: "0.82rem", color: INK }}>Meeting Chat</span>
+            <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
+              <div style={{ flex:1, overflowY:"auto", padding:"0.75rem 0.85rem" }}>
+                <p style={{ margin:0, fontSize:"0.78rem", color:MUTED_TXT, textAlign:"center" }}>Chat messages will appear here.</p>
               </div>
-              <div style={{ flex: 1, overflowY: "auto", padding: "0.75rem 0.85rem" }}>
-                <p style={{ margin: 0, fontSize: "0.78rem", color: MUTED_TXT, textAlign: "center" }}>Chat messages will appear here.</p>
-              </div>
-              <div style={{ padding: "0.6rem", borderTop: `1px solid ${PANEL_BDR}`, display: "flex", gap: "0.45rem" }}>
-                <input value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder="Type a message…"
-                  style={{ flex: 1, border: `1px solid ${PANEL_BDR}`, borderRadius: 8, padding: "0.48rem 0.7rem", fontSize: "0.8rem", color: INK, outline: "none" }}/>
-                <button style={{ width: 36, height: 36, borderRadius: 8, background: GOLD_DIM, border: "none", color: WHITE, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <Send s={14} c={WHITE}/>
-                </button>
+              <div style={{ padding:"0.6rem", borderTop:`1px solid ${PANEL_BDR}`, display:"flex", gap:"0.45rem" }}>
+                <input value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder="Type a message…" style={{ flex:1, border:`1px solid ${PANEL_BDR}`, borderRadius:8, padding:"0.48rem 0.7rem", fontSize:"0.8rem", color:INK, outline:"none" }}/>
+                <button style={{ width:36, height:36, borderRadius:8, background:GOLD_DIM, border:"none", color:WHITE, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}><Send s={14} c={WHITE}/></button>
               </div>
             </div>
           )}
-
           {activeTab === "qa" && (
-            <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "2rem" }}>
-              <p style={{ color: MUTED_TXT, fontSize: "0.82rem", textAlign: "center" }}>No questions yet. Be the first to ask!</p>
+            <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", padding:"2rem" }}>
+              <p style={{ color:MUTED_TXT, fontSize:"0.82rem", textAlign:"center" }}>No questions yet. Be the first to ask!</p>
             </div>
           )}
         </div>
       </div>
 
-      {/* ── BOTTOM BAR ─────────────────────────────────────────────── */}
-      <div style={{
-        flexShrink: 0, padding: "0.5rem 1.5rem",
-        background: `linear-gradient(0deg, ${SURFACE} 0%, rgba(28,8,8,0.97) 100%)`,
-        borderTop: "1px solid rgba(255,255,255,0.07)",
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        backdropFilter: "blur(10px)",
-      }}>
-        {/* meeting pill */}
-        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)", borderRadius: 10, padding: "0.42rem 0.85rem", cursor: "pointer" }}>
+      {/* bottom bar */}
+      <div style={{ flexShrink:0, padding:"0.5rem 1.5rem", background:`linear-gradient(0deg,${SURFACE} 0%,rgba(28,8,8,0.97) 100%)`, borderTop:"1px solid rgba(255,255,255,0.07)", display:"flex", alignItems:"center", justifyContent:"space-between", backdropFilter:"blur(10px)" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:"0.5rem", background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.09)", borderRadius:10, padding:"0.42rem 0.85rem" }}>
           <People s={14} c={GOLD}/>
           <div>
-            <div style={{ color: WHITE, fontSize: "0.72rem", fontWeight: 700 }}>General Meeting</div>
-            <div style={{ color: "rgba(255,255,255,0.38)", fontSize: "0.56rem" }}>NAKCONEL Learning Center</div>
+            <div style={{ color:WHITE, fontSize:"0.72rem", fontWeight:700 }}>General Meeting</div>
+            <div style={{ color:"rgba(255,255,255,0.38)", fontSize:"0.56rem" }}>NAKCONEL Learning Center</div>
           </div>
-          <span style={{ color: "rgba(255,255,255,0.3)", fontSize: "0.62rem", marginLeft: "0.15rem" }}>▾</span>
         </div>
-
-        {/* controls — Share button removed */}
-        <div style={{ display: "flex", gap: "0.28rem" }}>
-          <CtrlBtn icon={micOn ? <Mic s={20} c={MIC_ON}/> : <MicOff s={20} c={MIC_OFF}/>}
-            label={micOn ? "Mute" : "Unmute"} onClick={toggleMic} active={micOn}
-            color={micOn ? MIC_ON : MIC_OFF}/>
-          <CtrlBtn icon={camOn ? <Cam s={20} c={WHITE}/> : <CamOff s={20} c="rgba(255,255,255,0.4)"/>}
-            label={camOn ? "Stop Video" : "Start Video"} onClick={toggleCam} active={camOn}/>
-          <CtrlBtn icon={<People s={20} c={activeTab==="participants" ? GOLD : WHITE}/>}
-            label="Participants" onClick={() => setActiveTab("participants")} active={activeTab==="participants"}/>
-          <CtrlBtn icon={<Chat s={20} c={activeTab==="chat" ? GOLD : WHITE}/>}
-            label="Chat" onClick={() => setActiveTab("chat")} active={activeTab==="chat"}/>
-          <CtrlBtn icon={<More s={20} c="rgba(255,255,255,0.75)"/>} label="More"/>
+        <div style={{ display:"flex", gap:"0.28rem" }}>
+          {[
+            { icon:<Mic s={20} c={micOn?MIC_ON:MIC_OFF}/>, label:micOn?"Mute":"Unmute", onClick:toggleMic, active:micOn, color:micOn?MIC_ON:MIC_OFF },
+            { icon:<Cam s={20} c={camOn?WHITE:"rgba(255,255,255,0.4)"}/>, label:camOn?"Stop Video":"Start Video", onClick:toggleCam, active:camOn },
+            { icon:<People s={20} c={activeTab==="participants"?GOLD:WHITE}/>, label:"Participants", onClick:()=>setActiveTab("participants"), active:activeTab==="participants" },
+            { icon:<ChatIcon s={20} c={activeTab==="chat"?GOLD:WHITE}/>, label:"Chat", onClick:()=>setActiveTab("chat"), active:activeTab==="chat" },
+            { icon:<More s={20} c="rgba(255,255,255,0.75)"/>, label:"More" },
+          ].map(({ icon, label, onClick, active, color }) => (
+            <button key={label} type="button" onClick={onClick} style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:"0.22rem", background:active?"rgba(232,184,75,0.14)":"rgba(255,255,255,0.05)", border:active?`1px solid ${GOLD_DIM}`:"1px solid rgba(255,255,255,0.08)", color:color??(active?GOLD:"rgba(255,255,255,0.82)"), borderRadius:10, padding:"0.5rem 0.85rem", cursor:"pointer", minWidth:56, transition:"background 0.15s" }}>
+              {icon}
+              <span style={{ fontSize:"0.59rem", fontWeight:700, letterSpacing:"0.04em", whiteSpace:"nowrap" }}>{label}</span>
+            </button>
+          ))}
         </div>
-
-        {/* leave */}
-        <Link href="/learning" style={{ display: "flex", alignItems: "center", gap: "0.45rem", background: RED, color: WHITE, borderRadius: 10, padding: "0.55rem 1.3rem", fontWeight: 700, fontSize: "0.85rem", textDecoration: "none", boxShadow: "0 2px 14px rgba(229,53,53,0.38)" }}>
+        <Link href="/learning" style={{ display:"flex", alignItems:"center", gap:"0.45rem", background:RED, color:WHITE, borderRadius:10, padding:"0.55rem 1.3rem", fontWeight:700, fontSize:"0.85rem", textDecoration:"none", boxShadow:"0 2px 14px rgba(229,53,53,0.38)" }}>
           <PhoneOff s={16} c={WHITE}/> Leave Meeting
         </Link>
       </div>
 
       {cameraError && (
-        <div style={{ position: "fixed", bottom: 80, left: "50%", transform: "translateX(-50%)", background: "#fee2e2", color: "#991b1b", padding: "0.55rem 1rem", borderRadius: 8, fontSize: "0.8rem", zIndex: 100 }}>
+        <div style={{ position:"fixed", bottom:80, left:"50%", transform:"translateX(-50%)", background:"#fee2e2", color:"#991b1b", padding:"0.55rem 1rem", borderRadius:8, fontSize:"0.8rem", zIndex:100 }}>
           {cameraError}
         </div>
       )}
+    </div>
+  );
+}
+
+/* ─── Helper sub-components ─────────────────────────────────────────────── */
+
+function MobileCtrlBtn({ icon, label, onClick, active, highlight, activeColor }: {
+  icon: React.ReactNode; label: string; onClick?: () => void;
+  active?: boolean; highlight?: boolean; activeColor?: string;
+}) {
+  return (
+    <button type="button" onClick={onClick} style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:"0.22rem", background:highlight?"#d4a843":active?"rgba(232,184,75,0.1)":"transparent", border:highlight?"none":active?`1px solid rgba(232,184,75,0.3)`:"1px solid transparent", color:activeColor??(highlight?INK:active?GOLD:"rgba(255,255,255,0.75)"), borderRadius:12, padding:"0.5rem 0.5rem", cursor:"pointer", minWidth:44, WebkitTapHighlightColor:"transparent", transition:"background 0.12s" }}>
+      {icon}
+      <span style={{ fontSize:"0.56rem", fontWeight:600, letterSpacing:"0.02em", whiteSpace:"nowrap" }}>{label}</span>
+    </button>
+  );
+}
+
+function ParticipantRow({ name, role, micOn, camOn, isHost, isSelf }: {
+  name: string; role: string; micOn: boolean; camOn: boolean; isHost: boolean; isSelf: boolean;
+}) {
+  const initial = name.charAt(0).toUpperCase();
+  const avatarBg = isHost
+    ? "linear-gradient(135deg,#6b1f1f,#8b3030)"
+    : isSelf
+    ? `linear-gradient(135deg,${GOLD},#f6de88)`
+    : "rgba(255,255,255,0.1)";
+  const avatarColor = isSelf ? INK : WHITE;
+
+  return (
+    <div style={{ display:"flex", alignItems:"center", gap:"0.65rem", padding:"0.55rem 0.75rem", borderBottom:"1px solid rgba(255,255,255,0.05)" }}>
+      <div style={{ width:36, height:36, borderRadius:"50%", background:avatarBg, color:avatarColor, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800, fontSize:"0.88rem", flexShrink:0, position:"relative" }}>
+        {initial}
+        <span style={{ position:"absolute", bottom:0, right:0, width:9, height:9, borderRadius:"50%", background:MIC_ON, border:"1.5px solid #141414" }}/>
+      </div>
+      <div style={{ flex:1, minWidth:0 }}>
+        <div style={{ fontWeight:700, fontSize:"0.78rem", color:WHITE, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+          {name}{isSelf?" (You)":""}
+        </div>
+        <div style={{ fontSize:"0.6rem", color:"rgba(255,255,255,0.4)" }}>
+          {isHost ? "(Instructor)" : `(${role})`}
+        </div>
+      </div>
+      {/* Mic icon */}
+      <div style={{ width:28, height:28, borderRadius:6, background:"rgba(255,255,255,0.06)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+        <Mic s={14} c={micOn?MIC_ON:MIC_OFF}/>
+      </div>
+      {/* Cam icon */}
+      <div style={{ width:28, height:28, borderRadius:6, background:"rgba(255,255,255,0.06)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+        <Cam s={14} c={camOn?"rgba(255,255,255,0.7)":"rgba(255,255,255,0.2)"}/>
+      </div>
+      {/* More */}
+      <div style={{ width:28, height:28, borderRadius:6, background:"rgba(255,255,255,0.06)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+        <More s={14} c="rgba(255,255,255,0.45)"/>
+      </div>
     </div>
   );
 }
