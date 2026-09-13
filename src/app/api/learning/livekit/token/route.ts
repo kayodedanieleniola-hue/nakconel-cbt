@@ -7,12 +7,12 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const studentSession = await getStudentSession();
-  const adminSession = await getAdminSession();
+  const adminSession   = await getAdminSession();
   if (!studentSession && !adminSession) {
     return NextResponse.json({ error: "Authentication required" }, { status: 401 });
   }
 
-  const url = new URL(request.url);
+  const url     = new URL(request.url);
   const classId = url.searchParams.get("classId") ?? "";
   if (!classId) return NextResponse.json({ error: "classId is required" }, { status: 400 });
 
@@ -31,45 +31,62 @@ export async function GET(request: Request) {
 
   if (!learningClass) return NextResponse.json({ error: "Class not found" }, { status: 404 });
 
-  const isAdmin = !!adminSession;
+  const isAdmin   = !!adminSession;
+  const isGeneral = learningClass.isGeneral;
+
+  // Check whether the student is enrolled in the class's course
   const enrolledStudent = studentSession
-    ? learningClass.course.students.find((s) => s.id === studentSession.sub && s.status === "active")
+    ? learningClass.course.students.find(
+        (s) => s.id === studentSession.sub && s.status === "active"
+      )
     : undefined;
 
-  if (!isAdmin && !enrolledStudent) {
-    return NextResponse.json({ error: "Access denied: Not enrolled in this course" }, { status: 403 });
+  // For general meetings any active student can join regardless of course enrollment.
+  // For regular classes, enrollment in the course is required.
+  let resolvedStudent = enrolledStudent;
+  if (!isAdmin && !enrolledStudent && isGeneral && studentSession) {
+    const student = await prisma.student.findUnique({
+      where: { id: studentSession.sub },
+      select: { id: true, fullName: true, status: true },
+    });
+    if (student && student.status === "active") {
+      resolvedStudent = { id: student.id, fullName: student.fullName, status: student.status };
+    }
   }
 
-  const apiKey = process.env.LIVEKIT_API_KEY;
+  if (!isAdmin && !resolvedStudent) {
+    return NextResponse.json(
+      { error: "Access denied: Not enrolled in this course" },
+      { status: 403 }
+    );
+  }
+
+  const apiKey    = process.env.LIVEKIT_API_KEY;
   const apiSecret = process.env.LIVEKIT_API_SECRET;
-  const livekitUrl = process.env.LIVEKIT_URL ?? process.env.NEXT_PUBLIC_LIVEKIT_URL;
+  const livekitUrl =
+    process.env.LIVEKIT_URL ?? process.env.NEXT_PUBLIC_LIVEKIT_URL;
 
   if (!apiKey || !apiSecret || !livekitUrl) {
     return NextResponse.json({ error: "Live video is not configured" }, { status: 503 });
   }
 
-  const room = `classroom-${learningClass.id}`;
+  const room     = `classroom-${learningClass.id}`;
   const identity = isAdmin
-    ? `instructor-${adminSession.sub}`
+    ? `instructor-${adminSession!.sub}`
     : `student-${studentSession!.sub}`;
 
-  // Resolve a real display name so student tiles show the actual name
-  // rather than the raw identity string.
+  // Resolve a real display name
   let displayName = identity;
   if (isAdmin) {
     const admin = await prisma.admin.findUnique({
-      where: { id: adminSession.sub },
+      where: { id: adminSession!.sub },
       select: { fullName: true },
     });
     displayName = admin?.fullName ?? "Instructor";
-  } else if (enrolledStudent) {
-    displayName = enrolledStudent.fullName;
+  } else if (resolvedStudent) {
+    displayName = resolvedStudent.fullName;
   }
 
-  // Every participant — instructor and student — can publish, subscribe,
-  // and send data messages. Students publish their camera/mic automatically
-  // on join; the instructor sees them as live video tiles with no manual
-  // accept step required.
   const token = new AccessToken(apiKey, apiSecret, { identity, name: displayName });
   token.addGrant({
     roomJoin: true,
@@ -81,7 +98,9 @@ export async function GET(request: Request) {
 
   return NextResponse.json({
     token: await token.toJwt(),
-    url: livekitUrl,
+    url: livekitUrl.startsWith("https://")
+      ? livekitUrl.replace("https://", "wss://")
+      : livekitUrl,
     room,
     role: isAdmin ? "instructor" : "student",
   });
