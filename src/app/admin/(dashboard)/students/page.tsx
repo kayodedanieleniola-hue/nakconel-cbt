@@ -81,20 +81,36 @@ export default function AdminStudentsPage() {
           </p>
           <h1 style={{ fontSize: "1.9rem" }}>Students</h1>
         </div>
-        <a
-          href="/api/admin/students/export"
-          style={{
-            background: "var(--gold-600)",
-            color: "var(--burgundy-950)",
-            padding: "0.65rem 1.1rem",
-            borderRadius: 4,
-            fontWeight: 600,
-            fontSize: "0.9rem",
-            textDecoration: "none",
-          }}
-        >
-          Export to Excel
-        </a>
+        <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+          <Link
+            href="/admin/students/activate"
+            style={{
+              background: "var(--burgundy-900)",
+              color: "#fff",
+              padding: "0.65rem 1.1rem",
+              borderRadius: 4,
+              fontWeight: 600,
+              fontSize: "0.9rem",
+              textDecoration: "none",
+            }}
+          >
+            + Activate Student
+          </Link>
+          <a
+            href="/api/admin/students/export"
+            style={{
+              background: "var(--gold-600)",
+              color: "var(--burgundy-950)",
+              padding: "0.65rem 1.1rem",
+              borderRadius: 4,
+              fontWeight: 600,
+              fontSize: "0.9rem",
+              textDecoration: "none",
+            }}
+          >
+            Export to Excel
+          </a>
+        </div>
       </div>
 
       <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", marginBottom: "1.5rem" }}>

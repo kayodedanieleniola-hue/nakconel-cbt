@@ -29,14 +29,16 @@ export default function ClassroomChat({
   isInstructor,
   userId = "user-local",
   userName = isInstructor ? "Instructor" : "Student",
+  initialTab = "chat",
 }: {
   classId: string;
   room: Room | null;
   isInstructor: boolean;
   userId?: string;
   userName?: string;
+  initialTab?: "chat" | "qa";
 }) {
-  const [activeTab, setActiveTab] = useState<"chat" | "qa">("chat");
+  const [activeTab, setActiveTab] = useState<"chat" | "qa">(initialTab);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [questions, setQuestions] = useState<QAQuestion[]>([]);
   const [pinnedAnnouncement, setPinnedAnnouncement] = useState<string | null>(null);
@@ -48,6 +50,37 @@ export default function ClassroomChat({
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const bcRef = useRef<BroadcastChannel | null>(null);
+  const historyLoadedRef = useRef(false);
+
+  // Panels can be closed and reopened while a class is live. Retain this
+  // browser's room history so reopening Chat or Q&A does not look empty.
+  useEffect(() => {
+    historyLoadedRef.current = false;
+    try {
+      const saved = sessionStorage.getItem(`nak-classroom-history-${classId}`);
+      if (saved) {
+        const parsed = JSON.parse(saved) as { messages?: ChatMessage[]; questions?: QAQuestion[]; pinnedAnnouncement?: string | null };
+        setMessages(parsed.messages ?? []);
+        setQuestions(parsed.questions ?? []);
+        setPinnedAnnouncement(parsed.pinnedAnnouncement ?? null);
+      }
+    } catch {
+      // A malformed or unavailable browser store should never break chat.
+    }
+    historyLoadedRef.current = true;
+  }, [classId]);
+
+  useEffect(() => {
+    if (!historyLoadedRef.current) return;
+    try {
+      sessionStorage.setItem(
+        `nak-classroom-history-${classId}`,
+        JSON.stringify({ messages, questions, pinnedAnnouncement })
+      );
+    } catch {
+      // Storage is optional (for example, private browser modes may deny it).
+    }
+  }, [classId, messages, questions, pinnedAnnouncement]);
 
   // Scroll to bottom on new chat message
   useEffect(() => {

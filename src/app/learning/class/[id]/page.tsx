@@ -1,5 +1,5 @@
 import { notFound, redirect } from "next/navigation";
-import ClassroomClient from "@/components/ClassroomClient";
+import GeneralClassroomClient from "@/components/GeneralClassroomClient";
 import { getStudentSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { syncLearningClassStatuses } from "@/lib/learningSchedule";
@@ -11,6 +11,11 @@ export default async function ClassroomPage({ params }: { params: Promise<{ id: 
   if (!session) redirect("/login");
 
   await syncLearningClassStatuses();
+  const student = await prisma.student.findUnique({
+    where: { id: session.sub },
+    select: { fullName: true },
+  });
+  if (!student) redirect("/login");
   const { id } = await params;
   const learningClass = await prisma.learningClass.findFirst({
     where: {
@@ -18,30 +23,10 @@ export default async function ClassroomPage({ params }: { params: Promise<{ id: 
       NOT: { status: "CANCELLED" },
       course: { students: { some: { id: session.sub, status: "active" } } },
     },
-    include: {
-      course: {
-        select: {
-          name: true,
-          materials: {
-            orderBy: { createdAt: "desc" },
-            select: { id: true, title: true, fileName: true, mimeType: true, sizeBytes: true },
-          },
-        },
-      },
-      module: { select: { title: true } },
-    },
+    select: { id: true, title: true, instructor: true, description: true, status: true },
   });
 
   if (!learningClass) notFound();
 
-  return <ClassroomClient learningClass={{
-    id: learningClass.id,
-    title: learningClass.title,
-    course: learningClass.course.name,
-    module: learningClass.module?.title ?? null,
-    instructor: learningClass.instructor,
-    description: learningClass.description,
-    activeMaterialId: learningClass.activeMaterialId,
-    presentationPage: learningClass.presentationPage ?? 1,
-  }} materials={learningClass.course.materials} />;
+  return <GeneralClassroomClient meeting={learningClass} studentName={student.fullName} />;
 }

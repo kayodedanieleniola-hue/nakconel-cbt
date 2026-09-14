@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import InstructorBroadcaster from "@/components/InstructorBroadcaster";
+import GeneralClassroomClient from "@/components/GeneralClassroomClient";
 
 type ClassItem = {
   id: string;
@@ -431,11 +431,12 @@ export default function LearningManagementPage() {
       )}
 
       {broadcastingClass && (
-        <InstructorBroadcaster
-          classId={broadcastingClass.id}
-          classTitle={broadcastingClass.title}
-          materials={selected?.materials ?? []}
-          onClose={() => setBroadcastingClass(null)}
+        <GeneralClassroomClient
+          meeting={{ id: broadcastingClass.id, title: broadcastingClass.title, instructor: "Instructor", description: null, status: "LIVE" }}
+          studentName="Instructor"
+          isInstructor
+          backHref="/admin/learning"
+          onLeave={() => setBroadcastingClass(null)}
         />
       )}
     </div>

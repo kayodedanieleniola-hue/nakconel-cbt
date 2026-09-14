@@ -17,8 +17,9 @@ import Link from "next/link";
 import {
   Room, RoomEvent, Track,
   RemoteParticipant, RemoteTrackPublication,
-  createLocalTracks, type LocalTrack,
+  createLocalTracks, createLocalScreenTracks, type LocalTrack,
 } from "livekit-client";
+import ClassroomChat from "@/components/ClassroomChat";
 
 /* ─── tokens ─────────────────────────────────────────────────────────────── */
 const BG        = "#110505";
@@ -278,7 +279,13 @@ function SelfVideoTile({
 }
 
 /* ─── Main ───────────────────────────────────────────────────────────────── */
-export default function GeneralClassroomClient({ meeting, studentName }: { meeting: Meeting; studentName: string }) {
+export default function GeneralClassroomClient({ meeting, studentName, isInstructor = false, backHref = "/learning", onLeave }: {
+  meeting: Meeting;
+  studentName: string;
+  isInstructor?: boolean;
+  backHref?: string;
+  onLeave?: () => void;
+}) {
   const roomRef      = useRef<Room|null>(null);
   const activeRef    = useRef(true);
 
@@ -288,6 +295,7 @@ export default function GeneralClassroomClient({ meeting, studentName }: { meeti
   const [selfStream,  setSelfStream]  = useState<MediaStream|null>(null);
 
   const [connStatus,   setConnStatus]   = useState<"connecting"|"live"|"error">("connecting");
+  const [activeRoom,   setActiveRoom]   = useState<Room|null>(null);
   const [cameraReady,  setCameraReady]  = useState(false);
   const [cameraError,  setCameraError]  = useState("");
   const [micOn,        setMicOn]        = useState(true);
@@ -295,11 +303,13 @@ export default function GeneralClassroomClient({ meeting, studentName }: { meeti
   const [activeTab,    setActiveTab]    = useState<"participants"|"chat"|"qa"|"materials">("participants");
   const [panelOpen,    setPanelOpen]    = useState(true);
   const [participants, setParticipants] = useState<Record<string, PTile>>({});
-  const [chatInput,    setChatInput]    = useState("");
   const [elapsed,      setElapsed]      = useState(0);
   const [isMobile,     setIsMobile]     = useState(false);
   const localVideoTrack = useRef<LocalTrack|null>(null);
   const localAudioTrack = useRef<LocalTrack|null>(null);
+  const screenTracks = useRef<LocalTrack[]>([]);
+  const [screenSharing, setScreenSharing] = useState(false);
+  const [showMore, setShowMore] = useState(false);
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 700);
@@ -355,7 +365,7 @@ export default function GeneralClassroomClient({ meeting, studentName }: { meeti
 
       const room = new Room({ adaptiveStream:true, dynacast:true, disconnectOnPageLeave:false });
       roomRef.current = room;
-      room.on(RoomEvent.Connected,    () => { if (activeRef.current) setConnStatus("live"); });
+      room.on(RoomEvent.Connected,    () => { if (activeRef.current) { setConnStatus("live"); setActiveRoom(room); } });
       room.on(RoomEvent.Disconnected, () => { if (activeRef.current) setConnStatus("error"); });
       room.on(RoomEvent.ParticipantConnected, (rp: RemoteParticipant) => {
         if (!activeRef.current) return;
@@ -406,6 +416,7 @@ export default function GeneralClassroomClient({ meeting, studentName }: { meeti
     return () => {
       activeRef.current = false;
       localVideoTrack.current?.stop(); localAudioTrack.current?.stop();
+      screenTracks.current.forEach((track) => track.stop());
       roomRef.current?.disconnect().catch(() => {}); roomRef.current = null;
     };
   }, [meeting.id]);
@@ -433,6 +444,32 @@ export default function GeneralClassroomClient({ meeting, studentName }: { meeti
         setCamOn(true);
       });
     }
+  };
+  const toggleScreenShare = async () => {
+    if (!isInstructor || !roomRef.current) return;
+    if (screenSharing) {
+      for (const track of screenTracks.current) {
+        await roomRef.current.localParticipant.unpublishTrack(track).catch(() => {});
+        track.stop();
+      }
+      screenTracks.current = [];
+      setScreenSharing(false);
+      setShowMore(false);
+      return;
+    }
+    try {
+      const tracks = await createLocalScreenTracks({ audio: true });
+      for (const track of tracks) await roomRef.current.localParticipant.publishTrack(track);
+      screenTracks.current = tracks;
+      setScreenSharing(true);
+      setShowMore(false);
+    } catch {
+      setCameraError("Screen sharing was cancelled or is not available in this browser.");
+    }
+  };
+  const leaveMeeting = () => {
+    roomRef.current?.disconnect().catch(() => {});
+    onLeave?.();
   };
 
   const remoteList = Object.values(participants);
@@ -560,7 +597,7 @@ export default function GeneralClassroomClient({ meeting, studentName }: { meeti
                       </div>
                     </div>
                     <div style={{ flex:1, overflowY:"auto" }}>
-                      <ParticipantRow name={studentName} role="Student" micOn={micOn} camOn={camOn} isHost={false} isSelf/>
+                      <ParticipantRow name={studentName} role={isInstructor ? "Instructor" : "Student"} micOn={micOn} camOn={camOn} isHost={isInstructor} isSelf/>
                       {hostTile && <ParticipantRow name={hostTile.name} role="Instructor" micOn={!!hostTile.audioPub?.track} camOn={!!hostTile.videoPub?.track} isHost isSelf={false}/>}
                       {otherTiles.map(t => <ParticipantRow key={t.identity} name={t.name} role="Student" micOn={!!t.audioPub?.track} camOn={!!t.videoPub?.track} isHost={false} isSelf={false}/>)}
                     </div>
@@ -568,23 +605,12 @@ export default function GeneralClassroomClient({ meeting, studentName }: { meeti
                 )}
                 {activeTab === "chat" && (
                   <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
-                    <div style={{ flex:1, overflowY:"auto", padding:"0.75rem" }}>
-                      <p style={{ margin:0, fontSize:"0.78rem", color:"rgba(255,255,255,0.35)", textAlign:"center" }}>Chat messages will appear here.</p>
-                    </div>
-                    <div style={{ padding:"0.55rem", borderTop:"1px solid rgba(255,255,255,0.07)", display:"flex", gap:"0.4rem" }}>
-                      <input value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder="Type a message…" style={{ flex:1, border:"1px solid rgba(255,255,255,0.1)", borderRadius:8, padding:"0.55rem 0.7rem", fontSize:"0.82rem", color:WHITE, outline:"none", background:"rgba(255,255,255,0.06)" }}/>
-                      <button style={{ width:38, height:38, borderRadius:8, background:GOLD_DIM, border:"none", color:WHITE, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-                        <Send s={14} c={WHITE}/>
-                      </button>
-                    </div>
+                    <ClassroomChat classId={meeting.id} room={activeRoom} isInstructor={isInstructor} userId={studentName} userName={studentName}/>
                   </div>
                 )}
                 {activeTab === "qa" && (
-                  <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", padding:"1.5rem" }}>
-                    <div style={{ textAlign:"center" }}>
-                      <div style={{ fontSize:"2rem", marginBottom:"0.4rem" }}>❓</div>
-                      <p style={{ color:"rgba(255,255,255,0.35)", fontSize:"0.8rem", margin:0 }}>No questions yet. Be the first to ask!</p>
-                    </div>
+                  <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
+                    <ClassroomChat classId={meeting.id} room={activeRoom} isInstructor={isInstructor} userId={studentName} userName={studentName} initialTab="qa"/>
                   </div>
                 )}
                 {activeTab === "materials" && (
@@ -604,15 +630,16 @@ export default function GeneralClassroomClient({ meeting, studentName }: { meeti
         <div style={{ background:"#111111", borderTop:"1px solid rgba(255,255,255,0.07)", padding:"0.45rem 0.3rem calc(0.5rem + env(safe-area-inset-bottom,0px))", display:"flex", alignItems:"center", justifyContent:"space-around", flexShrink:0 }}>
           <MobileCtrlBtn icon={<Mic s={20} c={micOn?MIC_ON:"rgba(255,255,255,0.7)"}/>} label="Mic" onClick={toggleMic} active={micOn} activeColor={MIC_ON}/>
           <MobileCtrlBtn icon={<Cam s={20} c={camOn?WHITE:"rgba(255,255,255,0.4)"}/>} label="Camera" onClick={toggleCam} active={camOn}/>
-          <MobileCtrlBtn icon={<Present s={20} c={WHITE}/>} label="Present" highlight/>
+          {isInstructor && <MobileCtrlBtn icon={<Present s={20} c={WHITE}/>} label={screenSharing ? "Stop share" : "Share screen"} onClick={toggleScreenShare} highlight={!screenSharing}/>}
           <MobileCtrlBtn icon={<MaterialsIcon s={20} c="rgba(255,255,255,0.7)"/>} label="Materials" onClick={() => { setActiveTab("materials"); setPanelOpen(true); }}/>
           <MobileCtrlBtn icon={<ChatIcon s={20} c={activeTab==="chat"&&panelOpen?GOLD:"rgba(255,255,255,0.7)"}/>} label="Chat" onClick={() => { setActiveTab("chat"); setPanelOpen(true); }} active={activeTab==="chat"&&panelOpen}/>
           <MobileCtrlBtn icon={<QAIcon s={20} c={activeTab==="qa"&&panelOpen?GOLD:"rgba(255,255,255,0.7)"}/>} label="Q&A" onClick={() => { setActiveTab("qa"); setPanelOpen(true); }} active={activeTab==="qa"&&panelOpen}/>
-          <MobileCtrlBtn icon={<More s={20} c="rgba(255,255,255,0.7)"/>} label="More"/>
-          <Link href="/learning" style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:"0.22rem", background:RED, color:WHITE, borderRadius:14, padding:"0.55rem 0.65rem", textDecoration:"none", minWidth:52, WebkitTapHighlightColor:"transparent" }}>
+          {isInstructor && <MobileCtrlBtn icon={<More s={20} c="rgba(255,255,255,0.7)"/>} label="More" onClick={() => setShowMore(v => !v)}/>}
+          <Link href={backHref} onClick={leaveMeeting} style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:"0.22rem", background:RED, color:WHITE, borderRadius:14, padding:"0.55rem 0.65rem", textDecoration:"none", minWidth:52, WebkitTapHighlightColor:"transparent" }}>
             <PhoneOff s={20} c={WHITE}/>
             <span style={{ fontSize:"0.58rem", fontWeight:700 }}>Leave</span>
           </Link>
+          {showMore && isInstructor && <button type="button" onClick={toggleScreenShare} style={{ position:"absolute", bottom:72, right:58, background:CARD, color:WHITE, border:`1px solid ${GOLD}`, borderRadius:8, padding:"0.55rem 0.8rem", zIndex:10, cursor:"pointer" }}>{screenSharing ? "Stop screen share" : "Share screen"}</button>}
         </div>
 
         {cameraError && (
@@ -761,18 +788,12 @@ export default function GeneralClassroomClient({ meeting, studentName }: { meeti
           )}
           {activeTab === "chat" && (
             <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
-              <div style={{ flex:1, overflowY:"auto", padding:"0.75rem 0.85rem" }}>
-                <p style={{ margin:0, fontSize:"0.78rem", color:MUTED_TXT, textAlign:"center" }}>Chat messages will appear here.</p>
-              </div>
-              <div style={{ padding:"0.6rem", borderTop:`1px solid ${PANEL_BDR}`, display:"flex", gap:"0.45rem" }}>
-                <input value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder="Type a message…" style={{ flex:1, border:`1px solid ${PANEL_BDR}`, borderRadius:8, padding:"0.48rem 0.7rem", fontSize:"0.8rem", color:INK, outline:"none" }}/>
-                <button style={{ width:36, height:36, borderRadius:8, background:GOLD_DIM, border:"none", color:WHITE, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}><Send s={14} c={WHITE}/></button>
-              </div>
+              <ClassroomChat classId={meeting.id} room={activeRoom} isInstructor={isInstructor} userId={studentName} userName={studentName}/>
             </div>
           )}
           {activeTab === "qa" && (
-            <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", padding:"2rem" }}>
-              <p style={{ color:MUTED_TXT, fontSize:"0.82rem", textAlign:"center" }}>No questions yet. Be the first to ask!</p>
+            <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
+              <ClassroomChat classId={meeting.id} room={activeRoom} isInstructor={isInstructor} userId={studentName} userName={studentName} initialTab="qa"/>
             </div>
           )}
         </div>
@@ -793,7 +814,7 @@ export default function GeneralClassroomClient({ meeting, studentName }: { meeti
             { icon:<Cam s={20} c={camOn?WHITE:"rgba(255,255,255,0.4)"}/>, label:camOn?"Stop Video":"Start Video", onClick:toggleCam, active:camOn },
             { icon:<People s={20} c={activeTab==="participants"?GOLD:WHITE}/>, label:"Participants", onClick:()=>setActiveTab("participants"), active:activeTab==="participants" },
             { icon:<ChatIcon s={20} c={activeTab==="chat"?GOLD:WHITE}/>, label:"Chat", onClick:()=>setActiveTab("chat"), active:activeTab==="chat" },
-            { icon:<More s={20} c="rgba(255,255,255,0.75)"/>, label:"More" },
+            ...(isInstructor ? [{ icon:<More s={20} c="rgba(255,255,255,0.75)"/>, label:"More", onClick:()=>setShowMore(v => !v) }] : []),
           ] as { icon:React.ReactNode; label:string; onClick?:()=>void; active?:boolean; color?:string }[]).map(({ icon, label, onClick, active, color }) => (
             <button key={label} type="button" onClick={onClick} style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:"0.22rem", background:active?"rgba(232,184,75,0.14)":"rgba(255,255,255,0.05)", border:active?`1px solid ${GOLD_DIM}`:"1px solid rgba(255,255,255,0.08)", color:color??(active?GOLD:"rgba(255,255,255,0.82)"), borderRadius:10, padding:"0.5rem 0.85rem", cursor:"pointer", minWidth:56, transition:"background 0.15s" }}>
               {icon}
@@ -801,9 +822,10 @@ export default function GeneralClassroomClient({ meeting, studentName }: { meeti
             </button>
           ))}
         </div>
-        <Link href="/learning" style={{ display:"flex", alignItems:"center", gap:"0.45rem", background:RED, color:WHITE, borderRadius:10, padding:"0.55rem 1.3rem", fontWeight:700, fontSize:"0.85rem", textDecoration:"none", boxShadow:"0 2px 14px rgba(229,53,53,0.38)" }}>
+        <Link href={backHref} onClick={leaveMeeting} style={{ display:"flex", alignItems:"center", gap:"0.45rem", background:RED, color:WHITE, borderRadius:10, padding:"0.55rem 1.3rem", fontWeight:700, fontSize:"0.85rem", textDecoration:"none", boxShadow:"0 2px 14px rgba(229,53,53,0.38)" }}>
           <PhoneOff s={16} c={WHITE}/> Leave Meeting
         </Link>
+        {showMore && isInstructor && <button type="button" onClick={toggleScreenShare} style={{ position:"absolute", right:"7.5rem", bottom:"4.3rem", background:CARD, color:WHITE, border:`1px solid ${GOLD}`, borderRadius:8, padding:"0.6rem 0.9rem", cursor:"pointer", zIndex:5 }}>{screenSharing ? "Stop screen share" : "Share screen"}</button>}
       </div>
 
       {cameraError && (

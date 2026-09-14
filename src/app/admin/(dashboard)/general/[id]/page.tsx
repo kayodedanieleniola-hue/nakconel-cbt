@@ -44,6 +44,8 @@ export default async function AdminGeneralMeetingPage({
         status: meeting.status,
       }}
       studentName={admin.fullName}
+      isInstructor
+      backHref="/admin/learning"
     />
   );
 }
