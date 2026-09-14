@@ -47,7 +47,7 @@ export default async function DashboardPage() {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-          <img src="/nakconel-logo.svg" alt="NAKCONEL" style={{ width: 38, height: 38, objectFit: "contain" }} />
+          <img src="/logo.png" alt="NAKCONEL" style={{ width: 38, height: 38, objectFit: "contain" }} />
           <span style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontSize: "1.15rem" }}>
             Nakconel Examinations
           </span>

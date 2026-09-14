@@ -152,7 +152,7 @@ function NakLogo({ light=false, compact=false }: { light?: boolean; compact?: bo
     <div style={{ display:"flex", alignItems:"center", gap:"0.45rem" }}>
       {/* Company unicorn logo */}
       <img
-        src="/nakconel-logo.svg"
+        src="/logo.png"
         alt="NAKCONEL"
         style={{ width:compact?26:34, height:compact?26:34, objectFit:"contain", flexShrink:0, filter:"drop-shadow(0 1px 4px rgba(232,184,75,0.4))" }}
       />

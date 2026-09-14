@@ -25,7 +25,7 @@ export default async function HomePage() {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "1rem" }}>
-          <img src="/nakconel-logo.svg" alt="NAKCONEL" style={{ width: 52, height: 52, objectFit: "contain" }} />
+          <img src="/logo.png" alt="NAKCONEL" style={{ width: 52, height: 52, objectFit: "contain" }} />
           <p
             style={{
               color: "var(--gold-200)",

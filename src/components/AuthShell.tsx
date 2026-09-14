@@ -36,7 +36,7 @@ export default function AuthShell({
             textDecoration: "none",
           }}
         >
-          <img src="/nakconel-logo.svg" alt="NAKCONEL" style={{ width: 28, height: 28, objectFit: "contain" }} />
+          <img src="/logo.png" alt="NAKCONEL" style={{ width: 28, height: 28, objectFit: "contain" }} />
           Nakconel Examinations
         </Link>
 

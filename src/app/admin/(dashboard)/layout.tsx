@@ -42,7 +42,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-          <img src="/nakconel-logo.svg" alt="NAKCONEL" style={{ width: 36, height: 36, objectFit: "contain" }} />
+          <img src="/logo.png" alt="NAKCONEL" style={{ width: 36, height: 36, objectFit: "contain" }} />
           <div>
             <span style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontSize: "1.1rem" }}>
               Nakconel Examinations

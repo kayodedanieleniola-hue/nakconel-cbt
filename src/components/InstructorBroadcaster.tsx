@@ -707,7 +707,7 @@ export default function InstructorBroadcaster({ classId, classTitle, materials, 
           <div style={{ display:"flex", alignItems:"center", gap:"0.85rem", minWidth:0 }}>
             <div style={{ display:"flex", alignItems:"center", gap:"0.5rem" }}>
               <img
-                src="/nakconel-logo.svg"
+                src="/logo.png"
                 alt="NAKCONEL"
                 style={{ width:34, height:34, objectFit:"contain", flexShrink:0, filter:"drop-shadow(0 1px 4px rgba(212,168,67,0.4))" }}
               />

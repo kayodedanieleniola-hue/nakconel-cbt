@@ -88,7 +88,7 @@ export default async function MyCoursePage() {
     <main style={shell}>
       <header style={header}>
         <Link href="/dashboard" style={{ ...brand, display: "flex", alignItems: "center", gap: "0.5rem" }}>
-          <img src="/nakconel-logo.svg" alt="NAKCONEL" style={{ width: 34, height: 34, objectFit: "contain" }} />
+          <img src="/logo.png" alt="NAKCONEL" style={{ width: 34, height: 34, objectFit: "contain" }} />
           NAK Learning Center
         </Link>
         <div style={actions}><Link href="/dashboard" style={link}>CBT dashboard</Link><RefreshButton /><LogoutButton /></div>
