@@ -1,19 +1,22 @@
 import type { Metadata } from "next";
-import { Fraunces, IBM_Plex_Sans } from "next/font/google";
+import { Poppins } from "next/font/google";
 import "./globals.css";
 
-const display = Fraunces({
-  subsets: ["latin"],
-  weight: ["500", "600"],
-  style: ["normal", "italic"],
-  variable: "--font-display",
-  display: "swap",
-});
+/**
+ * Fonts:
+ *  - Display / headings: Agrandir (self-hosted or system) → Poppins fallback
+ *  - Body / UI:          Poppins (Google Fonts, loaded here)
+ *
+ * Agrandir is a licensed font. If you have it, place the woff2 files in
+ * public/fonts/ and uncomment the @font-face block in globals.css.
+ * Until then, Poppins covers both roles perfectly.
+ */
 
-const body = IBM_Plex_Sans({
+const poppins = Poppins({
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
-  variable: "--font-body",
+  weight: ["400", "500", "600", "700", "800", "900"],
+  style: ["normal", "italic"],
+  variable: "--font-poppins",
   display: "swap",
 });
 
@@ -24,7 +27,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${display.variable} ${body.variable}`}>
+    <html lang="en" className={poppins.variable}>
       <body>{children}</body>
     </html>
   );

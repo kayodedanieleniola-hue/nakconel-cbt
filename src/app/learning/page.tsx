@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getStudentSession } from "@/lib/auth";
+import { getStudentSession, getLcSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import LogoutButton from "@/components/LogoutButton";
+import LcLogoutButton from "@/components/LcLogoutButton";
 import RefreshButton from "@/components/RefreshButton";
 import StudentLearningDashboard from "@/components/StudentLearningDashboard";
 import { getExamStatus } from "@/lib/examStatus";
@@ -11,9 +12,100 @@ import { syncLearningClassStatuses } from "@/lib/learningSchedule";
 export const dynamic = "force-dynamic";
 
 export default async function MyCoursePage() {
-  const session = await getStudentSession();
-  if (!session) redirect("/login");
+  // Support both CBT students (old flow) and external LC students (new OTP flow)
+  const cbtSession = await getStudentSession();
+  const lcSession  = await getLcSession();
+
+  if (!cbtSession && !lcSession) redirect("/learning/login");
   await syncLearningClassStatuses();
+
+  // ── EXTERNAL LC STUDENT (new OTP flow) ────────────────────────────────
+  // These students authenticated via main Nakconel DB. They don't have a
+  // record in the Learning Center's students table yet.
+  if (lcSession && !cbtSession) {
+    // Fetch their LearningProfile (created on first OTP login)
+    const profile = await prisma.learningProfile.findUnique({
+      where: { id: lcSession.profileId },
+    });
+    if (!profile) redirect("/learning/login");
+
+    // Fetch general meetings they can attend
+    const generalMeetings = await prisma.learningClass.findMany({
+      where: { isGeneral: true, status: { in: ["LIVE", "SCHEDULED"] } },
+      orderBy: { startsAt: "asc" },
+      select: { id: true, title: true, instructor: true, status: true, startsAt: true, endsAt: true },
+    });
+
+    return (
+      <main style={shell}>
+        <header style={header}>
+          <Link href="/learning" style={{ ...brand, display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <img src="/logo.png" alt="NAKCONEL" style={{ width: 34, height: 34, objectFit: "contain" }} />
+            NAKCONEL Learning Center
+          </Link>
+          <div style={actions}>
+            <RefreshButton />
+            <LcLogoutButton />
+          </div>
+        </header>
+        <section style={content}>
+          <p style={eyebrow}>Learning Center</p>
+          <h1 style={title}>Welcome, {profile.fullName.split(" ")[0]} 🎉</h1>
+          <p style={intro}>
+            You are now connected to the NAKCONEL Learning Center. Your registered programme information is shown below.
+          </p>
+
+          {/* Student info card */}
+          <div style={{ background:"var(--cream-100,#fff8f8)", border:"1.5px solid var(--gold-200,#d4a843)", borderRadius:14, padding:"1.5rem", marginBottom:"2rem", display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))", gap:"1rem" }}>
+            {[
+              ["Full Name",            profile.fullName],
+              ["Email",                profile.email],
+              ["Programme",            profile.program],
+              ["Registration Status",  profile.mainStatus],
+            ].map(([label, value]) => (
+              <div key={label}>
+                <p style={{ margin:0, fontSize:"0.72rem", fontWeight:700, color:"var(--burgundy-600,#7f1d1d)", letterSpacing:"0.04em", textTransform:"uppercase" }}>{label}</p>
+                <p style={{ margin:"0.2rem 0 0", fontWeight:600, color:"var(--burgundy-900,#330808)" }}>{value}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* General Meetings */}
+          <h2 style={heading}>🌐 General Meetings</h2>
+          <p style={muted}>General meetings are open to all registered students.</p>
+          {generalMeetings.length === 0
+            ? <div style={empty}>No general meetings are currently live or scheduled.</div>
+            : <div style={classGrid}>{generalMeetings.map((item) => (
+                <article key={item.id} style={classCard}>
+                  <p style={eyebrow}>🌐 General Meeting</p>
+                  <h3 style={{ margin:"0.2rem 0", color:"var(--burgundy-900)" }}>{item.title}</h3>
+                  <span style={{ ...statusBadge, ...(item.status === "LIVE" ? liveBadge : {}) }}>
+                    {item.status === "LIVE" ? "● LIVE" : item.status}
+                  </span>
+                  {item.instructor && <p style={muted}>Host: {item.instructor}</p>}
+                  {item.startsAt && <p style={muted}>{formatDate(item.startsAt)}</p>}
+                  {item.status === "LIVE" && (
+                    <Link href={`/learning/general/${item.id}`} style={{ ...joinButton, background:"#98661B" }}>
+                      Join meeting →
+                    </Link>
+                  )}
+                </article>
+              ))}</div>
+          }
+
+          <div style={{ marginTop:"2.5rem", background:"var(--cream-100,#fff8f8)", border:"1px solid var(--cream-200,#fde8e8)", borderRadius:12, padding:"1.25rem" }}>
+            <p style={{ margin:0, color:"var(--ink-600,#4a1212)", fontSize:"0.88rem", lineHeight:1.6 }}>
+              <strong>Your course content</strong> — modules, lessons, live classes and assessments — will appear here once your instructor activates your programme. 
+              Contact <strong>nakconelcompany@gmail.com</strong> if you need help.
+            </p>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
+  // ── CBT STUDENT (existing flow, unchanged below) ─────────────────────
+  const session = cbtSession!;
 
   // Fetch general meetings (open to all active students)
   const generalMeetings = await prisma.learningClass.findMany({

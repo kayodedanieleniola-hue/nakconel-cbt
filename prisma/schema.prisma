@@ -377,3 +377,37 @@ model ClassQuestion {
   @@map("class_questions")
 }
 
+
+// ── Learning Center OTP verification codes ────────────────────────────────────
+// Stores short-lived codes sent to students during passwordless login.
+// Keyed on email (from main Nakconel DB). Expires after 10 minutes.
+model LearningOtp {
+  id        String   @id @default(cuid())
+  email     String
+  code      String   // 6-digit numeric code, hashed with bcrypt
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([email])
+  @@map("learning_otps")
+}
+
+// ── Learning Center external student profile ──────────────────────────────────
+// Links a main Nakconel career_registrations record to Learning Center data.
+// Created automatically on first successful login.
+model LearningProfile {
+  id                  String   @id @default(cuid())
+  // Stable identifier from career_registrations.id in the main DB
+  mainRegistrationId  String   @unique
+  email               String   @unique
+  fullName            String
+  phone               String
+  program             String
+  mainStatus          String   // mirrors career_registrations.status
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([email])
+  @@map("learning_profiles")
+}
