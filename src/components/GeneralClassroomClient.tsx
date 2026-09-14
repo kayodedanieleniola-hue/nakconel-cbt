@@ -149,13 +149,13 @@ const ExpandIcon = ({ s=14, c="currentColor" }: { s?: number; c?: string }) => (
 /* ─── Logo ───────────────────────────────────────────────────────────────── */
 function NakLogo({ light=false, compact=false }: { light?: boolean; compact?: boolean }) {
   return (
-    <div style={{ display:"flex", alignItems:"center", gap:"0.4rem" }}>
-      <div style={{ width:compact?26:34, height:compact?26:34, borderRadius:8, flexShrink:0, background:`linear-gradient(135deg,${GOLD} 0%,#f6de88 100%)`, display:"flex", alignItems:"center", justifyContent:"center", boxShadow:`0 2px 10px ${GOLD_GLOW}` }}>
-        <svg width={compact?13:17} height={compact?13:17} viewBox="0 0 18 18" fill="none">
-          <path d="M3 14V4l5 7V4" stroke={WINE} strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"/>
-          <line x1="15" y1="4" x2="15" y2="14" stroke={WINE} strokeWidth="2.3" strokeLinecap="round"/>
-        </svg>
-      </div>
+    <div style={{ display:"flex", alignItems:"center", gap:"0.45rem" }}>
+      {/* Company unicorn logo */}
+      <img
+        src="/nakconel-logo.svg"
+        alt="NAKCONEL"
+        style={{ width:compact?26:34, height:compact?26:34, objectFit:"contain", flexShrink:0, filter:"drop-shadow(0 1px 4px rgba(232,184,75,0.4))" }}
+      />
       <div style={{ lineHeight:1.1 }}>
         <div style={{ color:light?WHITE:INK, fontWeight:900, fontSize:compact?"0.72rem":"0.88rem", letterSpacing:"0.04em" }}>NAKCONEL</div>
         <div style={{ color:light?"rgba(255,255,255,0.45)":MUTED_TXT, fontSize:"0.46rem", letterSpacing:"0.08em", textTransform:"uppercase" }}>Learning Center</div>
@@ -416,7 +416,23 @@ export default function GeneralClassroomClient({ meeting, studentName }: { meeti
   };
   const toggleCam = () => {
     const vt = localVideoTrack.current; if (!vt) return;
-    if (camOn) { void vt.mute(); setCamOn(false); } else { void vt.unmute(); setCamOn(true); }
+    if (camOn) {
+      void vt.mute();
+      setCamOn(false);
+    } else {
+      void vt.unmute().then(() => {
+        // After unmuting, force the hidden video element to play again
+        // so the stream resumes and all SelfVideoTile mirrors update.
+        if (hiddenSelfRef.current) {
+          void hiddenSelfRef.current.play().catch(() => {});
+        }
+        // Bump selfStream so SelfVideoTile useEffect re-runs and calls play()
+        setSelfStream(s => s ? new MediaStream(s.getTracks()) : s);
+        setCamOn(true);
+      }).catch(() => {
+        setCamOn(true);
+      });
+    }
   };
 
   const remoteList = Object.values(participants);

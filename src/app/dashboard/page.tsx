@@ -46,9 +46,12 @@ export default async function DashboardPage() {
           alignItems: "center",
         }}
       >
-        <span style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontSize: "1.15rem" }}>
-          Nakconel Examinations
-        </span>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+          <img src="/nakconel-logo.svg" alt="NAKCONEL" style={{ width: 38, height: 38, objectFit: "contain" }} />
+          <span style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontSize: "1.15rem" }}>
+            Nakconel Examinations
+          </span>
+        </div>
         <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
           <a href="/learning" style={{ color: "inherit", textDecoration: "none", fontSize: "0.9rem" }}>My Course</a>
           <a href="/results" style={{ color: "inherit", textDecoration: "none", fontSize: "0.9rem" }}>Results</a>

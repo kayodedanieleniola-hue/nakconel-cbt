@@ -24,16 +24,19 @@ export default async function HomePage() {
           maxWidth: 640,
         }}
       >
-        <p
-          style={{
-            color: "var(--gold-200)",
-            fontSize: "0.95rem",
-            letterSpacing: "0.02em",
-            marginBottom: "1rem",
-          }}
-        >
-          Nakconel Examinations
-        </p>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "1rem" }}>
+          <img src="/nakconel-logo.svg" alt="NAKCONEL" style={{ width: 52, height: 52, objectFit: "contain" }} />
+          <p
+            style={{
+              color: "var(--gold-200)",
+              fontSize: "0.95rem",
+              letterSpacing: "0.02em",
+              margin: 0,
+            }}
+          >
+            Nakconel Examinations
+          </p>
+        </div>
         <h1
           style={{
             fontSize: "clamp(2.1rem, 6vw, 3.2rem)",

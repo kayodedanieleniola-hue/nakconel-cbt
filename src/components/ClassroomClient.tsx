@@ -81,10 +81,13 @@ function fmtTime(s: number) {
 /* ── Logo ────────────────────────────────────────────────────────────────── */
 function NakLogo({ light = false, compact = false }: { light?: boolean; compact?: boolean }) {
   return (
-    <div style={{ display:"flex", alignItems:"center", gap:"0.4rem" }}>
-      <div style={{ width:compact?26:32, height:compact?26:32, borderRadius:8, background:`linear-gradient(135deg,${GOLD} 0%,#e8c878 100%)`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-        <span style={{ fontSize:compact?"0.8rem":"1rem" }}>✦</span>
-      </div>
+    <div style={{ display:"flex", alignItems:"center", gap:"0.45rem" }}>
+      {/* Company unicorn logo */}
+      <img
+        src="/nakconel-logo.svg"
+        alt="NAKCONEL"
+        style={{ width:compact?26:34, height:compact?26:34, objectFit:"contain", flexShrink:0, filter:"drop-shadow(0 1px 4px rgba(212,168,67,0.35))" }}
+      />
       {!compact && (
         <div>
           <div style={{ color:light?WHITE:INK, fontWeight:900, fontSize:"0.92rem", lineHeight:1 }}>NAKCONEL</div>

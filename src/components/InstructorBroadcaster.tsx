@@ -418,7 +418,22 @@ export default function InstructorBroadcaster({ classId, classTitle, materials, 
 
   const toggleCamera = () => {
     const vt = videoTrackRef.current; if (!vt) return;
-    if (cameraOn) { void vt.mute(); setCameraOn(false); } else { void vt.unmute(); setCameraOn(true); }
+    if (cameraOn) {
+      void vt.mute();
+      setCameraOn(false);
+    } else {
+      void vt.unmute().then(() => {
+        // Re-attach / resume the video element after unmuting so it doesn't
+        // stay blank. The track is still attached to localVideoRef — just
+        // need to call play() again since some browsers pause on mute.
+        if (localVideoRef.current) {
+          void localVideoRef.current.play().catch(() => {});
+        }
+        setCameraOn(true);
+      }).catch(() => {
+        setCameraOn(true);
+      });
+    }
   };
   const toggleMic = () => {
     const at = audioTrackRef.current; if (!at) return;
@@ -690,10 +705,12 @@ export default function InstructorBroadcaster({ classId, classTitle, materials, 
         <div style={{ background:"#280808", borderBottom:"1px solid rgba(255,255,255,0.09)", padding:"0 1.5rem", height:58, display:"flex", alignItems:"center", justifyContent:"space-between", gap:"1rem", flexShrink:0 }}>
           {/* Left: breadcrumb */}
           <div style={{ display:"flex", alignItems:"center", gap:"0.85rem", minWidth:0 }}>
-            <div style={{ display:"flex", alignItems:"center", gap:"0.4rem" }}>
-              <div style={{ width:32, height:32, borderRadius:8, background:`linear-gradient(135deg,${GOLDB},#d4af37)`, display:"flex", alignItems:"center", justifyContent:"center" }}>
-                <span style={{ fontSize:"1rem" }}>?</span>
-              </div>
+            <div style={{ display:"flex", alignItems:"center", gap:"0.5rem" }}>
+              <img
+                src="/nakconel-logo.svg"
+                alt="NAKCONEL"
+                style={{ width:34, height:34, objectFit:"contain", flexShrink:0, filter:"drop-shadow(0 1px 4px rgba(212,168,67,0.4))" }}
+              />
               <div>
                 <div style={{ color:WHITE, fontWeight:900, fontSize:"0.78rem", lineHeight:1 }}>NAKCONEL</div>
                 <div style={{ color:"rgba(255,255,255,0.4)", fontSize:"0.46rem", letterSpacing:"0.08em" }}>LEARNING CENTER</div>

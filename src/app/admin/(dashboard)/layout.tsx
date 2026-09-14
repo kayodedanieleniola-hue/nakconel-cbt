@@ -41,11 +41,14 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           alignItems: "center",
         }}
       >
-        <div>
-          <span style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontSize: "1.1rem" }}>
-            Nakconel Examinations
-          </span>
-          <span style={{ color: "var(--gold-200)", fontSize: "0.82rem", marginLeft: "0.6rem" }}>Admin</span>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+          <img src="/nakconel-logo.svg" alt="NAKCONEL" style={{ width: 36, height: 36, objectFit: "contain" }} />
+          <div>
+            <span style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontSize: "1.1rem" }}>
+              Nakconel Examinations
+            </span>
+            <span style={{ color: "var(--gold-200)", fontSize: "0.82rem", marginLeft: "0.6rem" }}>Admin</span>
+          </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
           <span style={{ fontSize: "0.88rem", color: "var(--gold-200)" }}>{admin.fullName}</span>

@@ -27,14 +27,17 @@ export default function AuthShell({
         <Link
           href="/"
           style={{
-            display: "inline-block",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "0.5rem",
             marginBottom: "2rem",
             fontSize: "0.9rem",
             color: "var(--ink-600)",
             textDecoration: "none",
           }}
         >
-          ← Nakconel Examinations
+          <img src="/nakconel-logo.svg" alt="NAKCONEL" style={{ width: 28, height: 28, objectFit: "contain" }} />
+          Nakconel Examinations
         </Link>
 
         <p style={{ color: "var(--gold-600)", fontWeight: 600, fontSize: "0.9rem", marginBottom: "0.5rem" }}>
