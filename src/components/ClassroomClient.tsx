@@ -324,8 +324,8 @@ export default function ClassroomClient({ learningClass, materials }: { learning
             <iframe
               key={`${selected.id}-p${presState.page}`}
               title={selected.title}
-              /* sandbox blocks downloads, forms, scripts from the material iframe */
-              sandbox="allow-same-origin allow-scripts"
+
+
               src={`/api/learning/materials/${selected.id}?view=inline&page=${presState.page}${selected.mimeType === "application/pdf" ? "#toolbar=0&navpanes=0&scrollbar=0" : ""}`}
               style={{ width:"100%", height:"100%", minHeight:"60vh", border:0, display:"block" }}
             />
@@ -482,7 +482,6 @@ export default function ClassroomClient({ learningClass, materials }: { learning
               <iframe
                 key={`${selected.id}-p${presState.page}`}
                 title={selected.title}
-                sandbox="allow-same-origin allow-scripts"
                 src={`/api/learning/materials/${selected.id}?view=inline&page=${presState.page}${selected.mimeType === "application/pdf" ? "#toolbar=0&navpanes=0&scrollbar=0" : ""}`}
                 style={{ width:"100%", height:"100%", border:0 }}
               />
@@ -616,3 +615,5 @@ export default function ClassroomClient({ learningClass, materials }: { learning
     </div>
   );
 }
+
+
