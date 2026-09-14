@@ -431,13 +431,15 @@ export default function LearningManagementPage() {
       )}
 
       {broadcastingClass && (
-        <GeneralClassroomClient
-          meeting={{ id: broadcastingClass.id, title: broadcastingClass.title, instructor: "Instructor", description: null, status: "LIVE" }}
-          studentName="Instructor"
-          isInstructor
-          backHref="/admin/learning"
-          onLeave={() => setBroadcastingClass(null)}
-        />
+        <div style={{ position: "fixed", inset: 0, zIndex: 1000, background: "#110505" }}>
+          <GeneralClassroomClient
+            meeting={{ id: broadcastingClass.id, title: broadcastingClass.title, instructor: "Instructor", description: null, status: "LIVE" }}
+            studentName="Instructor"
+            isInstructor
+            backHref="/admin/learning"
+            onLeave={() => setBroadcastingClass(null)}
+          />
+        </div>
       )}
     </div>
   );

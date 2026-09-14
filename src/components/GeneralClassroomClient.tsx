@@ -232,6 +232,7 @@ function SelfVideoTile({
   micOn,
   studentName,
   cameraOn,
+  refreshToken,
   compact = false,
   showExpandIcon = false,
 }: {
@@ -239,6 +240,7 @@ function SelfVideoTile({
   micOn: boolean;
   studentName: string;
   cameraOn: boolean;
+  refreshToken: number;
   compact?: boolean;
   showExpandIcon?: boolean;
 }) {
@@ -247,9 +249,12 @@ function SelfVideoTile({
   useEffect(() => {
     const el = vidRef.current;
     if (!el || !hiddenSrc) return;
+    // Reassigning the stream is necessary in Chromium after a muted camera
+    // track is enabled again; otherwise only the local preview can stay black.
+    el.srcObject = null;
     el.srcObject = hiddenSrc;
     void el.play().catch(() => {});
-  }, [hiddenSrc]);
+  }, [hiddenSrc, refreshToken, cameraOn]);
 
   const showing = !!hiddenSrc && cameraOn;
   const sz = compact ? 26 : 44;
@@ -297,6 +302,7 @@ export default function GeneralClassroomClient({ meeting, studentName, isInstruc
   const [connStatus,   setConnStatus]   = useState<"connecting"|"live"|"error">("connecting");
   const [activeRoom,   setActiveRoom]   = useState<Room|null>(null);
   const [cameraReady,  setCameraReady]  = useState(false);
+  const [cameraRefresh, setCameraRefresh] = useState(0);
   const [cameraError,  setCameraError]  = useState("");
   const [micOn,        setMicOn]        = useState(true);
   const [camOn,        setCamOn]        = useState(true);
@@ -430,6 +436,7 @@ export default function GeneralClassroomClient({ meeting, studentName, isInstruc
     if (camOn) {
       void vt.mute();
       setCamOn(false);
+      setCameraRefresh((value) => value + 1);
     } else {
       void vt.unmute().then(() => {
         // After unmuting, force the hidden video element to play again
@@ -440,8 +447,10 @@ export default function GeneralClassroomClient({ meeting, studentName, isInstruc
         // Bump selfStream so SelfVideoTile useEffect re-runs and calls play()
         setSelfStream(s => s ? new MediaStream(s.getTracks()) : s);
         setCamOn(true);
+        setCameraRefresh((value) => value + 1);
       }).catch(() => {
         setCamOn(true);
+        setCameraRefresh((value) => value + 1);
       });
     }
   };
@@ -479,7 +488,7 @@ export default function GeneralClassroomClient({ meeting, studentName, isInstruc
   const connColor  = connStatus === "live" ? MIC_ON : connStatus === "error" ? RED : GOLD;
 
   /* shared self-tile props */
-  const selfProps = { hiddenSrc: selfStream, micOn, studentName, cameraOn: camOn && cameraReady };
+  const selfProps = { hiddenSrc: selfStream, micOn, studentName, cameraOn: camOn && cameraReady, refreshToken: cameraRefresh };
 
   /* ════════════════════════════════════════════════════════════════════════ */
   /* MOBILE LAYOUT                                                            */

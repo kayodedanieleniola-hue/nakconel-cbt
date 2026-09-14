@@ -11,6 +11,7 @@ export default function ActivateStudentPage() {
   const router = useRouter();
   const [courses,   setCourses]   = useState<Course[]>([]);
   const [email,     setEmail]     = useState("");
+  const [fullName,  setFullName]  = useState("");
   const [courseId,  setCourseId]  = useState("");
   const [loading,   setLoading]   = useState(false);
   const [error,     setError]     = useState<string | null>(null);
@@ -32,12 +33,12 @@ export default function ActivateStudentPage() {
       const res = await fetch("/api/admin/students/activate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, courseId }),
+        body: JSON.stringify({ email, fullName, courseId }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Failed to activate student."); return; }
       setResult(data);
-      setEmail(""); setCourseId("");
+      setEmail(""); setFullName(""); setCourseId("");
     } catch {
       setError("Network error. Please try again.");
     } finally {
@@ -67,7 +68,7 @@ export default function ActivateStudentPage() {
         </p>
         <h1 style={{ fontSize: "1.9rem", margin: 0 }}>Activate Student Account</h1>
         <p style={{ color: "var(--ink-600)", marginTop: "0.5rem", lineHeight: 1.6 }}>
-          Enter the student's email and assign a course. That course controls the classes and assessments they can access when they log in with their email.
+          Enter the student's name, email, and assigned course. That course controls the classes and assessments they can access when they log in with their email.
         </p>
       </div>
 
@@ -102,6 +103,14 @@ export default function ActivateStudentPage() {
         </div>
 
         <div style={fieldStyle}>
+          <label style={labelStyle}>Student Name *</label>
+          <input
+            type="text" required value={fullName} onChange={e => setFullName(e.target.value)}
+            placeholder="Student's full name" style={inputStyle} disabled={loading}
+          />
+        </div>
+
+        <div style={fieldStyle}>
           <label style={labelStyle}>Assign Course *</label>
           <select
             required value={courseId} onChange={e => setCourseId(e.target.value)}
@@ -122,9 +131,9 @@ export default function ActivateStudentPage() {
 
         <button
           type="submit"
-          disabled={loading || !email || !courseId}
+          disabled={loading || !email || !fullName || !courseId}
           style={{
-            background: loading || !email || !courseId ? "#ccc" : "var(--gold-600)",
+            background: loading || !email || !fullName || !courseId ? "#ccc" : "var(--gold-600)",
             color: "var(--burgundy-950)",
             border: "none", borderRadius: 6, padding: "0.75rem",
             fontWeight: 700, fontSize: "0.95rem", cursor: loading ? "wait" : "pointer",

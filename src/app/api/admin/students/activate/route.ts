@@ -17,7 +17,7 @@ import { hashPassword } from "@/lib/password";
 
 const bodySchema = z.object({
   email:    z.string().email(),
-  fullName: z.string().min(2).optional(),
+  fullName: z.string().min(2),
   courseId: z.string().min(1),
   phone:    z.string().optional().default(""),
 });
@@ -36,9 +36,7 @@ export async function POST(req: Request) {
   }
 
   const email = body.email.toLowerCase().trim();
-  // Account activation is intentionally email + course only. A usable display
-  // name is retained for legacy Student rows when an admin has not supplied one.
-  const fullName = body.fullName?.trim() || email.split("@")[0];
+  const fullName = body.fullName.trim();
 
   // Verify course exists
   const course = await prisma.course.findUnique({ where: { id: body.courseId } });
