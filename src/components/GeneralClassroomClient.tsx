@@ -508,7 +508,7 @@ export default function GeneralClassroomClient({ meeting, studentName, isInstruc
     }
 
     return (
-      <div style={{ height:"100dvh", background:"#0d0d0d", color:WHITE, fontFamily:"system-ui,-apple-system,'Segoe UI',sans-serif", display:"flex", flexDirection:"column", overflow:"hidden" }}>
+      <div style={{ position:"fixed", inset:0, zIndex:1100, height:"100dvh", width:"100vw", background:"#0d0d0d", color:WHITE, fontFamily:"system-ui,-apple-system,'Segoe UI',sans-serif", display:"flex", flexDirection:"column", overflow:"hidden" }}>
 
         {/* Always-mounted hidden video — track attaches here once, never unmounts */}
         <video ref={hiddenSelfRef} autoPlay playsInline muted
@@ -664,7 +664,7 @@ export default function GeneralClassroomClient({ meeting, studentName, isInstruc
   /* DESKTOP LAYOUT                                                           */
   /* ════════════════════════════════════════════════════════════════════════ */
   return (
-    <div style={{ minHeight:"100dvh", background:BG, color:WHITE, fontFamily:"system-ui,-apple-system,'Segoe UI',sans-serif", display:"flex", flexDirection:"column" }}>
+    <div style={{ position:"fixed", inset:0, zIndex:1100, height:"100dvh", width:"100vw", background:BG, color:WHITE, fontFamily:"system-ui,-apple-system,'Segoe UI',sans-serif", display:"flex", flexDirection:"column", overflow:"hidden" }}>
 
       {/* Always-mounted hidden video */}
       <video ref={hiddenSelfRef} autoPlay playsInline muted
