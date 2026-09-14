@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { getExamStatus, STATUS_LABEL } from "@/lib/examStatus";
 import StatusToggleButton from "./StatusToggleButton";
 import DeleteVerificationButton from "./DeleteVerificationButton";
+import DeleteStudentButton from "./DeleteStudentButton";
 
 export const dynamic = "force-dynamic";
 
@@ -44,7 +45,10 @@ export default async function AdminStudentDetailPage({
           <h1 style={{ fontSize: "1.9rem", marginBottom: "0.3rem" }}>{student.fullName}</h1>
           <p style={{ color: "var(--ink-600)" }}>{student.studentId} &middot; {student.course.name}</p>
         </div>
-        <StatusToggleButton studentDbId={student.id} status={student.status} />
+        <div style={{ display: "flex", gap: "0.65rem", flexWrap: "wrap" }}>
+          <StatusToggleButton studentDbId={student.id} status={student.status} />
+          <DeleteStudentButton studentDbId={student.id} studentName={student.fullName} />
+        </div>
       </div>
 
       <div

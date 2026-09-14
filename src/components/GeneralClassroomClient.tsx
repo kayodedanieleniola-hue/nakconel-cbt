@@ -233,6 +233,7 @@ function SelfVideoTile({
   studentName,
   cameraOn,
   refreshToken,
+  videoTrack,
   compact = false,
   showExpandIcon = false,
 }: {
@@ -241,6 +242,7 @@ function SelfVideoTile({
   studentName: string;
   cameraOn: boolean;
   refreshToken: number;
+  videoTrack: LocalTrack | null;
   compact?: boolean;
   showExpandIcon?: boolean;
 }) {
@@ -248,13 +250,19 @@ function SelfVideoTile({
 
   useEffect(() => {
     const el = vidRef.current;
-    if (!el || !hiddenSrc) return;
-    // Reassigning the stream is necessary in Chromium after a muted camera
-    // track is enabled again; otherwise only the local preview can stay black.
+    if (!el) return;
+    // Let LiveKit attach the actual local video track. This reliably resumes
+    // the self-preview after mute/unmute in Chromium browsers.
+    if (videoTrack?.kind === Track.Kind.Video) {
+      videoTrack.attach(el);
+      void el.play().catch(() => {});
+      return () => { videoTrack.detach(el); };
+    }
+    if (!hiddenSrc) return;
     el.srcObject = null;
     el.srcObject = hiddenSrc;
     void el.play().catch(() => {});
-  }, [hiddenSrc, refreshToken, cameraOn]);
+  }, [hiddenSrc, videoTrack, refreshToken, cameraOn]);
 
   const showing = !!hiddenSrc && cameraOn;
   const sz = compact ? 26 : 44;
@@ -431,14 +439,16 @@ export default function GeneralClassroomClient({ meeting, studentName, isInstruc
     const at = localAudioTrack.current; if (!at) return;
     if (micOn) { void at.mute(); setMicOn(false); } else { void at.unmute(); setMicOn(true); }
   };
-  const toggleCam = () => {
+  const toggleCam = async () => {
     const vt = localVideoTrack.current; if (!vt) return;
     if (camOn) {
-      void vt.mute();
+      await vt.mute();
       setCamOn(false);
       setCameraRefresh((value) => value + 1);
     } else {
-      void vt.unmute().then(() => {
+      try {
+        await vt.unmute();
+        if (vt.mediaStreamTrack) vt.mediaStreamTrack.enabled = true;
         // After unmuting, force the hidden video element to play again
         // so the stream resumes and all SelfVideoTile mirrors update.
         if (hiddenSelfRef.current) {
@@ -448,10 +458,10 @@ export default function GeneralClassroomClient({ meeting, studentName, isInstruc
         setSelfStream(s => s ? new MediaStream(s.getTracks()) : s);
         setCamOn(true);
         setCameraRefresh((value) => value + 1);
-      }).catch(() => {
+      } catch {
         setCamOn(true);
         setCameraRefresh((value) => value + 1);
-      });
+      }
     }
   };
   const toggleScreenShare = async () => {
@@ -483,12 +493,14 @@ export default function GeneralClassroomClient({ meeting, studentName, isInstruc
 
   const remoteList = Object.values(participants);
   const totalCount = remoteList.length + 1;
+  const galleryTiles = [{ identity: "self", self: true as const }, ...remoteList];
+  const galleryColumns = galleryTiles.length <= 1 ? 1 : galleryTiles.length <= 4 ? 2 : galleryTiles.length <= 9 ? 3 : 4;
   const hostTile   = remoteList.find(t => t.identity.startsWith("instructor-"));
   const otherTiles = remoteList.filter(t => !t.identity.startsWith("instructor-"));
   const connColor  = connStatus === "live" ? MIC_ON : connStatus === "error" ? RED : GOLD;
 
   /* shared self-tile props */
-  const selfProps = { hiddenSrc: selfStream, micOn, studentName, cameraOn: camOn && cameraReady, refreshToken: cameraRefresh };
+  const selfProps = { hiddenSrc: selfStream, micOn, studentName, cameraOn: camOn && cameraReady, refreshToken: cameraRefresh, videoTrack: localVideoTrack.current };
 
   /* ════════════════════════════════════════════════════════════════════════ */
   /* MOBILE LAYOUT                                                            */
@@ -720,15 +732,15 @@ export default function GeneralClassroomClient({ meeting, studentName, isInstruc
       {/* body */}
       <div style={{ flex:1, display:"flex", overflow:"hidden", minHeight:0 }}>
         {/* gallery */}
-        <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden", padding:"0.9rem", gap:"0.75rem" }}>
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 0.48fr", gap:"0.75rem" }}>
-            <div style={{ position:"relative", borderRadius:14, overflow:"hidden", background:`linear-gradient(160deg,${RIM},${CARD})`, aspectRatio:"4/3", border:`2px solid ${GOLD}`, boxShadow:`0 0 28px ${GOLD_GLOW},0 6px 24px rgba(0,0,0,0.55)` }}>
+        <div style={{ flex:1, minWidth:0, overflowY:"auto", padding:"0.9rem", display:"grid", gridTemplateColumns:`repeat(${galleryColumns}, minmax(0, 1fr))`, gridAutoRows:"minmax(150px, 1fr)", alignContent:"stretch", gap:"0.75rem" }}>
+          <div style={{ display:"contents" }}>
+            <div style={{ position:"relative", minHeight:150, borderRadius:14, overflow:"hidden", background:`linear-gradient(160deg,${RIM},${CARD})`, border:`2px solid ${GOLD}`, boxShadow:`0 0 28px ${GOLD_GLOW},0 6px 24px rgba(0,0,0,0.55)` }}>
               {hostTile
                 ? <RemoteTile tile={hostTile} large/>
                 : <SelfVideoTile {...selfProps}/>
               }
             </div>
-            <div style={{ display:"flex", flexDirection:"column", gap:"0.75rem" }}>
+            <div style={{ display:"contents" }}>
               {hostTile && (
                 <div style={{ flex:1, position:"relative", borderRadius:10, overflow:"hidden", background:`linear-gradient(160deg,${RIM},${CARD})`, border:`2px solid ${GOLD}` }}>
                   <SelfVideoTile {...selfProps} compact/>
@@ -743,10 +755,10 @@ export default function GeneralClassroomClient({ meeting, studentName, isInstruc
               )}
             </div>
           </div>
-          {(hostTile ? otherTiles : otherTiles.slice(1)).length > 0 && (
-            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(180px,1fr))", gap:"0.75rem" }}>
-              {(hostTile ? otherTiles : otherTiles.slice(1)).map(t => (
-                <div key={t.identity} style={{ position:"relative", aspectRatio:"16/9" }}><RemoteTile tile={t}/></div>
+          {otherTiles.slice(1).length > 0 && (
+            <div style={{ display:"contents" }}>
+              {otherTiles.slice(1).map(t => (
+                <div key={t.identity} style={{ position:"relative", minHeight:150 }}><RemoteTile tile={t}/></div>
               ))}
             </div>
           )}

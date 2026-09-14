@@ -73,3 +73,25 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   return NextResponse.json({ ok: true, status: student.status });
 }
+
+export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard.response;
+
+  const { id } = await params;
+  const student = await prisma.student.findUnique({ where: { id }, select: { id: true, studentId: true, fullName: true } });
+  if (!student) return NextResponse.json({ error: "Student not found" }, { status: 404 });
+
+  await prisma.$transaction([
+    prisma.classAttendance.deleteMany({ where: { studentId: id } }),
+    prisma.classPollAnswer.deleteMany({ where: { studentId: id } }),
+    prisma.classQuestion.deleteMany({ where: { studentId: id } }),
+    prisma.courseCertificate.deleteMany({ where: { studentId: id } }),
+    prisma.student.delete({ where: { id } }),
+  ]);
+
+  await prisma.auditLog.create({
+    data: { actorType: "admin", actorId: guard.session.sub, action: "admin.delete_student", detail: `${student.studentId} (${student.fullName})` },
+  });
+  return NextResponse.json({ ok: true });
+}
