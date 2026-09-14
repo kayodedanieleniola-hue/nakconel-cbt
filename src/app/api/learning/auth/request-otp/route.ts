@@ -76,7 +76,7 @@ export async function POST(req: Request) {
 
   // 4. Send email via Resend
   const resendKey = process.env.RESEND_API_KEY;
-  const fromAddr  = process.env.RESEND_FROM ?? "NAKCONEL Learning Center <noreply@nakconel.com>";
+  const fromAddr  = process.env.RESEND_FROM ?? "NAKCONEL Learning Center <onboarding@resend.dev>";
 
   if (!resendKey || resendKey.startsWith("re_your_")) {
     // Dev mode — log the code instead of sending
