@@ -87,7 +87,7 @@ export async function GET(request: Request) {
     displayName = resolvedStudent.fullName;
   }
 
-  const token = new AccessToken(apiKey, apiSecret, { identity, name: displayName });
+  const token = new AccessToken(apiKey, apiSecret, { identity, name: displayName, ttl: "24h" });
   token.addGrant({
     roomJoin: true,
     room,

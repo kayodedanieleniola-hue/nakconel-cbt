@@ -46,7 +46,7 @@ export async function GET(request: Request) {
 
   const room = `exam-${attempt.id}`;
   const identity = isStudent ? `student-${attempt.student.studentId}` : `admin-${adminSession!.sub}`;
-  const token = new AccessToken(apiKey, apiSecret, { identity, name: identity });
+  const token = new AccessToken(apiKey, apiSecret, { identity, name: identity, ttl: "24h" });
   token.addGrant({
     roomJoin: true,
     room,
