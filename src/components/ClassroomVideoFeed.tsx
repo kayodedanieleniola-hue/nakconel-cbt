@@ -245,7 +245,7 @@ export default function ClassroomVideoFeed({
 
       // ── STEP 3: Connect to LiveKit room ───────────────────────────────────
       const room = new Room({
-        adaptiveStream: true,
+        adaptiveStream: false,
         dynacast: true,
         disconnectOnPageLeave: false,
       });

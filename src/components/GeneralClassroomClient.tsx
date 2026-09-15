@@ -384,7 +384,7 @@ export default function GeneralClassroomClient({ meeting, studentName, isInstruc
       } catch { if (activeRef.current) setConnStatus("error"); return; }
       if (!activeRef.current) return;
 
-      const room = new Room({ adaptiveStream:true, dynacast:true, disconnectOnPageLeave:false });
+      const room = new Room({ adaptiveStream:false, dynacast:true, disconnectOnPageLeave:false });
       roomRef.current = room;
       room.on(RoomEvent.Connected, () => { if (activeRef.current) { setConnStatus("live"); setActiveRoom(room); } });
       room.on(RoomEvent.Disconnected, () => { if (activeRef.current) setConnStatus("error"); });
