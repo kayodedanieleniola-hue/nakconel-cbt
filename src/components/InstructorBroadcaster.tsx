@@ -358,9 +358,12 @@ export default function InstructorBroadcaster({ classId, classTitle, materials, 
           if (localVideoRef.current) { videoTrack.attach(localVideoRef.current); void localVideoRef.current.play().catch(() => {}); }
           else pendingVideoTrack.current = videoTrack;
         }
-        for (const track of tracks) {
-          if (track.kind === Track.Kind.Video) await room.localParticipant.publishTrack(track, { simulcast:true });
-          else await room.localParticipant.publishTrack(track);
+        if (activeRef.current && room.state === "connected") {
+          for (const track of tracks) {
+            if (!activeRef.current || room.state !== "connected") break;
+            if (track.kind === Track.Kind.Video) await room.localParticipant.publishTrack(track, { simulcast:true });
+            else await room.localParticipant.publishTrack(track);
+          }
         }
         const canvas = document.createElement("canvas");
         const ctx2d  = canvas.getContext("2d");
