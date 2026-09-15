@@ -319,11 +319,13 @@ export default function ClassroomVideoFeed({
       // ── Publish tracks (wait for camera result now that LiveKit is ready) ──
       const camResult = await cameraPromise;
       const { vidTrack, audTrack } = camResult ?? { vidTrack: null, audTrack: null };
-      if (vidTrack || audTrack) {
+      if ((vidTrack || audTrack) && activeRef.current && room.state === "connected") {
         try {
           const toPublish = [vidTrack, audTrack].filter(Boolean) as LocalTrack[];
           for (const track of toPublish) {
-            await room.localParticipant.publishTrack(track);
+            if (room.state === "connected") {
+              await room.localParticipant.publishTrack(track);
+            }
           }
           console.log("[Student] camera + mic published to LiveKit room");
           if (activeRef.current) setCameraPublished(true);

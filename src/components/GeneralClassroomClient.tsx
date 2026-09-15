@@ -174,24 +174,31 @@ function RemoteTile({ tile, large=false, compact=false }: { tile: PTile; large?:
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const isHost   = tile.identity.startsWith("instructor-");
-  const micLive  = !!tile.audioPub?.track;
-  const camLive  = !!tile.videoPub?.track;
+  const videoTrack = tile.videoPub?.track;
+  const audioTrack = tile.audioPub?.track;
+  const micLive  = !!audioTrack;
+  const camLive  = !!videoTrack;
+  const [needsTap, setNeedsTap] = useState(false);
 
   useEffect(() => {
-    const vp = tile.videoPub;
-    if (!vp?.track || !videoRef.current) return;
-    vp.track.attach(videoRef.current);
-    void videoRef.current.play().catch(() => {});
-    return () => { if (videoRef.current) vp.track?.detach(videoRef.current); };
-  }, [tile.videoPub]);
+    const el = videoRef.current;
+    if (!videoTrack || !el) return;
+    videoTrack.attach(el);
+    void el.play().then(() => setNeedsTap(false)).catch(() => setNeedsTap(true));
+    return () => {
+      videoTrack.detach(el);
+    };
+  }, [videoTrack]);
 
   useEffect(() => {
-    const ap = tile.audioPub;
-    if (!ap?.track || !audioRef.current) return;
-    ap.track.attach(audioRef.current);
-    void audioRef.current.play().catch(() => {});
-    return () => { if (audioRef.current) ap.track?.detach(audioRef.current); };
-  }, [tile.audioPub]);
+    const el = audioRef.current;
+    if (!audioTrack || !el) return;
+    audioTrack.attach(el);
+    void el.play().then(() => setNeedsTap(false)).catch(() => setNeedsTap(true));
+    return () => {
+      audioTrack.detach(el);
+    };
+  }, [audioTrack]);
 
   const sz = large ? 56 : compact ? 28 : 38;
   return (
@@ -379,22 +386,40 @@ export default function GeneralClassroomClient({ meeting, studentName, isInstruc
 
       const room = new Room({ adaptiveStream:true, dynacast:true, disconnectOnPageLeave:false });
       roomRef.current = room;
-      room.on(RoomEvent.Connected,    () => { if (activeRef.current) { setConnStatus("live"); setActiveRoom(room); } });
+      room.on(RoomEvent.Connected, () => { if (activeRef.current) { setConnStatus("live"); setActiveRoom(room); } });
       room.on(RoomEvent.Disconnected, () => { if (activeRef.current) setConnStatus("error"); });
+      room.on(RoomEvent.Reconnected, () => {
+        if (!activeRef.current) return;
+        setConnStatus("live");
+        setParticipants(prev => {
+          const next = { ...prev };
+          for (const [id, rp] of Array.from(room.remoteParticipants.entries())) {
+            const ex = next[id] ?? { identity: id, name: rp.name || id, videoPub: null, audioPub: null };
+            let vp = ex.videoPub;
+            let ap = ex.audioPub;
+            for (const pub of Array.from(rp.trackPublications.values())) {
+              if (pub.kind === Track.Kind.Video && (pub.isSubscribed || pub.track)) vp = pub;
+              if (pub.kind === Track.Kind.Audio && (pub.isSubscribed || pub.track)) ap = pub;
+            }
+            next[id] = { identity: id, name: rp.name || id, videoPub: vp, audioPub: ap };
+          }
+          return next;
+        });
+      });
       room.on(RoomEvent.ParticipantConnected, (rp: RemoteParticipant) => {
         if (!activeRef.current) return;
-        setParticipants(p => ({ ...p, [rp.identity]:{ identity:rp.identity, name:rp.name||rp.identity, videoPub:null, audioPub:null } }));
+        setParticipants(p => ({ ...p, [rp.identity]: { identity: rp.identity, name: rp.name || rp.identity, videoPub: p[rp.identity]?.videoPub || null, audioPub: p[rp.identity]?.audioPub || null } }));
       });
       room.on(RoomEvent.ParticipantDisconnected, (rp: RemoteParticipant) => {
         if (!activeRef.current) return;
-        setParticipants(p => { const n={...p}; delete n[rp.identity]; return n; });
+        setParticipants(p => { const n = { ...p }; delete n[rp.identity]; return n; });
       });
       room.on(RoomEvent.TrackSubscribed, (track, pub, rp: RemoteParticipant) => {
         if (!activeRef.current) return;
         setParticipants(p => {
-          const ex = p[rp.identity] ?? { identity:rp.identity, name:rp.name||rp.identity, videoPub:null, audioPub:null };
-          if (track.kind === Track.Kind.Video) return { ...p, [rp.identity]:{ ...ex, videoPub:pub } };
-          if (track.kind === Track.Kind.Audio) return { ...p, [rp.identity]:{ ...ex, audioPub:pub } };
+          const ex = p[rp.identity] ?? { identity: rp.identity, name: rp.name || rp.identity, videoPub: null, audioPub: null };
+          if (track.kind === Track.Kind.Video) return { ...p, [rp.identity]: { ...ex, videoPub: pub } };
+          if (track.kind === Track.Kind.Audio) return { ...p, [rp.identity]: { ...ex, audioPub: pub } };
           return p;
         });
       });
@@ -402,8 +427,8 @@ export default function GeneralClassroomClient({ meeting, studentName, isInstruc
         if (!activeRef.current) return;
         setParticipants(p => {
           const ex = p[rp.identity]; if (!ex) return p;
-          if (track.kind === Track.Kind.Video) return { ...p, [rp.identity]:{ ...ex, videoPub:null } };
-          if (track.kind === Track.Kind.Audio) return { ...p, [rp.identity]:{ ...ex, audioPub:null } };
+          if (track.kind === Track.Kind.Video) return { ...p, [rp.identity]: { ...ex, videoPub: null } };
+          if (track.kind === Track.Kind.Audio) return { ...p, [rp.identity]: { ...ex, audioPub: null } };
           return p;
         });
       });
@@ -412,19 +437,27 @@ export default function GeneralClassroomClient({ meeting, studentName, isInstruc
       catch { if (activeRef.current) setConnStatus("error"); return; }
       if (!activeRef.current) { void room.disconnect(); return; }
 
-      const tiles: Record<string, PTile> = {};
-      for (const [id, rp] of Array.from(room.remoteParticipants.entries())) {
-        let vp: RemoteTrackPublication|null = null, ap: RemoteTrackPublication|null = null;
-        for (const pub of Array.from(rp.trackPublications.values())) {
-          if (pub.kind === Track.Kind.Video && pub.isSubscribed && pub.track) vp = pub;
-          if (pub.kind === Track.Kind.Audio && pub.isSubscribed && pub.track) ap = pub;
+      setParticipants(prev => {
+        const next = { ...prev };
+        for (const [id, rp] of Array.from(room.remoteParticipants.entries())) {
+          const ex = next[id] ?? { identity: id, name: rp.name || id, videoPub: null, audioPub: null };
+          let vp = ex.videoPub;
+          let ap = ex.audioPub;
+          for (const pub of Array.from(rp.trackPublications.values())) {
+            if (pub.kind === Track.Kind.Video && (pub.isSubscribed || pub.track)) vp = pub;
+            if (pub.kind === Track.Kind.Audio && (pub.isSubscribed || pub.track)) ap = pub;
+          }
+          next[id] = { identity: id, name: rp.name || id, videoPub: vp, audioPub: ap };
         }
-        tiles[id] = { identity:id, name:rp.name||id, videoPub:vp, audioPub:ap };
-      }
-      if (Object.keys(tiles).length > 0) setParticipants(tiles);
+        return next;
+      });
 
       const cr = await camP;
-      if (cr) for (const t of [cr.vid, cr.aud].filter(Boolean) as LocalTrack[]) await room.localParticipant.publishTrack(t).catch(() => {});
+      if (cr && activeRef.current && room.state === "connected") {
+        for (const t of [cr.vid, cr.aud].filter(Boolean) as LocalTrack[]) {
+          await room.localParticipant.publishTrack(t).catch((err) => console.warn("Track publish error:", err));
+        }
+      }
     }
     void connect();
     return () => {
@@ -495,6 +528,7 @@ export default function GeneralClassroomClient({ meeting, studentName, isInstruc
   const totalCount = remoteList.length + 1;
   const galleryTiles = [{ identity: "self", self: true as const }, ...remoteList];
   const galleryColumns = galleryTiles.length <= 1 ? 1 : galleryTiles.length <= 4 ? 2 : galleryTiles.length <= 9 ? 3 : 4;
+  const useGroupGrid = totalCount > 2;
   const hostTile   = remoteList.find(t => t.identity.startsWith("instructor-"));
   const otherTiles = remoteList.filter(t => !t.identity.startsWith("instructor-"));
   const connColor  = connStatus === "live" ? MIC_ON : connStatus === "error" ? RED : GOLD;
@@ -732,15 +766,15 @@ export default function GeneralClassroomClient({ meeting, studentName, isInstruc
       {/* body */}
       <div style={{ flex:1, display:"flex", overflow:"hidden", minHeight:0 }}>
         {/* gallery */}
-        <div style={{ flex:1, minWidth:0, overflowY:"auto", padding:"0.9rem", display:"grid", gridTemplateColumns:`repeat(${galleryColumns}, minmax(0, 1fr))`, gridAutoRows:"minmax(150px, 1fr)", alignContent:"stretch", gap:"0.75rem" }}>
-          <div style={{ display:"contents" }}>
-            <div style={{ position:"relative", minHeight:150, borderRadius:14, overflow:"hidden", background:`linear-gradient(160deg,${RIM},${CARD})`, border:`2px solid ${GOLD}`, boxShadow:`0 0 28px ${GOLD_GLOW},0 6px 24px rgba(0,0,0,0.55)` }}>
+        <div style={useGroupGrid ? { flex:1, minWidth:0, overflowY:"auto", padding:"0.9rem", display:"grid", gridTemplateColumns:`repeat(${galleryColumns}, minmax(0, 1fr))`, gridAutoRows:"minmax(150px, 1fr)", alignContent:"stretch", gap:"0.75rem" } : { flex:1, minWidth:0, overflow:"hidden", padding:"0.9rem", display:"flex", flexDirection:"column", gap:"0.75rem" }}>
+          <div style={useGroupGrid ? { display:"contents" } : { display:"grid", gridTemplateColumns:"1fr 0.48fr", gap:"0.75rem", flex:1, minHeight:0 }}>
+            <div style={{ position:"relative", minHeight:150, borderRadius:14, overflow:"hidden", background:`linear-gradient(160deg,${RIM},${CARD})`, aspectRatio:useGroupGrid ? undefined : "4/3", border:`2px solid ${GOLD}`, boxShadow:`0 0 28px ${GOLD_GLOW},0 6px 24px rgba(0,0,0,0.55)` }}>
               {hostTile
                 ? <RemoteTile tile={hostTile} large/>
                 : <SelfVideoTile {...selfProps}/>
               }
             </div>
-            <div style={{ display:"contents" }}>
+            <div style={useGroupGrid ? { display:"contents" } : { display:"flex", flexDirection:"column", gap:"0.75rem", minHeight:0 }}>
               {hostTile && (
                 <div style={{ flex:1, position:"relative", borderRadius:10, overflow:"hidden", background:`linear-gradient(160deg,${RIM},${CARD})`, border:`2px solid ${GOLD}` }}>
                   <SelfVideoTile {...selfProps} compact/>
@@ -755,14 +789,14 @@ export default function GeneralClassroomClient({ meeting, studentName, isInstruc
               )}
             </div>
           </div>
-          {otherTiles.slice(1).length > 0 && (
+          {useGroupGrid && otherTiles.slice(1).length > 0 && (
             <div style={{ display:"contents" }}>
               {otherTiles.slice(1).map(t => (
                 <div key={t.identity} style={{ position:"relative", minHeight:150 }}><RemoteTile tile={t}/></div>
               ))}
             </div>
           )}
-          {remoteList.length === 0 && (
+          {false && remoteList.length === 0 && (
             <div style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:"0.9rem", opacity:0.55 }}>
               <People s={48} c="rgba(255,255,255,0.3)"/>
               <div style={{ fontWeight:700, fontSize:"1rem" }}>Waiting for others to join…</div>
