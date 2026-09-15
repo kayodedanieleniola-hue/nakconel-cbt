@@ -544,13 +544,17 @@ export default function GeneralClassroomClient({ meeting, studentName, isInstruc
     // Right 4 slots = students; if host present + 0 students → self in slot 0 once only
     const rightSlots: Array<PTile | "self" | null> = [];
     if (hostTile) {
-      for (let i = 0; i < 4; i++) {
-        if (otherTiles[i]) rightSlots.push(otherTiles[i]);
-        else if (i === 0 && otherTiles.length === 0) rightSlots.push("self");
-        else rightSlots.push(null);
+      if (otherTiles.length === 0) {
+        rightSlots.push("self");
+      } else {
+        rightSlots.push(...otherTiles);
       }
     } else {
-      for (let i = 0; i < 4; i++) rightSlots.push(otherTiles[i] ?? null);
+      if (otherTiles.length === 0) {
+        rightSlots.push(null);
+      } else {
+        rightSlots.push(...otherTiles);
+      }
     }
 
     return (
@@ -581,8 +585,8 @@ export default function GeneralClassroomClient({ meeting, studentName, isInstruc
           </div>
           <div style={{ width:34, height:34, borderRadius:8, background:"rgba(255,255,255,0.07)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, position:"relative" }}>
             <People s={16} c="rgba(255,255,255,0.7)"/>
-            <span style={{ position:"absolute", top:-3, right:-3, background:GOLD, color:INK, borderRadius:"50%", width:15, height:15, fontSize:"0.48rem", fontWeight:800, display:"flex", alignItems:"center", justifyContent:"center" }}>
-              {totalCount > 9 ? "9+" : totalCount}
+            <span style={{ position:"absolute", top:-3, right:-3, background:GOLD, color:INK, borderRadius:"50%", padding:"0 4px", minWidth:16, height:16, fontSize:"0.52rem", fontWeight:800, display:"flex", alignItems:"center", justifyContent:"center" }}>
+              {totalCount}
             </span>
           </div>
         </div>
