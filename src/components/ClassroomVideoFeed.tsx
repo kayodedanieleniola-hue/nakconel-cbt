@@ -341,10 +341,11 @@ export default function ClassroomVideoFeed({
       console.log("[Student] cleanup — disconnecting");
       activeRef.current = false;
       if (bc) bc.close();
+      const r = roomRef.current;
+      roomRef.current = null;
+      if (r) r.disconnect().catch(() => {});
       localVideoTrack.current?.stop();
       localAudioTrack.current?.stop();
-      roomRef.current?.disconnect().catch(() => {});
-      roomRef.current = null;
     };
   }, [classId]);
 

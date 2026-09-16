@@ -462,9 +462,14 @@ export default function GeneralClassroomClient({ meeting, studentName, isInstruc
     void connect();
     return () => {
       activeRef.current = false;
-      localVideoTrack.current?.stop(); localAudioTrack.current?.stop();
       screenTracks.current.forEach((track) => track.stop());
-      roomRef.current?.disconnect().catch(() => {}); roomRef.current = null;
+      const r = roomRef.current;
+      roomRef.current = null;
+      if (r) {
+        r.disconnect().catch(() => {});
+      }
+      localVideoTrack.current?.stop();
+      localAudioTrack.current?.stop();
     };
   }, [meeting.id]);
 

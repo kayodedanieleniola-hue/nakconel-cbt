@@ -407,8 +407,11 @@ export default function InstructorBroadcaster({ classId, classTitle, materials, 
       activeRef.current = false;
       if (fallbackInterval) clearInterval(fallbackInterval);
       if (bc) { bc.postMessage({ type:"STOP" }); bc.close(); }
-      videoTrackRef.current?.stop(); audioTrackRef.current?.stop();
-      roomRef.current?.disconnect().catch(() => {}); roomRef.current = null;
+      const r = roomRef.current;
+      roomRef.current = null;
+      if (r) r.disconnect().catch(() => {});
+      videoTrackRef.current?.stop();
+      audioTrackRef.current?.stop();
     };
   }, [classId]); // eslint-disable-line react-hooks/exhaustive-deps
 
