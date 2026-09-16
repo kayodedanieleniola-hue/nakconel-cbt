@@ -139,19 +139,7 @@ export default function LoginPage() {
         </form>
 
         {/* Footer */}
-        <p style={{ textAlign:"center", fontSize:"0.78rem", color:MUTED, marginTop:"1.5rem", lineHeight:1.6 }}>
-          Not registered yet?{" "}
-          <a
-            href="https://nakconel.company"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ color:WINE3, fontWeight:700, textDecoration:"none" }}
-          >
-            Register for Nakconel training →
-          </a>
-        </p>
-
-        <p style={{ textAlign:"center", fontSize:"0.75rem", color:MUTED, marginTop:"0.75rem" }}>
+        <p style={{ textAlign:"center", fontSize:"0.75rem", color:MUTED, marginTop:"1.5rem" }}>
           <Link href="/admin/login" style={{ color:MUTED, textDecoration:"none" }}>
             Admin sign in
           </Link>

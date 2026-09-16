@@ -59,14 +59,9 @@ export default async function HomePage() {
               Go to my dashboard
             </Link>
           ) : (
-            <>
-              <Link href="/register" style={primaryBtn}>
-                Register as a student
-              </Link>
-              <Link href="/login" style={secondaryBtn}>
-                Log in
-              </Link>
-            </>
+            <Link href="/login" style={primaryBtn}>
+              Log in to Portal →
+            </Link>
           )}
         </div>
       </div>
