@@ -312,7 +312,10 @@ export default function InstructorBroadcaster({ classId, classTitle, materials, 
         if (!activeRef.current) return;
         const d = event.data;
         if (!d) return;
-        if (d.type === "RAISE_HAND" && d.identity) setRaisedHands((prev) => ({ ...prev, [d.identity]: d.name || d.identity }));
+        if (d.type === "RAISE_HAND" && d.identity) {
+          setRaisedHands((prev) => ({ ...prev, [d.identity]: d.name || d.identity }));
+          triggerNotification(`✋ ${d.name || d.identity} raised their hand`);
+        }
         else if (d.type === "LOWER_HAND" && d.identity) setRaisedHands((prev) => { const n = { ...prev }; delete n[d.identity]; return n; });
       };
     } catch { /* BroadcastChannel unsupported */ }
@@ -335,6 +338,24 @@ export default function InstructorBroadcaster({ classId, classTitle, materials, 
       roomRef.current = room;
 
       room.on(RoomEvent.Connected,    () => { if (activeRef.current) { setConnectionStatus("live"); setErrorMsg(""); } });
+      room.on(RoomEvent.DataReceived, (payload: Uint8Array, rp) => {
+        try {
+          const d = JSON.parse(new TextDecoder().decode(payload));
+          if (d.type === "RAISE_HAND") {
+            const id = d.identity || rp?.identity || "unknown";
+            const name = d.name || rp?.name || id.replace(/^student-/, "");
+            setRaisedHands((prev) => ({ ...prev, [id]: name }));
+            triggerNotification(`✋ ${name} raised their hand`);
+          } else if (d.type === "LOWER_HAND") {
+            const id = d.identity || rp?.identity || "unknown";
+            setRaisedHands((prev) => {
+              const n = { ...prev };
+              delete n[id];
+              return n;
+            });
+          }
+        } catch {}
+      });
       room.on(RoomEvent.Disconnected, (reason) => { if (activeRef.current) { setConnectionStatus("error"); setErrorMsg(`Disconnected: ${reason ?? "unknown reason"}`); } });
       room.on(RoomEvent.Reconnecting, () => {});
       room.on(RoomEvent.Reconnected, () => {

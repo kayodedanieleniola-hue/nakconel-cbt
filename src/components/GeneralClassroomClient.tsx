@@ -330,6 +330,8 @@ export default function GeneralClassroomClient({ meeting, studentName, isInstruc
   const localAudioTrack = useRef<LocalTrack|null>(null);
   const screenTracks = useRef<LocalTrack[]>([]);
   const [screenSharing, setScreenSharing] = useState(false);
+  const [isHandRaised,  setIsHandRaised]  = useState(false);
+  const [raisedHands,   setRaisedHands]   = useState<Record<string, string>>({});
   const [showMore, setShowMore] = useState(false);
 
   const bcRef = useRef<BroadcastChannel|null>(null);
@@ -343,6 +345,25 @@ export default function GeneralClassroomClient({ meeting, studentName, isInstruc
       setMuteNotice(null);
     }, 4500);
   }, []);
+
+  const toggleRaiseHand = useCallback(() => {
+    const next = !isHandRaised;
+    setIsHandRaised(next);
+    const myId = roomRef.current?.localParticipant?.identity || "user-" + Math.random().toString(36).substring(7);
+    const payloadData = {
+      type: next ? "RAISE_HAND" : "LOWER_HAND",
+      identity: myId,
+      name: studentName || "Participant",
+    };
+    const jsonStr = JSON.stringify(payloadData);
+    if (roomRef.current?.state === "connected") {
+      roomRef.current.localParticipant.publishData(new TextEncoder().encode(jsonStr), { reliable: true }).catch(() => {});
+    }
+    if (bcRef.current) {
+      bcRef.current.postMessage(payloadData);
+    }
+    triggerNotification(next ? "✋ You raised your hand" : "✋ Hand lowered");
+  }, [isHandRaised, studentName, triggerNotification]);
 
   const handleMuteSignal = useCallback((data: { type: string; targetIdentity?: string; targetName?: string; senderName?: string }) => {
     if (!data) return;
@@ -362,6 +383,18 @@ export default function GeneralClassroomClient({ meeting, studentName, isInstruc
         setMicOn(false);
       }
       triggerNotification(`🎙️ ${data.senderName || "Admin"} muted all microphones`);
+    } else if (data.type === "RAISE_HAND") {
+      const id = data.targetIdentity || (data as any).identity || "unknown";
+      const name = (data as any).name || data.targetName || id;
+      setRaisedHands((prev) => ({ ...prev, [id]: name }));
+      triggerNotification(`✋ ${name} raised their hand`);
+    } else if (data.type === "LOWER_HAND") {
+      const id = data.targetIdentity || (data as any).identity || "unknown";
+      setRaisedHands((prev) => {
+        const n = { ...prev };
+        delete n[id];
+        return n;
+      });
     }
   }, [isInstructor, studentName, triggerNotification]);
 

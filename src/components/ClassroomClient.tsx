@@ -110,6 +110,28 @@ function FileTypeBadge({ mimeType, size="normal" }: { mimeType: string; size?: "
 }
 
 /* ══════════════════════════════════════════════════════════════════════════ */
+function ScreenShareViewer({ track }: { track: any }) {
+  const vidRef = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    const el = vidRef.current;
+    if (!el || !track) return;
+    track.attach(el);
+    void el.play().catch(() => {});
+    return () => {
+      track.detach(el);
+    };
+  }, [track]);
+
+  return (
+    <div style={{ position: "relative", width: "100%", height: "100%", background: "#050202", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <video ref={vidRef} autoPlay playsInline style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+      <div style={{ position: "absolute", top: "0.75rem", left: "0.75rem", background: "rgba(0,0,0,0.85)", border: "1px solid #d4a843", borderRadius: 6, padding: "0.3rem 0.75rem", color: "#d4a843", fontSize: "0.78rem", fontWeight: 700, display: "flex", alignItems: "center", gap: "0.45rem", zIndex: 10, boxShadow: "0 4px 12px rgba(0,0,0,0.5)" }}>
+        <span>🖥️</span> Instructor Screen Share (Primary Focus)
+      </div>
+    </div>
+  );
+}
+
 export default function ClassroomClient({ learningClass, materials }: { learningClass: LearningClass; materials: Material[] }) {
   const stageRef = useRef<HTMLDivElement>(null);
   const [activeRoom,   setActiveRoom]   = useState<Room | null>(null);
@@ -122,6 +144,9 @@ export default function ClassroomClient({ learningClass, materials }: { learning
   const [sheetTab,     setSheetTab]     = useState<"materials"|"chat"|"qa"|"info">("materials");
   const [notes,        setNotes]        = useState("");
   const [matSearch,    setMatSearch]    = useState("");
+  const [isHandRaised,     setIsHandRaised]     = useState(false);
+  const [screenShareTrack, setScreenShareTrack] = useState<any | null>(null);
+  const [localAudioTrack,  setLocalAudioTrack]  = useState<any | null>(null);
 
   const [muteNotice, setMuteNotice] = useState<string|null>(null);
   const noticeTimerRef = useRef<NodeJS.Timeout|null>(null);
@@ -133,6 +158,27 @@ export default function ClassroomClient({ learningClass, materials }: { learning
       setMuteNotice(null);
     }, 4500);
   }, []);
+
+  const toggleRaiseHand = useCallback(() => {
+    const next = !isHandRaised;
+    setIsHandRaised(next);
+    const myId = activeRoom?.localParticipant?.identity || "student-" + Math.random().toString(36).substring(7);
+    const payloadData = {
+      type: next ? "RAISE_HAND" : "LOWER_HAND",
+      identity: myId,
+      name: "Student",
+    };
+    const jsonStr = JSON.stringify(payloadData);
+    if (activeRoom && activeRoom.state === "connected") {
+      activeRoom.localParticipant.publishData(new TextEncoder().encode(jsonStr), { reliable: true }).catch(() => {});
+    }
+    try {
+      const bc = new BroadcastChannel(`nak-classroom-${learningClass.id}`);
+      bc.postMessage(payloadData);
+      bc.close();
+    } catch {}
+    triggerNotification(next ? "✋ You raised your hand" : "✋ Hand lowered");
+  }, [activeRoom, isHandRaised, learningClass.id, triggerNotification]);
 
   useEffect(() => {
     if (!learningClass.id) return;
@@ -370,7 +416,9 @@ export default function ClassroomClient({ learningClass, materials }: { learning
 
         {/* Slide area — overflow:auto so content can scroll on mobile */}
         <div ref={stageRef} style={{ flex:1, overflow:"auto", background:"#f9f5f5", position:"relative", minHeight:0, WebkitOverflowScrolling:"touch" as React.CSSProperties["WebkitOverflowScrolling"], ...(isFullscreen ? { position:"fixed", inset:0, zIndex:9999, height:"100dvh", width:"100vw" } as React.CSSProperties : {}) }}>
-          {selected && previewable ? (
+          {screenShareTrack ? (
+            <ScreenShareViewer track={screenShareTrack} />
+          ) : selected && previewable ? (
             <iframe
               key={`${selected.id}-p${presState.page}`}
               title={selected.title}
@@ -394,7 +442,7 @@ export default function ClassroomClient({ learningClass, materials }: { learning
           {/* Instructor PiP */}
           <div style={{ position:"absolute", top:"0.55rem", right:"0.55rem", zIndex:20 }}>
             <div style={{ width:100, borderRadius:8, overflow:"hidden", border:`2px solid ${GOLD}`, background:BG2, marginBottom:"0.3rem" }}>
-              <ClassroomVideoFeed classId={learningClass.id} onRoomReady={setActiveRoom} onPresentationState={handlePresentationState} pipMode />
+              <ClassroomVideoFeed classId={learningClass.id} onRoomReady={setActiveRoom} onPresentationState={handlePresentationState} onScreenShareTrack={setScreenShareTrack} onLocalAudioTrack={setLocalAudioTrack} pipMode />
             </div>
             <ClassroomPollOverlay classId={learningClass.id} />
           </div>
@@ -414,6 +462,12 @@ export default function ClassroomClient({ learningClass, materials }: { learning
               <span style={{ fontSize:"0.58rem", fontWeight:700 }}>{label}</span>
             </button>
           ))}
+          
+          <button type="button" onClick={toggleRaiseHand}
+            style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:"0.22rem", background:isHandRaised?GOLD:"rgba(255,255,255,0.05)", border:isHandRaised?`1px solid ${GOLDD}`:"1px solid rgba(255,255,255,0.08)", borderRadius:12, padding:"0.55rem 0.75rem", color:isHandRaised?INK:"rgba(255,255,255,0.82)", cursor:"pointer", minWidth:56, WebkitTapHighlightColor:"transparent", transition:"all 0.2s ease" }}>
+            <span style={{ fontSize:"1.15rem" }}>✋</span>
+            <span style={{ fontSize:"0.58rem", fontWeight:700 }}>{isHandRaised ? "Raised" : "Raise Hand"}</span>
+          </button>
           <Link href="/learning" style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:"0.22rem", background:RED_BTN, color:WHITE, borderRadius:12, padding:"0.55rem 0.75rem", fontWeight:700, fontSize:"0.58rem", textDecoration:"none", minWidth:56, WebkitTapHighlightColor:"transparent" }}>
             <span style={{ fontSize:"1.15rem" }}>🚪</span>
             <span>Leave</span>
@@ -528,7 +582,9 @@ export default function ClassroomClient({ learningClass, materials }: { learning
 
           {/* Slide area */}
           <div ref={stageRef} style={{ flex:1, overflow:"hidden", background:"#f9f5f5", position:"relative", ...(isFullscreen ? { position:"fixed", inset:0, zIndex:9999, height:"100dvh", width:"100vw" } as React.CSSProperties : {}) }}>
-            {selected && previewable ? (
+            {screenShareTrack ? (
+            <ScreenShareViewer track={screenShareTrack} />
+          ) : selected && previewable ? (
               <iframe
                 key={`${selected.id}-p${presState.page}`}
                 title={selected.title}
@@ -548,7 +604,7 @@ export default function ClassroomClient({ learningClass, materials }: { learning
             )}
             {/* Instructor PiP */}
             <div style={{ position:"absolute", top:"0.65rem", right:"0.65rem", zIndex:20, width:120, borderRadius:10, overflow:"hidden", border:`2px solid ${GOLD}`, boxShadow:"0 4px 16px rgba(0,0,0,0.4)", background:BG2 }}>
-              <ClassroomVideoFeed classId={learningClass.id} onRoomReady={setActiveRoom} onPresentationState={handlePresentationState} pipMode />
+              <ClassroomVideoFeed classId={learningClass.id} onRoomReady={setActiveRoom} onPresentationState={handlePresentationState} onScreenShareTrack={setScreenShareTrack} onLocalAudioTrack={setLocalAudioTrack} pipMode />
             </div>
             <div style={{ position:"absolute", top:"0.65rem", right:"0.65rem", zIndex:21 }}>
               <ClassroomPollOverlay classId={learningClass.id} />
@@ -644,17 +700,19 @@ export default function ClassroomClient({ learningClass, materials }: { learning
           {[
             { icon:"🎤", label:"Mic" },
             { icon:"📷", label:"Camera" },
+            { icon:"✋", label: isHandRaised ? "Raised" : "Raise Hand", isRaiseHand: true },
             { icon:"📤", label:"Present", gold:true },
             { icon:"📁", label:"Materials" },
             { icon:"👥", label:"Participants" },
             { icon:"💬", label:"Chat" },
             { icon:"❓", label:"Q&A" },
             { icon:"⋯", label:"More" },
-          ].map(({ icon, label, gold }) => (
-            <button key={label} type="button"
-              style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:"0.12rem", background:gold?WINE2:"transparent", border:"1px solid transparent", color:gold?WHITE:GRAY2, borderRadius:8, padding:"0.4rem 0.6rem", cursor:"pointer", minWidth:48 }}>
-              <span style={{ fontSize:"1.1rem" }}>{icon}</span>
-              <span style={{ fontSize:"0.56rem", fontWeight:600, letterSpacing:"0.02em" }}>{label}</span>
+          ].map((item: any) => (
+            <button key={item.label} type="button"
+              onClick={item.isRaiseHand ? toggleRaiseHand : undefined}
+              style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:"0.12rem", background:item.isRaiseHand && isHandRaised ? GOLD : item.gold ? WINE2 : "transparent", border:item.isRaiseHand && isHandRaised ? `1px solid ${GOLDD}` : "1px solid transparent", color:item.isRaiseHand && isHandRaised ? INK : item.gold ? WHITE : GRAY2, borderRadius:8, padding:"0.4rem 0.6rem", cursor:"pointer", minWidth:48, transition:"all 0.2s ease" }}>
+              <span style={{ fontSize:"1.1rem" }}>{item.icon}</span>
+              <span style={{ fontSize:"0.56rem", fontWeight:600, letterSpacing:"0.02em" }}>{item.label}</span>
             </button>
           ))}
         </div>

@@ -103,11 +103,15 @@ export default function ClassroomVideoFeed({
   classId,
   onRoomReady,
   onPresentationState,
+  onScreenShareTrack,
+  onLocalAudioTrack,
   pipMode = false,
 }: {
   classId: string;
   onRoomReady?: (room: Room) => void;
   onPresentationState?: (state: PresentationState) => void;
+  onScreenShareTrack?: (track: Track | null) => void;
+  onLocalAudioTrack?: (track: LocalTrack | null) => void;
   /** pip mode: render only the instructor video, no self-preview or controls */
   pipMode?: boolean;
 }) {
@@ -122,10 +126,14 @@ export default function ClassroomVideoFeed({
   const localVideoTrack  = useRef<LocalTrack | null>(null);
   const localAudioTrack  = useRef<LocalTrack | null>(null);
 
-  const onRoomReadyRef    = useRef(onRoomReady);
-  const onPresentationRef = useRef(onPresentationState);
+  const onRoomReadyRef       = useRef(onRoomReady);
+  const onPresentationRef    = useRef(onPresentationState);
+  const onScreenShareRef     = useRef(onScreenShareTrack);
+  const onLocalAudioRef      = useRef(onLocalAudioTrack);
   useEffect(() => { onRoomReadyRef.current = onRoomReady; });
   useEffect(() => { onPresentationRef.current = onPresentationState; });
+  useEffect(() => { onScreenShareRef.current = onScreenShareTrack; });
+  useEffect(() => { onLocalAudioRef.current = onLocalAudioTrack; });
 
   // Callback ref for self-preview — attaches the video track the instant
   // the <video> element mounts, eliminating the race condition where
@@ -203,6 +211,7 @@ export default function ClassroomVideoFeed({
           if (activeRef.current) {
             setCameraReady(true);
             setMicTrack(audTrack);
+            onLocalAudioRef.current?.(audTrack);
             console.log("[Student] camera + mic captured");
           }
           return { vidTrack, audTrack };
@@ -262,13 +271,18 @@ export default function ClassroomVideoFeed({
       room.on(RoomEvent.Reconnecting, () => { if (activeRef.current) setStatus("Reconnecting…"); });
       room.on(RoomEvent.Reconnected,  () => { if (activeRef.current) setStatus("● Reconnected"); });
 
-      // Instructor tracks
+      // Instructor tracks & Screen Sharing
       room.on(RoomEvent.TrackSubscribed, async (track, _pub, participant: RemoteParticipant) => {
         console.log(`[Student] TrackSubscribed — from=${participant.identity} kind=${track.kind}`);
         if (!activeRef.current) return;
 
+        const isScreen = _pub?.source === Track.Source.ScreenShare || track.source === Track.Source.ScreenShare;
+        if (isScreen && track.kind === Track.Kind.Video) {
+          onScreenShareRef.current?.(track);
+        }
+
         if (participant.identity.startsWith("instructor-")) {
-          if (track.kind === Track.Kind.Video && instructorVidRef.current) {
+          if (track.kind === Track.Kind.Video && instructorVidRef.current && !isScreen) {
             track.attach(instructorVidRef.current);
             setInstructorLive(true);
             setStatus("● LIVE");
@@ -288,7 +302,11 @@ export default function ClassroomVideoFeed({
       room.on(RoomEvent.TrackUnsubscribed, (track, _pub, participant: RemoteParticipant) => {
         console.log(`[Student] TrackUnsubscribed — from=${participant.identity} kind=${track.kind}`);
         track.detach();
-        if (participant.identity.startsWith("instructor-") && track.kind === Track.Kind.Video) {
+        const isScreen = _pub?.source === Track.Source.ScreenShare || track.source === Track.Source.ScreenShare;
+        if (isScreen && track.kind === Track.Kind.Video) {
+          onScreenShareRef.current?.(null);
+        }
+        if (participant.identity.startsWith("instructor-") && track.kind === Track.Kind.Video && !isScreen) {
           if (activeRef.current) setInstructorLive(false);
         }
       });
