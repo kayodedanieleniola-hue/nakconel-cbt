@@ -13,7 +13,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import ClassroomVideoFeed, { type PresentationState } from "@/components/ClassroomVideoFeed";
 import ClassroomChat from "@/components/ClassroomChat";
 import ClassroomPollOverlay from "@/components/ClassroomPollOverlay";
-import { Room } from "livekit-client";
+import { Room, RoomEvent } from "livekit-client";
 
 /* ── Brand tokens — wine + white ──────────────────────────────────────────── */
 const BG      = "#1a0505";   // deep wine-black bg
@@ -122,6 +122,53 @@ export default function ClassroomClient({ learningClass, materials }: { learning
   const [sheetTab,     setSheetTab]     = useState<"materials"|"chat"|"qa"|"info">("materials");
   const [notes,        setNotes]        = useState("");
   const [matSearch,    setMatSearch]    = useState("");
+
+  const [muteNotice, setMuteNotice] = useState<string|null>(null);
+  const noticeTimerRef = useRef<NodeJS.Timeout|null>(null);
+
+  const triggerNotification = useCallback((text: string) => {
+    setMuteNotice(text);
+    if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
+    noticeTimerRef.current = setTimeout(() => {
+      setMuteNotice(null);
+    }, 4500);
+  }, []);
+
+  useEffect(() => {
+    if (!learningClass.id) return;
+    try {
+      const bc = new BroadcastChannel(`nak-classroom-${learningClass.id}`);
+      bc.onmessage = (evt) => {
+        const d = evt.data;
+        if (!d) return;
+        if (d.type === "MUTE_STUDENT" || d.type === "MUTE_INDIVIDUAL") {
+          triggerNotification(`🎙️ ${d.senderName || "Instructor"} muted ${d.targetName || "a student"}'s microphone`);
+        } else if (d.type === "MUTE_ALL") {
+          triggerNotification(`🎙️ ${d.senderName || "Instructor"} muted all microphones`);
+        }
+      };
+      return () => bc.close();
+    } catch { /* BroadcastChannel fallback */ }
+  }, [learningClass.id, triggerNotification]);
+
+  useEffect(() => {
+    if (!activeRoom) return;
+    const handleData = (payload: Uint8Array) => {
+      try {
+        const text = new TextDecoder().decode(payload);
+        const d = JSON.parse(text);
+        if (d.type === "MUTE_STUDENT" || d.type === "MUTE_INDIVIDUAL") {
+          triggerNotification(`🎙️ ${d.senderName || "Instructor"} muted ${d.targetName || "a student"}'s microphone`);
+        } else if (d.type === "MUTE_ALL") {
+          triggerNotification(`🎙️ ${d.senderName || "Instructor"} muted all microphones`);
+        }
+      } catch { /* parse fail */ }
+    };
+    activeRoom.on(RoomEvent.DataReceived, handleData);
+    return () => {
+      activeRoom.off(RoomEvent.DataReceived, handleData);
+    };
+  }, [activeRoom, triggerNotification]);
 
   const [presState, setPresState] = useState<PresentationState>({
     materialId: learningClass.activeMaterialId && materials.some(m => m.id === learningClass.activeMaterialId)

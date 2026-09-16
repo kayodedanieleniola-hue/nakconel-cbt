@@ -1,47 +1,36 @@
 /*
- * Agrandir self-hosted (optional).
- * Drop your Agrandir woff2 files into public/fonts/ and
- * uncomment the blocks below to activate the real Agrandir typeface.
- *
- * @font-face {
- *   font-family: "Agrandir";
- *   src: url("/fonts/Agrandir-Regular.woff2") format("woff2");
- *   font-weight: 400;
- *   font-style: normal;
- *   font-display: swap;
- * }
- * @font-face {
- *   font-family: "Agrandir";
- *   src: url("/fonts/Agrandir-TextBold.woff2") format("woff2");
- *   font-weight: 700 900;
- *   font-style: normal;
- *   font-display: swap;
- * }
+ * NAKCONEL Design Tokens & Global Styles (ui-ux-pro-max enhanced)
  */
 
 :root {
   /* ── Colours ──────────────────────────────────────────────────────────── */
-  --burgundy-950: #1f0505;
-  --burgundy-900: #330808;
+  --burgundy-950: #1a0505;
+  --burgundy-900: #75100B;   /* Primary Deep Wine */
   --burgundy-800: #4a1210;
   --burgundy-600: #7f1d1d;
   --burgundy-300: #fca5a5;
-  --gold-600: #98661b;
+  --gold-600: #cda553;       /* Primary Gold Accent */
   --gold-400: #c68f3f;
   --gold-200: #e3c690;
-  --cream-50:  #f7f3ec;
+  --cream-50:  #fdfaf6;
   --cream-100: #fff8f8;
   --cream-200: #fde8e8;
-  --ink-900: #201512;
+  --ink-900: #1f1110;
   --ink-600: #5a4c46;
-  --line: rgba(230, 205, 160, 0.22);
-  --danger:  #b3402f;
-  --success: #3f7a4f;
+  --line: rgba(127, 29, 29, 0.15);
+  --line-gold: rgba(198, 143, 63, 0.3);
+  --danger:  #dc2626;
+  --success: #16a34a;
+
+  /* ── Shadows & Glassmorphism ────────────────────────────────────────── */
+  --shadow-sm: 0 2px 8px rgba(31, 5, 5, 0.05);
+  --shadow-md: 0 8px 24px rgba(31, 5, 5, 0.09);
+  --shadow-lg: 0 16px 36px rgba(31, 5, 5, 0.15);
+  --glass-bg: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(127, 29, 29, 0.12);
 
   /* ── Typography ───────────────────────────────────────────────────────── */
-  /* Display (headings): Agrandir when available, Poppins as fallback */
-  --font-display: "Agrandir", var(--font-poppins), "Segoe UI", system-ui, sans-serif;
-  /* Body / UI: Poppins (loaded via next/font) */
+  --font-display: var(--font-poppins), "Segoe UI", system-ui, sans-serif;
   --font-body: var(--font-poppins), "Segoe UI", system-ui, sans-serif;
 }
 
@@ -52,6 +41,7 @@
 html, body {
   padding: 0;
   margin: 0;
+  scroll-behavior: smooth;
 }
 
 body {
@@ -62,14 +52,17 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-h1, h2, h3 {
+h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-display);
   color: var(--burgundy-900);
   margin: 0;
-  line-height: 1.15;
+  line-height: 1.2;
 }
 
-a { color: inherit; }
+a {
+  color: inherit;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
 
 button, input, select, textarea {
   font-family: var(--font-body);
@@ -79,6 +72,46 @@ button, input, select, textarea {
 :focus-visible {
   outline: 2px solid var(--gold-600);
   outline-offset: 2px;
+}
+
+/* ── Custom Scrollbar ────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(127, 29, 29, 0.25);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(127, 29, 29, 0.45);
+}
+
+/* ── Keyframe Animations ────────────────────────────────────────────── */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(22, 163, 74, 0);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

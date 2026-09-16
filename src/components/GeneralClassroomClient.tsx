@@ -12,7 +12,7 @@
  * without fighting over a shared ref.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import {
   Room, RoomEvent, Track,
@@ -332,6 +332,86 @@ export default function GeneralClassroomClient({ meeting, studentName, isInstruc
   const [screenSharing, setScreenSharing] = useState(false);
   const [showMore, setShowMore] = useState(false);
 
+  const bcRef = useRef<BroadcastChannel|null>(null);
+  const [muteNotice, setMuteNotice] = useState<string|null>(null);
+  const noticeTimerRef = useRef<NodeJS.Timeout|null>(null);
+
+  const triggerNotification = useCallback((text: string) => {
+    setMuteNotice(text);
+    if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
+    noticeTimerRef.current = setTimeout(() => {
+      setMuteNotice(null);
+    }, 4500);
+  }, []);
+
+  const handleMuteSignal = useCallback((data: { type: string; targetIdentity?: string; targetName?: string; senderName?: string }) => {
+    if (!data) return;
+    if (data.type === "MUTE_INDIVIDUAL") {
+      const myIdentity = roomRef.current?.localParticipant?.identity;
+      const isTarget = data.targetIdentity === myIdentity || (data.targetIdentity === "self" && !isInstructor);
+      if (isTarget) {
+        if (localAudioTrack.current) {
+          void localAudioTrack.current.mute();
+          setMicOn(false);
+        }
+      }
+      triggerNotification(`🎙️ ${data.senderName || "Admin"} muted ${data.targetName || "a participant"}'s microphone`);
+    } else if (data.type === "MUTE_ALL") {
+      if (data.senderName !== studentName && localAudioTrack.current) {
+        void localAudioTrack.current.mute();
+        setMicOn(false);
+      }
+      triggerNotification(`🎙️ ${data.senderName || "Admin"} muted all microphones`);
+    }
+  }, [isInstructor, studentName, triggerNotification]);
+
+  useEffect(() => {
+    try {
+      const bc = new BroadcastChannel(`nak-meeting-control-${meeting.id}`);
+      bcRef.current = bc;
+      bc.onmessage = (evt) => {
+        if (evt.data) handleMuteSignal(evt.data);
+      };
+      return () => {
+        bc.close();
+      };
+    } catch {
+      /* BroadcastChannel fallback */
+    }
+  }, [meeting.id, handleMuteSignal]);
+
+  const handleMuteParticipant = (targetIdentity: string, targetName: string) => {
+    const payloadData = {
+      type: "MUTE_INDIVIDUAL",
+      targetIdentity,
+      targetName,
+      senderName: studentName || "Admin",
+    };
+    const jsonStr = JSON.stringify(payloadData);
+    if (roomRef.current?.state === "connected") {
+      roomRef.current.localParticipant.publishData(new TextEncoder().encode(jsonStr), { reliable: true }).catch(() => {});
+    }
+    if (bcRef.current) {
+      bcRef.current.postMessage(payloadData);
+    }
+    triggerNotification(`🎙️ ${studentName || "Admin"} muted ${targetName}'s microphone`);
+  };
+
+  const handleMuteAll = () => {
+    const payloadData = {
+      type: "MUTE_ALL",
+      senderName: studentName || "Admin",
+    };
+    const jsonStr = JSON.stringify(payloadData);
+    if (roomRef.current?.state === "connected") {
+      roomRef.current.localParticipant.publishData(new TextEncoder().encode(jsonStr), { reliable: true }).catch(() => {});
+    }
+    if (bcRef.current) {
+      bcRef.current.postMessage(payloadData);
+    }
+    triggerNotification(`🎙️ ${studentName || "Admin"} muted all microphones`);
+  };
+
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 700);
     check();
@@ -388,6 +468,13 @@ export default function GeneralClassroomClient({ meeting, studentName, isInstruc
       roomRef.current = room;
       room.on(RoomEvent.Connected, () => { if (activeRef.current) { setConnStatus("live"); setActiveRoom(room); } });
       room.on(RoomEvent.Disconnected, () => { if (activeRef.current) setConnStatus("error"); });
+      room.on(RoomEvent.DataReceived, (payload: Uint8Array) => {
+        try {
+          const text = new TextDecoder().decode(payload);
+          const data = JSON.parse(text);
+          handleMuteSignal(data);
+        } catch { /* parse error */ }
+      });
       room.on(RoomEvent.Reconnected, () => {
         if (!activeRef.current) return;
         setConnStatus("live");
@@ -827,11 +914,23 @@ export default function GeneralClassroomClient({ meeting, studentName, isInstruc
           </div>
           {activeTab === "participants" && (
             <div style={{ flex:1, overflowY:"auto" }}>
+              {isInstructor && (
+                <div style={{ padding:"0.6rem 0.85rem", borderBottom:`1px solid ${PANEL_BDR}`, background:"#fff5f5", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+                  <span style={{ fontSize:"0.7rem", fontWeight:700, color:WINE }}>Admin Controls</span>
+                  <button
+                    type="button"
+                    onClick={handleMuteAll}
+                    style={{ background:RED, color:WHITE, border:"none", borderRadius:6, padding:"0.28rem 0.65rem", fontSize:"0.68rem", fontWeight:700, cursor:"pointer", boxShadow:"0 1px 4px rgba(229,53,53,0.3)" }}
+                  >
+                    🔇 Mute All
+                  </button>
+                </div>
+              )}
               <div style={{ display:"flex", alignItems:"center", gap:"0.6rem", padding:"0.52rem 0.85rem", borderBottom:`1px solid ${PANEL_BDR}` }}>
                 <div style={{ width:38, height:38, borderRadius:"50%", background:`linear-gradient(135deg,${GOLD},#f6de88)`, color:INK, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800, fontSize:"0.9rem", flexShrink:0 }}>{studentName.charAt(0).toUpperCase()}</div>
                 <div style={{ flex:1 }}>
                   <div style={{ fontWeight:700, fontSize:"0.8rem", color:INK }}>{studentName}</div>
-                  <div style={{ fontSize:"0.62rem", color:MUTED_TXT }}>You · Participant</div>
+                  <div style={{ fontSize:"0.62rem", color:MUTED_TXT }}>You · {isInstructor ? "Admin / Host" : "Participant"}</div>
                 </div>
                 {micOn ? <Mic s={15} c={MIC_ON}/> : <MicOff s={15} c={MIC_OFF}/>}
               </div>
@@ -840,11 +939,20 @@ export default function GeneralClassroomClient({ meeting, studentName, isInstruc
                 return (
                   <div key={tile.identity} style={{ display:"flex", alignItems:"center", gap:"0.6rem", padding:"0.52rem 0.85rem", borderBottom:`1px solid ${PANEL_BDR}` }}>
                     <div style={{ width:38, height:38, borderRadius:"50%", background:isHost?`linear-gradient(135deg,${WINE},#8b3030)`:"#ede8e2", color:isHost?WHITE:INK, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800, fontSize:"0.88rem", flexShrink:0 }}>{tile.name.charAt(0).toUpperCase()}</div>
-                    <div style={{ flex:1 }}>
-                      <div style={{ fontWeight:700, fontSize:"0.8rem", color:INK }}>{tile.name}</div>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontWeight:700, fontSize:"0.8rem", color:INK, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{tile.name}</div>
                       <div style={{ fontSize:"0.62rem", color:MUTED_TXT }}>{isHost?"Host":"Participant"}</div>
                     </div>
                     {!!tile.audioPub?.track ? <Mic s={15} c={MIC_ON}/> : <MicOff s={15} c={MIC_OFF}/>}
+                    {isInstructor && !isHost && (
+                      <button
+                        type="button"
+                        onClick={() => handleMuteParticipant(tile.identity, tile.name)}
+                        style={{ background:"rgba(229,53,53,0.12)", color:RED, border:"1px solid rgba(229,53,53,0.3)", borderRadius:5, padding:"0.2rem 0.45rem", fontSize:"0.62rem", fontWeight:700, cursor:"pointer" }}
+                      >
+                        Mute
+                      </button>
+                    )}
                   </div>
                 );
               })}
@@ -891,6 +999,32 @@ export default function GeneralClassroomClient({ meeting, studentName, isInstruc
         </Link>
         {showMore && isInstructor && <button type="button" onClick={toggleScreenShare} style={{ position:"absolute", right:"7.5rem", bottom:"4.3rem", background:CARD, color:WHITE, border:`1px solid ${GOLD}`, borderRadius:8, padding:"0.6rem 0.9rem", cursor:"pointer", zIndex:5 }}>{screenSharing ? "Stop screen share" : "Share screen"}</button>}
       </div>
+
+      {muteNotice && (
+        <div style={{
+          position: "fixed",
+          top: 68,
+          left: "50%",
+          transform: "translateX(-50%)",
+          zIndex: 99999,
+          background: "rgba(153, 27, 27, 0.95)",
+          backdropFilter: "blur(12px)",
+          color: "#ffffff",
+          border: "1px solid rgba(255, 217, 138, 0.5)",
+          boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
+          borderRadius: 99,
+          padding: "0.55rem 1.35rem",
+          fontSize: "0.82rem",
+          fontWeight: 700,
+          display: "flex",
+          alignItems: "center",
+          gap: "0.6rem",
+          pointerEvents: "none",
+        }}>
+          <span style={{ fontSize: "1rem" }}>🎙️</span>
+          <span>{muteNotice}</span>
+        </div>
+      )}
 
       {cameraError && (
         <div style={{ position:"fixed", bottom:80, left:"50%", transform:"translateX(-50%)", background:"#fee2e2", color:"#991b1b", padding:"0.55rem 1rem", borderRadius:8, fontSize:"0.8rem", zIndex:100 }}>

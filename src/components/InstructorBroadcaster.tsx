@@ -156,6 +156,41 @@ export default function InstructorBroadcaster({ classId, classTitle, materials, 
   const [pollQuestion,   setPollQuestion]   = useState("");
   const [pollOptionsStr, setPollOptionsStr] = useState("Yes, No, Needs Clarification");
 
+  const [muteNotice, setMuteNotice] = useState<string|null>(null);
+  const noticeTimerRef = useRef<NodeJS.Timeout|null>(null);
+
+  const triggerNotification = useCallback((text: string) => {
+    setMuteNotice(text);
+    if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
+    noticeTimerRef.current = setTimeout(() => {
+      setMuteNotice(null);
+    }, 4500);
+  }, []);
+
+  const handleMuteStudent = useCallback((identity: string, name: string) => {
+    const payloadData = { type: "MUTE_STUDENT", targetIdentity: identity, targetName: name, senderName: "Instructor" };
+    const jsonStr = JSON.stringify(payloadData);
+    if (roomRef.current?.state === "connected") {
+      roomRef.current.localParticipant.publishData(new TextEncoder().encode(jsonStr), { reliable: true }).catch(() => {});
+    }
+    if (bcRef.current) {
+      bcRef.current.postMessage(payloadData);
+    }
+    triggerNotification(`🎙️ Instructor muted ${name}'s microphone`);
+  }, [triggerNotification]);
+
+  const handleMuteAllStudents = useCallback(() => {
+    const payloadData = { type: "MUTE_ALL", senderName: "Instructor" };
+    const jsonStr = JSON.stringify(payloadData);
+    if (roomRef.current?.state === "connected") {
+      roomRef.current.localParticipant.publishData(new TextEncoder().encode(jsonStr), { reliable: true }).catch(() => {});
+    }
+    if (bcRef.current) {
+      bcRef.current.postMessage(payloadData);
+    }
+    triggerNotification(`🎙️ Instructor muted all student microphones`);
+  }, [triggerNotification]);
+
   /* elapsed timer */
   const [elapsed, setElapsed] = useState(0);
   useEffect(() => {
@@ -983,19 +1018,25 @@ export default function InstructorBroadcaster({ classId, classTitle, materials, 
                   <span>{t==="participants"?`Participants (${studentCount+1})`:"Chat"}</span>
                 </button>
               ))}
-              <button type="button" style={{ width:40, background:"transparent", border:"none", cursor:"pointer", color:"rgba(255,255,255,0.4)", fontSize:"0.8rem" }}>?</button>
+              <button type="button" style={{ width:40, background:"transparent", border:"none", cursor:"pointer", color:"rgba(255,255,255,0.4)", fontSize:"0.8rem" }}>⚙️</button>
             </div>
 
             {rightTab === "participants" && (
               <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
                 <div style={{ padding:"0.6rem 0.85rem", borderBottom:"1px solid rgba(255,255,255,0.08)", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                   <span style={{ fontWeight:700, fontSize:"0.82rem", color:WHITE }}>Participants ({studentCount+1})</span>
-                  <span style={{ color:GOLD, fontSize:"0.75rem", cursor:"pointer" }}>View All</span>
+                  <button
+                    type="button"
+                    onClick={handleMuteAllStudents}
+                    style={{ background:"#dc2626", color:WHITE, border:"none", borderRadius:6, padding:"0.22rem 0.55rem", fontSize:"0.65rem", fontWeight:700, cursor:"pointer" }}
+                  >
+                    🔇 Mute All
+                  </button>
                 </div>
                 <div style={{ padding:"0.5rem 0.75rem", borderBottom:"1px solid rgba(255,255,255,0.08)" }}>
                   <div style={{ display:"flex", alignItems:"center", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:7, padding:"0.35rem 0.55rem", gap:"0.35rem" }}>
-                    <span style={{ color:"rgba(255,255,255,0.4)", fontSize:"0.8rem" }}>??</span>
-                    <input placeholder="Search participants�" style={{ flex:1, border:"none", outline:"none", fontSize:"0.75rem", color:WHITE, background:"transparent" }}/>
+                    <span style={{ color:"rgba(255,255,255,0.4)", fontSize:"0.8rem" }}>🔍</span>
+                    <input placeholder="Search participants…" style={{ flex:1, border:"none", outline:"none", fontSize:"0.75rem", color:WHITE, background:"transparent" }}/>
                   </div>
                 </div>
                 <div style={{ flex:1, overflowY:"auto" }}>
@@ -1012,9 +1053,8 @@ export default function InstructorBroadcaster({ classId, classTitle, materials, 
                       </div>
                     </div>
                     <div style={{ display:"flex", gap:"0.25rem" }}>
-                      <span style={{ fontSize:"0.8rem" }}>{micOn?"??":"??"}</span>
-                      <span style={{ fontSize:"0.8rem" }}>{cameraOn?"??":"??"}</span>
-                      <span style={{ fontSize:"0.8rem", color:"rgba(255,255,255,0.3)" }}>?</span>
+                      <span style={{ fontSize:"0.8rem" }}>{micOn?"🎤":"🔇"}</span>
+                      <span style={{ fontSize:"0.8rem" }}>{cameraOn?"📷":"🚫"}</span>
                     </div>
                   </div>
                   {/* Students */}
@@ -1022,17 +1062,19 @@ export default function InstructorBroadcaster({ classId, classTitle, materials, 
                     <div key={tile.identity} style={{ display:"flex", alignItems:"center", gap:"0.6rem", padding:"0.5rem 0.85rem", borderBottom:"1px solid rgba(255,255,255,0.06)" }}>
                       <div style={{ width:36, height:36, borderRadius:"50%", background:"rgba(255,255,255,0.12)", color:WHITE, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800, fontSize:"0.88rem", flexShrink:0, position:"relative" }}>
                         {tile.name.charAt(0).toUpperCase()}
-                        <span style={{ position:"absolute", bottom:0, right:0, width:9, height:9, borderRadius:"50%", background:"#22c55e", border:"1.5px solid #280808" }}/>
+                        <span style={{ position:"absolute", bottom:0, right:0, width:9, height:9, borderRadius:"50%", background:tile.hasAudio?"#22c55e":"#dc2626", border:"1.5px solid #280808" }}/>
                       </div>
-                      <div style={{ flex:1 }}>
-                        <div style={{ fontWeight:700, fontSize:"0.8rem", color:WHITE }}>{tile.name}</div>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontWeight:700, fontSize:"0.8rem", color:WHITE, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{tile.name}</div>
                         <div style={{ fontSize:"0.62rem", color:"rgba(255,255,255,0.45)" }}>Student</div>
                       </div>
-                      <div style={{ display:"flex", gap:"0.25rem" }}>
-                        <span style={{ fontSize:"0.8rem" }}>{tile.hasAudio?"??":"??"}</span>
-                        <span style={{ fontSize:"0.8rem" }}>{tile.hasVideo?"??":"??"}</span>
-                        <span style={{ fontSize:"0.8rem", color:"rgba(255,255,255,0.3)" }}>?</span>
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleMuteStudent(tile.identity, tile.name)}
+                        style={{ background:"rgba(220,38,38,0.2)", color:"#ef4444", border:"1px solid rgba(220,38,38,0.4)", borderRadius:5, padding:"0.18rem 0.45rem", fontSize:"0.62rem", fontWeight:700, cursor:"pointer" }}
+                      >
+                        Mute
+                      </button>
                     </div>
                   ))}
                   {studentCount === 0 && (
@@ -1106,6 +1148,31 @@ export default function InstructorBroadcaster({ classId, classTitle, materials, 
         </div>
       </div>
 
+      {muteNotice && (
+        <div style={{
+          position: "fixed",
+          top: 64,
+          left: "50%",
+          transform: "translateX(-50%)",
+          zIndex: 99999,
+          background: "rgba(153, 27, 27, 0.95)",
+          backdropFilter: "blur(12px)",
+          color: "#ffffff",
+          border: "1px solid rgba(255, 217, 138, 0.5)",
+          boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
+          borderRadius: 99,
+          padding: "0.55rem 1.35rem",
+          fontSize: "0.82rem",
+          fontWeight: 700,
+          display: "flex",
+          alignItems: "center",
+          gap: "0.6rem",
+          pointerEvents: "none",
+        }}>
+          <span style={{ fontSize: "1rem" }}>🎙️</span>
+          <span>{muteNotice}</span>
+        </div>
+      )}
       {showPollModal && <PollModal/>}
     </div>
   );
