@@ -52,9 +52,7 @@ export default async function DashboardPage() {
             Nakconel Examinations
           </span>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-          <a href="/learning" style={{ color: "inherit", textDecoration: "none", fontSize: "0.9rem" }}>My Course</a>
-          <a href="/results" style={{ color: "inherit", textDecoration: "none", fontSize: "0.9rem" }}>Results</a>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.7rem" }}>
           <RefreshButton />
           <LogoutButton />
         </div>
@@ -65,6 +63,12 @@ export default async function DashboardPage() {
           Welcome back
         </p>
         <h1 style={{ fontSize: "2rem", marginBottom: "1.75rem" }}>{student.fullName}</h1>
+
+        <nav aria-label="Student portal" style={portalNav}>
+          <a href="/dashboard" aria-current="page" style={{ ...portalNavLink, ...portalNavActive }}>Overview</a>
+          <a href="/learning" style={portalNavLink}>My Course</a>
+          <a href="/results" style={portalNavLink}>Results</a>
+        </nav>
 
         <div
           style={{
@@ -154,6 +158,9 @@ function StatusBadge({ status }: { status: ExamStatus }) {
 
 const fieldLabel = { fontSize: "0.8rem", color: "var(--ink-600)", marginBottom: "0.2rem" };
 const fieldValue = { fontFamily: "var(--font-display)", fontSize: "1.15rem", color: "var(--burgundy-900)", margin: 0 };
+const portalNav = { display: "flex", gap: "0.55rem", flexWrap: "wrap", margin: "-0.7rem 0 1.35rem" } as const;
+const portalNavLink = { minHeight: 44, display: "inline-flex", alignItems: "center", padding: "0.5rem 0.85rem", borderRadius: 6, border: "1px solid var(--line)", color: "var(--burgundy-900)", fontSize: "0.88rem", fontWeight: 700, textDecoration: "none" } as const;
+const portalNavActive = { background: "var(--burgundy-900)", borderColor: "var(--burgundy-900)", color: "#fff" } as const;
 
 const emptyState = {
   border: "1px dashed var(--gold-400)",

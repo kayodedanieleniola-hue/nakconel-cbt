@@ -25,6 +25,7 @@ export default function ClassroomReplayPlayer({
   const videoRef = useRef<HTMLVideoElement>(null);
   const [playbackRate, setPlaybackRate] = useState(1);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [showMore, setShowMore] = useState(false);
 
   const changeSpeed = (rate: number) => {
     setPlaybackRate(rate);
@@ -47,19 +48,30 @@ export default function ClassroomReplayPlayer({
 
   return (
     <div style={overlay}>
-      <div style={modalCard}>
-        <div style={modalHeader}>
+      <div style={modalCard} className="replay-modal">
+        <div style={modalHeader} className="replay-header">
           <div>
             <span style={archiveTag}>ARCHIVED REPLAY SESSION</span>
             <h3 style={modalTitle}>{classTitle}</h3>
             {instructorName && <p style={instructorSub}>Instructor: {instructorName}</p>}
           </div>
-          <button type="button" onClick={onClose} style={closeBtn}>
-            Close Replay
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", position: "relative" }}>
+            <button type="button" onClick={() => setShowMore((open) => !open)} aria-label="Replay options" aria-expanded={showMore} style={moreBtn}>•••</button>
+            {showMore && (
+              <div style={moreMenu}>
+                <span style={speedLabel}>Playback speed</span>
+                <div style={speedOptions}>
+                  {[1, 1.25, 1.5, 2].map((rate) => (
+                    <button key={rate} type="button" onClick={() => { changeSpeed(rate); setShowMore(false); }} style={{ ...speedBtn, background: playbackRate === rate ? "#98661B" : "#2a1010", color: playbackRate === rate ? "#fff" : "#ffd98a" }}>{rate}x</button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <button type="button" onClick={onClose} style={closeBtn}>End session</button>
+          </div>
         </div>
 
-        <div style={bodyGrid}>
+        <div style={bodyGrid} className="replay-body">
           {/* Main Video Screen */}
           <div style={videoStage}>
             <video
@@ -77,28 +89,12 @@ export default function ClassroomReplayPlayer({
                 {isPlaying ? "Pause" : "Play"}
               </button>
 
-              <div style={speedSelector}>
-                <span style={speedLabel}>Speed:</span>
-                {[1, 1.25, 1.5, 2].map((rate) => (
-                  <button
-                    key={rate}
-                    type="button"
-                    onClick={() => changeSpeed(rate)}
-                    style={{
-                      ...speedBtn,
-                      background: playbackRate === rate ? "#98661B" : "#2a1010",
-                      color: playbackRate === rate ? "#fff" : "#ffd98a",
-                    }}
-                  >
-                    {rate}x
-                  </button>
-                ))}
-              </div>
+              <span style={speedLabel}>{playbackRate}x playback</span>
             </div>
           </div>
 
           {/* Materials Sidebar */}
-          <div style={materialsSidebar}>
+          <div style={materialsSidebar} className="replay-materials">
             <h4 style={materialsHeader}>Class Materials ({materials.length})</h4>
             {materials.length === 0 ? (
               <p style={emptyMaterials}>No files attached to this class session.</p>
@@ -193,6 +189,10 @@ const closeBtn = {
   cursor: "pointer",
 } as const;
 
+const moreBtn = { width: 44, height: 40, background: "#2a1010", color: "#ffd98a", border: "1px solid #4a1c1c", borderRadius: 6, cursor: "pointer", fontSize: "1.1rem", fontWeight: 800, lineHeight: 1 } as const;
+const moreMenu = { position: "absolute", right: "6.5rem", top: "2.8rem", zIndex: 5, minWidth: 190, padding: "0.75rem", borderRadius: 8, background: "#250b0b", border: "1px solid #98661B", boxShadow: "0 10px 24px rgba(0,0,0,0.5)" } as const;
+const speedOptions = { display: "flex", gap: "0.35rem", marginTop: "0.45rem" } as const;
+
 const bodyGrid = {
   display: "grid",
   gridTemplateColumns: "1fr 300px",
@@ -232,12 +232,6 @@ const playBtn = {
   fontSize: "0.85rem",
   fontWeight: 700,
   cursor: "pointer",
-} as const;
-
-const speedSelector = {
-  display: "flex",
-  alignItems: "center",
-  gap: "0.4rem",
 } as const;
 
 const speedLabel = {

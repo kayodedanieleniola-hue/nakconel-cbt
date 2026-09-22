@@ -120,3 +120,10 @@ button, input, select, textarea {
     transition-duration: 0.001ms !important;
   }
 }
+
+@media (max-width: 700px) {
+  .replay-modal { max-height: 100dvh !important; border-radius: 0 !important; }
+  .replay-header { padding: 0.8rem !important; align-items: flex-start !important; gap: 0.75rem !important; }
+  .replay-body { grid-template-columns: 1fr !important; overflow-y: auto !important; }
+  .replay-materials { border-left: 0 !important; border-top: 1px solid #331010 !important; max-height: 30dvh; }
+}

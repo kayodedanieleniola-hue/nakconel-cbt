@@ -169,6 +169,21 @@ function NakLogo({ light=false, compact=false }: { light?: boolean; compact?: bo
 type Meeting = { id: string; title: string; instructor: string|null; description: string|null; status: string };
 type PTile   = { identity: string; name: string; videoPub: RemoteTrackPublication|null; audioPub: RemoteTrackPublication|null };
 
+function ScreenShareFocus({ track, instructorName }: { track: any; instructorName: string }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !track) return;
+    track.attach(video);
+    void video.play().catch(() => {});
+    return () => { track.detach(video); };
+  }, [track]);
+  return <section aria-label="Instructor screen share" style={{ position:"fixed", inset:0, zIndex:1200, background:"#050202", display:"flex", alignItems:"center", justifyContent:"center" }}>
+    <video ref={videoRef} autoPlay playsInline style={{ width:"100%", height:"100%", objectFit:"contain" }} />
+    <div style={{ position:"absolute", top:"max(0.75rem, env(safe-area-inset-top))", left:"0.75rem", borderRadius:999, background:"rgba(0,0,0,0.78)", border:`1px solid ${GOLD}`, color:WHITE, padding:"0.45rem 0.8rem", fontSize:"0.78rem", fontWeight:700 }}>{instructorName} is sharing their screen</div>
+  </section>;
+}
+
 /* ─── Remote video tile ──────────────────────────────────────────────────── */
 function RemoteTile({ tile, large=false, compact=false }: { tile: PTile; large?: boolean; compact?: boolean }) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -330,6 +345,7 @@ export default function GeneralClassroomClient({ meeting, studentName, isInstruc
   const localAudioTrack = useRef<LocalTrack|null>(null);
   const screenTracks = useRef<LocalTrack[]>([]);
   const [screenSharing, setScreenSharing] = useState(false);
+  const [remoteScreenTrack, setRemoteScreenTrack] = useState<any | null>(null);
   const [isHandRaised,  setIsHandRaised]  = useState(false);
   const [raisedHands,   setRaisedHands]   = useState<Record<string, string>>({});
   const [showMore, setShowMore] = useState(false);
@@ -536,6 +552,8 @@ export default function GeneralClassroomClient({ meeting, studentName, isInstruc
       });
       room.on(RoomEvent.TrackSubscribed, (track, pub, rp: RemoteParticipant) => {
         if (!activeRef.current) return;
+        const isScreen = pub.source === Track.Source.ScreenShare || track.source === Track.Source.ScreenShare;
+        if (isScreen && track.kind === Track.Kind.Video && rp.identity.startsWith("instructor-")) setRemoteScreenTrack(track);
         setParticipants(p => {
           const ex = p[rp.identity] ?? { identity: rp.identity, name: rp.name || rp.identity, videoPub: null, audioPub: null };
           if (track.kind === Track.Kind.Video) return { ...p, [rp.identity]: { ...ex, videoPub: pub } };
@@ -545,6 +563,8 @@ export default function GeneralClassroomClient({ meeting, studentName, isInstruc
       });
       room.on(RoomEvent.TrackUnsubscribed, (track, _pub, rp: RemoteParticipant) => {
         if (!activeRef.current) return;
+        const isScreen = _pub.source === Track.Source.ScreenShare || track.source === Track.Source.ScreenShare;
+        if (isScreen && track.kind === Track.Kind.Video && rp.identity.startsWith("instructor-")) setRemoteScreenTrack(null);
         setParticipants(p => {
           const ex = p[rp.identity]; if (!ex) return p;
           if (track.kind === Track.Kind.Video) return { ...p, [rp.identity]: { ...ex, videoPub: null } };
@@ -688,6 +708,7 @@ export default function GeneralClassroomClient({ meeting, studentName, isInstruc
         {/* Always-mounted hidden video — track attaches here once, never unmounts */}
         <video ref={hiddenSelfRef} autoPlay playsInline muted
           style={{ position:"absolute", width:1, height:1, opacity:0, pointerEvents:"none", top:-9999 }}/>
+        {remoteScreenTrack && <ScreenShareFocus track={remoteScreenTrack} instructorName={hostTile?.name ?? meeting.instructor ?? "Instructor"} />}
 
         {/* ── TOP BAR ────────────────────────────────────────────────── */}
         <div style={{ height:56, padding:"0 0.75rem", display:"flex", alignItems:"center", gap:"0.5rem", background:"#111111", borderBottom:"1px solid rgba(255,255,255,0.06)", flexShrink:0 }}>
@@ -844,6 +865,7 @@ export default function GeneralClassroomClient({ meeting, studentName, isInstruc
       {/* Always-mounted hidden video */}
       <video ref={hiddenSelfRef} autoPlay playsInline muted
         style={{ position:"absolute", width:1, height:1, opacity:0, pointerEvents:"none", top:-9999 }}/>
+      {remoteScreenTrack && <ScreenShareFocus track={remoteScreenTrack} instructorName={hostTile?.name ?? meeting.instructor ?? "Instructor"} />}
 
       {/* top bar */}
       <header style={{ height:58, padding:"0 1.5rem", flexShrink:0, background:`linear-gradient(180deg,${SURFACE} 0%,rgba(28,8,8,0.97) 100%)`, borderBottom:"1px solid rgba(255,255,255,0.07)", display:"flex", alignItems:"center", justifyContent:"space-between", gap:"1rem", backdropFilter:"blur(10px)" }}>

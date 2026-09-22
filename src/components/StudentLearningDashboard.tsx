@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import CertificateModal, { CertificateData } from "@/components/CertificateModal";
 import ClassroomReplayPlayer from "@/components/ClassroomReplayPlayer";
 
 type LearningClassItem = {
@@ -32,7 +31,6 @@ export default function StudentLearningDashboard({
   totalExams,
   allClasses,
   materials,
-  certificate,
 }: {
   studentName: string;
   studentId: string;
@@ -44,19 +42,8 @@ export default function StudentLearningDashboard({
   totalExams: number;
   allClasses: LearningClassItem[];
   materials: MaterialItem[];
-  certificate?: CertificateData | null;
 }) {
-  const [showCertModal, setShowCertModal] = useState(false);
   const [selectedReplay, setSelectedReplay] = useState<LearningClassItem | null>(null);
-
-  const activeCert: CertificateData = certificate || {
-    code: `CERT-NAK-2026-${studentId.replace(/\D/g, "") || "9021"}`,
-    issuedAt: new Date().toISOString(),
-    grade: progressPercent >= 85 ? "FIRST CLASS HONORS" : "EXCELLENCE",
-    studentName,
-    studentId,
-    courseName,
-  };
 
   return (
     <div style={{ marginTop: "1rem" }}>
@@ -73,13 +60,6 @@ export default function StudentLearningDashboard({
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setShowCertModal(true)}
-            style={certBtn}
-          >
-            View / Download Certificate
-          </button>
         </div>
 
         <div style={progressTrack}>
@@ -89,14 +69,14 @@ export default function StudentLearningDashboard({
 
       {/* Completed & Recorded Replay Classes */}
       <h2 style={heading}>Archived & Recorded Class Replays</h2>
-      {allClasses.filter((c) => c.status === "COMPLETED" || c.recordingUrl).length === 0 ? (
+      {allClasses.filter((c) => c.recordingUrl).length === 0 ? (
         <div style={emptyCard}>
           <p style={{ margin: 0 }}>No archived class replays are available yet. Completed live classes will appear here for replay.</p>
         </div>
       ) : (
         <div style={classGrid}>
           {allClasses
-            .filter((c) => c.status === "COMPLETED" || c.recordingUrl)
+            .filter((c) => c.recordingUrl)
             .map((item) => (
               <article key={item.id} style={replayCard}>
                 <span style={replayBadge}>CLASS REPLAY</span>
@@ -114,19 +94,11 @@ export default function StudentLearningDashboard({
         </div>
       )}
 
-      {/* Certificate Modal Popup */}
-      {showCertModal && (
-        <CertificateModal
-          data={activeCert}
-          onClose={() => setShowCertModal(false)}
-        />
-      )}
-
       {/* Replay Player Modal Popup */}
       {selectedReplay && (
         <ClassroomReplayPlayer
           classTitle={selectedReplay.title}
-          videoUrl={selectedReplay.recordingUrl || "/sample-replay.mp4"}
+          videoUrl={selectedReplay.recordingUrl!}
           materials={materials}
           onClose={() => setSelectedReplay(null)}
         />
@@ -172,18 +144,6 @@ const progressFill = {
   background: "linear-gradient(90deg, #98661B, #d4af37)",
   borderRadius: 99,
   transition: "width 0.5s ease",
-} as const;
-
-const certBtn = {
-  background: "linear-gradient(135deg, #5c1d1d, #802626)",
-  color: "#ffd98a",
-  border: "1px solid #98661B",
-  borderRadius: 8,
-  padding: "0.6rem 1.1rem",
-  fontSize: "0.88rem",
-  fontWeight: 800,
-  cursor: "pointer",
-  boxShadow: "0 4px 12px rgba(92, 29, 29, 0.25)",
 } as const;
 
 const heading = {

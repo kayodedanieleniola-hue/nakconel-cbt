@@ -13,6 +13,7 @@ type ClassItem = {
   endsAt: string | null;
   status: string;
   activeMaterialId: string | null;
+  recordingUrl?: string | null;
   isGeneral?: boolean;
 };
 
@@ -530,6 +531,7 @@ function ClassCard({
     endsAt: local(item.endsAt),
     status: item.status,
     activeMaterialId: item.activeMaterialId ?? "",
+    recordingUrl: item.recordingUrl ?? "",
   });
 
   return (
@@ -572,6 +574,10 @@ function ClassCard({
               </option>
             ))}
           </select>
+          <label style={label}>
+            Recording URL (optional)
+            <input value={form.recordingUrl} onChange={(e) => setForm({ ...form, recordingUrl: e.target.value })} placeholder="https://…/class-recording.mp4" style={input} />
+          </label>
           <select
             value={form.status}
             onChange={(e) => setForm({ ...form, status: e.target.value })}
@@ -605,6 +611,7 @@ function ClassCard({
                 ? ` · Active Deck: ${materials.find((m) => m.id === item.activeMaterialId)?.title ?? "Assigned"}`
                 : ""}
             </p>
+            {item.recordingUrl && <a href={item.recordingUrl} download style={outline}>Download recording</a>}
           </div>
           <div style={actions}>
             {item.isGeneral ? (

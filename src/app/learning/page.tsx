@@ -138,15 +138,6 @@ export default async function MyCoursePage() {
     where: { studentId: student.id, passed: true },
   });
 
-  const certificate = await prisma.courseCertificate.findUnique({
-    where: {
-      studentId_courseId: {
-        studentId: student.studentId,
-        courseId: student.course.id,
-      },
-    },
-  });
-
   const assignments = await prisma.assignment.findMany({
     where: { courseId: student.course.id },
     include: {
@@ -208,18 +199,6 @@ export default async function MyCoursePage() {
             recordingUrl: c.recordingUrl,
           }))}
           materials={student.course.materials}
-          certificate={
-            certificate
-              ? {
-                  code: certificate.code,
-                  issuedAt: certificate.issuedAt.toISOString(),
-                  grade: certificate.grade,
-                  studentName: student.fullName,
-                  studentId: student.studentId,
-                  courseName: student.course.name,
-                }
-              : null
-          }
         />
         <section style={dashboardGrid} aria-label="Learning overview">
           <OverviewCard label="Live now" title={liveClass?.title ?? "No live class"} text={liveClass ? "Your class is live now. Select Join live classroom below." : "There is no live class at the moment."} tone="live" />
