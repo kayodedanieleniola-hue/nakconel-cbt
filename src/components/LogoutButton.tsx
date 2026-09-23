@@ -6,9 +6,11 @@ import { useState } from "react";
 export default function LogoutButton({
   redirectTo = "/login",
   role = "student",
+  className,
 }: {
   redirectTo?: string;
   role?: "student" | "admin";
+  className?: string;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -28,6 +30,7 @@ export default function LogoutButton({
     <button
       onClick={handleLogout}
       disabled={loading}
+      className={className}
       style={{
         background: "transparent",
         border: "1px solid var(--gold-400)",

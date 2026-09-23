@@ -7,11 +7,12 @@ export default async function AdminOverviewPage() {
   const stats = await getOverviewStats();
 
   return (
-    <div>
-      <p style={{ color: "var(--gold-600)", fontWeight: 600, fontSize: "0.9rem", marginBottom: "0.4rem" }}>
-        Overview
-      </p>
-      <h1 style={{ fontSize: "1.9rem", marginBottom: "2rem" }}>Platform at a glance</h1>
+    <div className="admin-overview">
+      <div className="admin-overview__content">
+        <p style={{ color: "var(--gold-600)", fontWeight: 700, fontSize: "0.86rem", marginBottom: "0.4rem" }}>
+          Overview
+        </p>
+        <h1 style={{ fontSize: "1.9rem", marginBottom: "2rem" }}>Platform at a glance</h1>
 
       <div
         style={{
@@ -29,7 +30,7 @@ export default async function AdminOverviewPage() {
         <StatCard label="Closed" value={stats.exams.closed} />
       </div>
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", gap: "1rem", flexWrap: "wrap" }}>
         <h2 style={{ fontSize: "1.2rem" }}>Recent registrations</h2>
         <Link href="/admin/students" style={{ color: "var(--gold-600)", fontWeight: 600, fontSize: "0.9rem", textDecoration: "none" }}>
           View all students →
@@ -66,6 +67,19 @@ export default async function AdminOverviewPage() {
           ))}
         </div>
       )}
+      </div>
+
+      <aside className="admin-overview__aside" aria-label="Quick actions">
+        <h2>Quick actions</h2>
+        <Link href="/admin/students/activate" className="admin-quick-action admin-quick-action--primary">+ Activate student</Link>
+        <Link href="/admin/courses" className="admin-quick-action admin-quick-action--gold">Add course</Link>
+        <Link href="/admin/exams/new" className="admin-quick-action">Create exam</Link>
+        <Link href="/admin/learning" className="admin-quick-action">Manage classes</Link>
+        <div className="admin-overview__note">
+          <strong>Admin workspace</strong>
+          <p>Use the navigation to manage students, courses, learning sessions, examinations, and reviews.</p>
+        </div>
+      </aside>
     </div>
   );
 }
