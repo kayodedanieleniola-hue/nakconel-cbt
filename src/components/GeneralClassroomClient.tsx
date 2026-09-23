@@ -480,12 +480,17 @@ export default function GeneralClassroomClient({ meeting, studentName, isInstruc
 
   /* LiveKit — logic unchanged ───────────────────────────────────────────── */
   useEffect(() => {
+    // Cancel stale asynchronous joins. Without this, a remounted React
+    // component can finish an old token request and join again as the same
+    // student, causing LiveKit to disconnect the newly joined participant.
+    let disposed = false;
+    const isActive = () => !disposed && activeRef.current;
     activeRef.current = true;
     async function connect() {
       const camP = (async () => {
         try {
           const tracks = await createLocalTracks({ audio:true, video:{ facingMode:"user" } });
-          if (!activeRef.current) { tracks.forEach(t => t.stop()); return; }
+          if (!isActive()) { tracks.forEach(t => t.stop()); return; }
           const vid = tracks.find(t => t.kind === Track.Kind.Video) ?? null;
           const aud = tracks.find(t => t.kind === Track.Kind.Audio) ?? null;
           localVideoTrack.current = vid; localAudioTrack.current = aud;
@@ -498,9 +503,9 @@ export default function GeneralClassroomClient({ meeting, studentName, isInstruc
             }
             setSelfStream(stream);
           }
-          if (activeRef.current) setCameraReady(true);
+          if (isActive()) setCameraReady(true);
           return { vid, aud };
-        } catch { if (activeRef.current) setCameraError("Camera access denied."); return { vid:null, aud:null }; }
+        } catch { if (isActive()) setCameraError("Camera access denied."); return { vid:null, aud:null }; }
       })();
 
       let url: string, token: string;
@@ -510,13 +515,13 @@ export default function GeneralClassroomClient({ meeting, studentName, isInstruc
         if (!res.ok || !d.url || !d.token) throw new Error(d.error ?? "Token unavailable");
         url   = (d.url as string).replace(/^https:\/\//,"wss://").replace(/^http:\/\//,"ws://");
         token = d.token as string;
-      } catch { if (activeRef.current) setConnStatus("error"); return; }
-      if (!activeRef.current) return;
+      } catch { if (isActive()) setConnStatus("error"); return; }
+      if (!isActive()) return;
 
       const room = new Room({ adaptiveStream:false, dynacast:true, disconnectOnPageLeave:false });
       roomRef.current = room;
-      room.on(RoomEvent.Connected, () => { if (activeRef.current) { setConnStatus("live"); setActiveRoom(room); } });
-      room.on(RoomEvent.Disconnected, () => { if (activeRef.current) setConnStatus("error"); });
+      room.on(RoomEvent.Connected, () => { if (isActive()) { setConnStatus("live"); setActiveRoom(room); } });
+      room.on(RoomEvent.Disconnected, () => { if (isActive()) setConnStatus("error"); });
       room.on(RoomEvent.DataReceived, (payload: Uint8Array) => {
         try {
           const text = new TextDecoder().decode(payload);
@@ -574,8 +579,8 @@ export default function GeneralClassroomClient({ meeting, studentName, isInstruc
       });
 
       try { await room.connect(url, token); }
-      catch { if (activeRef.current) setConnStatus("error"); return; }
-      if (!activeRef.current) { void room.disconnect(); return; }
+      catch { if (isActive()) setConnStatus("error"); return; }
+      if (!isActive()) { void room.disconnect(); return; }
 
       setParticipants(prev => {
         const next = { ...prev };
@@ -593,7 +598,7 @@ export default function GeneralClassroomClient({ meeting, studentName, isInstruc
       });
 
       const cr = await camP;
-      if (cr && activeRef.current && room.state === "connected") {
+      if (cr && isActive() && room.state === "connected") {
         for (const t of [cr.vid, cr.aud].filter(Boolean) as LocalTrack[]) {
           await room.localParticipant.publishTrack(t).catch((err) => console.warn("Track publish error:", err));
         }
@@ -601,6 +606,7 @@ export default function GeneralClassroomClient({ meeting, studentName, isInstruc
     }
     void connect();
     return () => {
+      disposed = true;
       activeRef.current = false;
       screenTracks.current.forEach((track) => track.stop());
       const r = roomRef.current;
