@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
 import { getStudentSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import LogoutButton from "@/components/LogoutButton";
-import RefreshButton from "@/components/RefreshButton";
+import StudentShell from "@/components/StudentShell";
 
 export const dynamic = "force-dynamic";
 
@@ -20,44 +19,141 @@ export default async function ResultsPage() {
   });
 
   return (
-    <main style={{ minHeight: "100dvh", background: "var(--cream-50)" }}>
-      <header style={header}>
-        <a href="/dashboard" style={brand}>Nakconel Examinations</a>
-        <div style={headerActions}><a href="/dashboard" style={navLink}>Dashboard</a><RefreshButton /><LogoutButton /></div>
-      </header>
-      <section style={content}>
-        <p style={eyebrow}>Student record</p>
-        <h1>Results and history</h1>
+    <StudentShell studentName={student.fullName} backTitle="Results and history" backHref="/dashboard">
+      <div style={{ maxWidth: 850, margin: "0 auto" }}>
+        {/* Eyebrow and Heading */}
+        <div style={{ marginBottom: "1.75rem" }}>
+          <p
+            style={{
+              color: "var(--gold-600)",
+              fontWeight: 700,
+              fontSize: "0.88rem",
+              textTransform: "uppercase",
+              letterSpacing: "0.04em",
+              margin: "0 0 0.35rem 0",
+            }}
+          >
+            Student record
+          </p>
+          <h1
+            style={{
+              fontSize: "clamp(1.75rem, 4vw, 2.4rem)",
+              fontWeight: 800,
+              color: "var(--burgundy-900)",
+              margin: 0,
+              letterSpacing: "-0.02em",
+            }}
+          >
+            Results and history
+          </h1>
+        </div>
+
+        {/* Results List */}
         {attempts.length === 0 ? (
-          <div style={emptyState}>You have not completed an exam yet.</div>
+          <div
+            style={{
+              background: "#ffffff",
+              border: "1px dashed var(--gold-400)",
+              borderRadius: 8,
+              padding: "2rem",
+              textAlign: "center",
+              color: "var(--ink-600)",
+              fontSize: "0.95rem",
+            }}
+          >
+            You have not completed an exam yet.
+          </div>
         ) : (
-          <div style={{ display: "grid", gap: "0.8rem" }}>
-            {attempts.map((attempt) => (
-              <article key={attempt.id} style={resultCard}>
-                <div>
-                  <h2 style={{ margin: 0, fontSize: "1.15rem", color: "var(--burgundy-900)" }}>{attempt.exam.name}</h2>
-                  <p style={{ margin: "0.35rem 0 0", color: "var(--ink-600)", fontSize: "0.9rem" }}>
-                    {attempt.submittedAt ? new Date(attempt.submittedAt).toLocaleString() : "No submission time"}
-                  </p>
-                </div>
-                <div style={{ textAlign: "right" }}>
-                  <strong style={{ color: attempt.passed ? "var(--success)" : "var(--danger)", fontSize: "1.2rem" }}>{attempt.score ?? 0}%</strong>
-                  <p style={{ margin: "0.2rem 0 0", fontSize: "0.82rem" }}>{attempt.status === "TIMED_OUT" ? "Timed out" : attempt.passed ? "Passed" : `Not passed (need ${attempt.exam.passingScore}%)`}</p>
-                </div>
-              </article>
-            ))}
+          <div style={{ display: "grid", gap: "1rem" }}>
+            {attempts.map((attempt) => {
+              const formattedDate = attempt.submittedAt
+                ? new Date(attempt.submittedAt).toLocaleString("en-US", {
+                    month: "numeric",
+                    day: "numeric",
+                    year: "numeric",
+                    hour: "numeric",
+                    minute: "2-digit",
+                    second: "2-digit",
+                    hour12: true,
+                  })
+                : "No submission time";
+
+              const statusText =
+                attempt.status === "TIMED_OUT"
+                  ? "Timed out"
+                  : attempt.passed
+                  ? "Passed"
+                  : "Completed";
+
+              const isSuccess = attempt.passed;
+
+              return (
+                <article key={attempt.id} style={resultCardStyle}>
+                  <div style={{ minWidth: 0 }}>
+                    <h2
+                      style={{
+                        margin: "0 0 0.35rem 0",
+                        fontSize: "1.2rem",
+                        fontWeight: 700,
+                        color: "var(--burgundy-900)",
+                      }}
+                    >
+                      {attempt.exam.name}
+                    </h2>
+                    <p
+                      style={{
+                        margin: 0,
+                        color: "var(--ink-600)",
+                        fontSize: "0.88rem",
+                        fontWeight: 500,
+                      }}
+                    >
+                      {formattedDate}
+                    </p>
+                  </div>
+
+                  <div className="result-card-right" style={{ textAlign: "right" }}>
+                    <strong
+                      style={{
+                        display: "block",
+                        color: isSuccess ? "var(--success)" : "var(--danger)",
+                        fontSize: "1.4rem",
+                        fontWeight: 800,
+                        lineHeight: 1.2,
+                      }}
+                    >
+                      {attempt.score ?? 0}%
+                    </strong>
+                    <p
+                      style={{
+                        margin: "0.25rem 0 0 0",
+                        color: "var(--ink-600)",
+                        fontSize: "0.85rem",
+                        fontWeight: 600,
+                      }}
+                    >
+                      {statusText}
+                    </p>
+                  </div>
+                </article>
+              );
+            })}
           </div>
         )}
-      </section>
-    </main>
+      </div>
+    </StudentShell>
   );
 }
 
-const header = { background: "var(--burgundy-900)", color: "var(--cream-50)", padding: "1.1rem 6vw", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "1rem" } as const;
-const brand = { color: "inherit", fontFamily: "var(--font-display)", fontStyle: "italic", fontSize: "1.15rem", textDecoration: "none" } as const;
-const headerActions = { display: "flex", alignItems: "center", gap: "1rem" } as const;
-const navLink = { color: "inherit", textDecoration: "none", fontSize: "0.9rem" } as const;
-const content = { padding: "5vh 6vw", maxWidth: 780, margin: "0 auto" } as const;
-const eyebrow = { color: "var(--gold-600)", fontWeight: 600, fontSize: "0.9rem" } as const;
-const emptyState = { border: "1px dashed var(--gold-400)", borderRadius: 6, padding: "1.5rem", color: "var(--ink-600)" } as const;
-const resultCard = { background: "#fff", border: "1px solid var(--line)", borderRadius: 6, padding: "1.15rem 1.4rem", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "1rem", flexWrap: "wrap" } as const;
+const resultCardStyle = {
+  background: "#ffffff",
+  border: "1px solid var(--line)",
+  borderRadius: 8,
+  padding: "1.35rem 1.6rem",
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: "1.25rem",
+  flexWrap: "wrap",
+  boxShadow: "var(--shadow-sm)",
+} as const;

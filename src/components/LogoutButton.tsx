@@ -7,10 +7,12 @@ export default function LogoutButton({
   redirectTo = "/login",
   role = "student",
   className,
+  children,
 }: {
   redirectTo?: string;
   role?: "student" | "admin";
   className?: string;
+  children?: React.ReactNode;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -31,17 +33,21 @@ export default function LogoutButton({
       onClick={handleLogout}
       disabled={loading}
       className={className}
-      style={{
-        background: "transparent",
-        border: "1px solid var(--gold-400)",
-        color: "var(--cream-50)",
-        padding: "0.5rem 1rem",
-        borderRadius: 4,
-        cursor: "pointer",
-        fontSize: "0.9rem",
-      }}
+      style={
+        className
+          ? undefined
+          : {
+              background: "transparent",
+              border: "1px solid var(--gold-400)",
+              color: "var(--cream-50)",
+              padding: "0.5rem 1rem",
+              borderRadius: 4,
+              cursor: "pointer",
+              fontSize: "0.9rem",
+            }
+      }
     >
-      {loading ? "Logging out…" : "Log out"}
+      {loading ? "Logging out…" : children || "Log out"}
     </button>
   );
 }

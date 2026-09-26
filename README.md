@@ -45,8 +45,12 @@ contents.)
    | `SEED_ADMIN_EMAIL` | the email for your first admin login (optional but recommended) |
    | `SEED_ADMIN_PASSWORD` | a strong password for that admin (optional but recommended) |
 
-4. Deploy. The build automatically creates all the database tables — you
-   don't need to run any migration command yourself.
+4. Deploy. Preview builds compile the app without altering the database.
+   Before the first production deployment (or after changing
+   `prisma/schema.prisma`), run `npm run db:deploy` in an environment with
+   the production database credentials. This keeps preview deployments from
+   failing when a database is unavailable and prevents preview builds from
+   changing a shared database schema.
 
 ## 4. Create the courses (one-time)
 

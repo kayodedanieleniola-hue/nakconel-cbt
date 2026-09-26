@@ -80,7 +80,6 @@ export default function AdminShell({ adminName, children }: { adminName: string;
     </header>
     <nav className="admin-top-nav" aria-label="Primary navigation"><Navigation variant="top" /></nav>
     <div className="admin-shell__body">
-      <aside className="admin-rail" aria-label="Primary navigation"><Navigation variant="rail" /><div className="admin-rail__logout"><Icon name="logout" size={19} /><LogoutButton redirectTo="/admin/login" role="admin" className="admin-rail-logout" /></div></aside>
       <main className="admin-main">{children}</main>
     </div>
     {drawerOpen && <div className="admin-drawer-layer" role="presentation" onMouseDown={() => setDrawerOpen(false)}>
