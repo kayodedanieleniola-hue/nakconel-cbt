@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import MaterialViewerModal from "@/components/MaterialViewerModal";
 
 type MaterialItem = {
   id: string;
@@ -26,6 +27,8 @@ export default function ClassroomReplayPlayer({
   const [playbackRate, setPlaybackRate] = useState(1);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showMore, setShowMore] = useState(false);
+
+  const [viewingMaterial, setViewingMaterial] = useState<MaterialItem | null>(null);
 
   const changeSpeed = (rate: number) => {
     setPlaybackRate(rate);
@@ -101,24 +104,33 @@ export default function ClassroomReplayPlayer({
             ) : (
               <div style={materialsList}>
                 {materials.map((item) => (
-                  <a
+                  <button
                     key={item.id}
-                    href={`/api/student/learning/materials?id=${item.id}`}
-                    download
+                    type="button"
+                    onClick={() => setViewingMaterial(item)}
                     style={materialCard}
                   >
                     <div>
                       <strong style={materialTitle}>{item.title}</strong>
                       <span style={materialMeta}>{item.fileName} ({Math.ceil(item.sizeBytes / 1024)} KB)</span>
                     </div>
-                    <span style={downloadIcon}>Download</span>
-                  </a>
+                    <span style={downloadIcon}>View</span>
+                  </button>
                 ))}
               </div>
             )}
           </div>
         </div>
       </div>
+
+      {viewingMaterial && (
+        <MaterialViewerModal
+          materialId={viewingMaterial.id}
+          title={viewingMaterial.title}
+          fileName={viewingMaterial.fileName}
+          onClose={() => setViewingMaterial(null)}
+        />
+      )}
     </div>
   );
 }

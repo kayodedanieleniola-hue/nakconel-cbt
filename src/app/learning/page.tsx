@@ -6,6 +6,7 @@ import LcLogoutButton from "@/components/LcLogoutButton";
 import RefreshButton from "@/components/RefreshButton";
 import StudentLearningDashboard from "@/components/StudentLearningDashboard";
 import StudentShell from "@/components/StudentShell";
+import StudentMaterialsList from "@/components/StudentMaterialsList";
 import { getExamStatus } from "@/lib/examStatus";
 import { syncLearningClassStatuses } from "@/lib/learningSchedule";
 
@@ -242,29 +243,8 @@ export default async function MyCoursePage() {
           </div>
         )}
 
-        {/* Course Materials */}
-        {student.course.materials.length > 0 && (
-          <div style={{ marginTop: "2rem" }}>
-            <h2 style={headingStyle}>Course Materials</h2>
-            <div style={{ display: "grid", gap: "0.85rem", marginTop: "0.75rem" }}>
-              {student.course.materials.map((material) => (
-                <article key={material.id} style={classCardStyle}>
-                  <div>
-                    <h3 style={{ margin: "0 0 0.2rem 0", color: "var(--burgundy-900)", fontSize: "1.05rem" }}>
-                      {material.title}
-                    </h3>
-                    <p style={mutedStyle}>
-                      {material.fileName} &middot; {Math.ceil(material.sizeBytes / 1024)} KB
-                    </p>
-                  </div>
-                  <a href={`/api/learning/materials/${material.id}`} style={downloadBtnStyle}>
-                    Download
-                  </a>
-                </article>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* Course Materials & Textbooks */}
+        <StudentMaterialsList materials={student.course.materials} />
       </div>
     </StudentShell>
   );
