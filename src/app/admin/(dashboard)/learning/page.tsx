@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import GeneralClassroomClient from "@/components/GeneralClassroomClient";
+import AdminCurriculumManager, { CurriculumItem } from "@/components/AdminCurriculumManager";
 
 type ClassItem = {
   id: string;
@@ -41,6 +42,7 @@ type Course = {
   modules: Module[];
   classes: ClassItem[];
   materials: Material[];
+  curriculum?: CurriculumItem[];
 };
 
 const statuses = ["DRAFT", "SCHEDULED", "LIVE", "COMPLETED", "CANCELLED"];
@@ -218,6 +220,14 @@ export default function LearningManagementPage() {
               </option>
             ))}
           </select>
+          {selected && (
+            <AdminCurriculumManager
+              courseId={selected.id}
+              courseName={selected.name}
+              items={selected.curriculum ?? []}
+              onRefresh={load}
+            />
+          )}
 
           {selected && (
             <>

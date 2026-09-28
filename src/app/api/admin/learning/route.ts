@@ -10,7 +10,39 @@ export async function GET() {
   const guard = await requireAdmin();
   if (!guard.ok) return guard.response;
   await syncLearningClassStatuses();
-  const courses = await prisma.course.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, materials: { orderBy: { createdAt: "desc" }, select: { id: true, title: true, fileName: true, mimeType: true, sizeBytes: true, moduleId: true, classId: true } }, modules: { orderBy: { position: "asc" }, select: { id: true, title: true, description: true, position: true, classes: { orderBy: { startsAt: "asc" }, select: { id: true, title: true, instructor: true, description: true, startsAt: true, endsAt: true, status: true, activeMaterialId: true, recordingUrl: true, isGeneral: true } } } }, classes: { where: { moduleId: null }, orderBy: { startsAt: "asc" }, select: { id: true, title: true, instructor: true, description: true, startsAt: true, endsAt: true, status: true, activeMaterialId: true, recordingUrl: true, isGeneral: true } } } });
+  const courses = await prisma.course.findMany({
+    orderBy: { name: "asc" },
+    select: {
+      id: true,
+      name: true,
+      materials: {
+        orderBy: { createdAt: "desc" },
+        select: { id: true, title: true, fileName: true, mimeType: true, sizeBytes: true, moduleId: true, classId: true },
+      },
+      modules: {
+        orderBy: { position: "asc" },
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          position: true,
+          classes: {
+            orderBy: { startsAt: "asc" },
+            select: { id: true, title: true, instructor: true, description: true, startsAt: true, endsAt: true, status: true, activeMaterialId: true, recordingUrl: true, isGeneral: true },
+          },
+        },
+      },
+      classes: {
+        where: { moduleId: null },
+        orderBy: { startsAt: "asc" },
+        select: { id: true, title: true, instructor: true, description: true, startsAt: true, endsAt: true, status: true, activeMaterialId: true, recordingUrl: true, isGeneral: true },
+      },
+      curriculum: {
+        orderBy: [{ weekNumber: "asc" }, { position: "asc" }, { createdAt: "asc" }],
+        select: { id: true, weekNumber: true, weekTitle: true, title: true, description: true, status: true, position: true },
+      },
+    },
+  });
   return NextResponse.json({ courses });
 }
 

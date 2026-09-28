@@ -25,6 +25,7 @@ model Course {
   classes   LearningClass[]
   materials LearningMaterial[]
   assignments Assignment[]
+  curriculum CurriculumItem[]
 
   @@map("courses")
 }
@@ -411,3 +412,22 @@ model LearningProfile {
   @@index([email])
   @@map("learning_profiles")
 }
+
+model CurriculumItem {
+  id          String   @id @default(cuid())
+  courseId    String
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  weekNumber  Int      @default(1)
+  weekTitle   String?
+  title       String
+  description String?
+  status      String   @default("NOT_DONE") // NOT_DONE | PARTIAL | DONE
+  position    Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([courseId])
+  @@index([courseId, weekNumber])
+  @@map("curriculum_items")
+}
+

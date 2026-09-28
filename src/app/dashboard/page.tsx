@@ -3,21 +3,15 @@ import { getStudentSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getExamStatus, STATUS_LABEL, type ExamStatus } from "@/lib/examStatus";
 import StudentShell from "@/components/StudentShell";
+import StudentCurriculumView from "@/components/StudentCurriculumView";
 
 export const dynamic = "force-dynamic";
 
-interface PageProps {
-  searchParams?: Promise<{ tab?: string }>;
-}
-
-export default async function DashboardPage({ searchParams }: PageProps) {
+export default async function DashboardPage() {
   const session = await getStudentSession();
   if (!session || session.role !== "student") {
     redirect("/login");
   }
-
-  const resolvedSearchParams = searchParams ? await searchParams : {};
-  const activeTab = resolvedSearchParams.tab || "overview";
 
   const student = await prisma.student.findUnique({
     where: { id: session.sub },
@@ -25,6 +19,9 @@ export default async function DashboardPage({ searchParams }: PageProps) {
       course: {
         include: {
           exams: { orderBy: { order: "asc" } },
+          curriculum: {
+            orderBy: [{ weekNumber: "asc" }, { position: "asc" }, { createdAt: "asc" }],
+          },
         },
       },
     },
@@ -40,16 +37,18 @@ export default async function DashboardPage({ searchParams }: PageProps) {
     status: getExamStatus(exam, now),
   }));
 
+  const studentFirstName = student.fullName.split(" ")[0];
+
   return (
     <StudentShell studentName={student.fullName}>
-      <div style={{ maxWidth: 850, margin: "0 auto" }}>
+      <div style={{ maxWidth: 900, margin: "0 auto" }}>
         {/* Welcome Section */}
         <div style={{ marginBottom: "1.5rem" }}>
           <p
             style={{
               color: "var(--gold-600)",
               fontWeight: 700,
-              fontSize: "0.88rem",
+              fontSize: "0.85rem",
               textTransform: "uppercase",
               letterSpacing: "0.04em",
               margin: "0 0 0.35rem 0",
@@ -70,46 +69,6 @@ export default async function DashboardPage({ searchParams }: PageProps) {
           </h1>
         </div>
 
-        {/* Student Navigation Tabs */}
-        <div
-          style={{
-            display: "flex",
-            gap: "0.6rem",
-            marginBottom: "1.75rem",
-            overflowX: "auto",
-            paddingBottom: "0.25rem",
-            scrollbarWidth: "none",
-          }}
-        >
-          <a
-            href="/dashboard"
-            style={{
-              ...tabBaseStyle,
-              ...(activeTab === "overview" ? tabActiveStyle : tabInactiveStyle),
-            }}
-          >
-            Overview
-          </a>
-          <a
-            href="/dashboard?tab=my-course"
-            style={{
-              ...tabBaseStyle,
-              ...(activeTab === "my-course" ? tabActiveStyle : tabInactiveStyle),
-            }}
-          >
-            My Course
-          </a>
-          <a
-            href="/results"
-            style={{
-              ...tabBaseStyle,
-              ...(activeTab === "results" ? tabActiveStyle : tabInactiveStyle),
-            }}
-          >
-            Results
-          </a>
-        </div>
-
         {/* Student Information Card */}
         <div
           style={{
@@ -120,7 +79,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
             gap: "1.4rem",
-            marginBottom: "2.5rem",
+            marginBottom: "1.75rem",
             boxShadow: "var(--shadow-sm)",
           }}
         >
@@ -138,65 +97,82 @@ export default async function DashboardPage({ searchParams }: PageProps) {
           </div>
         </div>
 
-        {/* Registered Course & Exams */}
-        <div style={{ marginBottom: "1rem" }}>
-          <h2
-            style={{
-              fontSize: "1.25rem",
-              fontWeight: 800,
-              color: "var(--burgundy-900)",
-              letterSpacing: "0.02em",
-              marginBottom: "1.25rem",
-            }}
-          >
-            {student.course.name.toUpperCase()}
-          </h2>
+        {/* ── COURSE COMPLETION & CURRICULUM SECTION ───────────── */}
+        <StudentCurriculumView
+          courseName={student.course.name}
+          items={student.course.curriculum || []}
+        />
+
+        {/* ── TESTS SECTION (Test 1, Test 2, Test 3...) ──────── */}
+        <div style={{ marginBottom: "2rem" }}>
+          <div style={{ marginBottom: "1rem" }}>
+            <p style={eyebrowStyle}>Assessments</p>
+            <h2
+              style={{
+                fontSize: "1.4rem",
+                fontWeight: 800,
+                color: "var(--burgundy-900)",
+                letterSpacing: "-0.01em",
+                margin: 0,
+              }}
+            >
+              Course Tests & Exams
+            </h2>
+            <p style={{ color: "var(--ink-600)", fontSize: "0.9rem", margin: "0.35rem 0 0 0" }}>
+              Take your official computer-based tests and view schedule details.
+            </p>
+          </div>
 
           {exams.length === 0 ? (
             <div
               style={{
                 background: "#ffffff",
                 border: "1px dashed var(--gold-400)",
-                borderRadius: 8,
-                padding: "1.75rem",
+                borderRadius: 10,
+                padding: "2rem",
                 textAlign: "center",
                 color: "var(--ink-600)",
                 fontSize: "0.95rem",
               }}
             >
-              No assessments have been configured for this course yet.
+              No tests or assessments have been configured for <strong>{student.course.name}</strong> yet.
             </div>
           ) : (
             <div style={{ display: "grid", gap: "1rem" }}>
-              {exams.map((exam) => (
+              {exams.map((exam, idx) => (
                 <div key={exam.id} style={examCardStyle}>
-                  <div>
-                    <h3
-                      style={{
-                        fontFamily: "var(--font-display)",
-                        fontSize: "1.15rem",
-                        fontWeight: 700,
-                        margin: "0 0 0.4rem 0",
-                        color: "var(--burgundy-900)",
-                      }}
-                    >
-                      {exam.name}
-                    </h3>
-                    <p
-                      style={{
-                        color: "var(--ink-600)",
-                        fontSize: "0.88rem",
-                        margin: 0,
-                        fontWeight: 500,
-                      }}
-                    >
-                      {exam.numQuestions} Questions &middot; Duration: {exam.durationMinutes} Minutes
-                    </p>
+                  <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                    <div style={testBadgeStyle}>
+                      T{idx + 1}
+                    </div>
+                    <div>
+                      <h3
+                        style={{
+                          fontFamily: "var(--font-display)",
+                          fontSize: "1.15rem",
+                          fontWeight: 800,
+                          margin: "0 0 0.3rem 0",
+                          color: "var(--burgundy-900)",
+                        }}
+                      >
+                        {exam.name}
+                      </h3>
+                      <p
+                        style={{
+                          color: "var(--ink-600)",
+                          fontSize: "0.88rem",
+                          margin: 0,
+                          fontWeight: 500,
+                        }}
+                      >
+                        {exam.numQuestions} Questions &middot; Duration: {exam.durationMinutes} Minutes &middot; Pass score: {exam.passingScore}%
+                      </p>
+                    </div>
                   </div>
 
                   {exam.status === "ONGOING" ? (
                     <a href={`/exam/${exam.id}`} style={startButtonProps}>
-                      Start exam
+                      Start exam &rarr;
                     </a>
                   ) : (
                     <StatusBadge status={exam.status} />
@@ -224,7 +200,7 @@ function StatusBadge({ status }: { status: ExamStatus }) {
       style={{
         background: c.bg,
         color: c.fg,
-        padding: "0.4rem 0.85rem",
+        padding: "0.45rem 0.9rem",
         borderRadius: 6,
         fontSize: "0.82rem",
         fontWeight: 700,
@@ -237,28 +213,13 @@ function StatusBadge({ status }: { status: ExamStatus }) {
   );
 }
 
-const tabBaseStyle = {
-  minHeight: 40,
-  display: "inline-flex",
-  alignItems: "center",
-  padding: "0.45rem 1.1rem",
-  borderRadius: 6,
-  fontSize: "0.88rem",
+const eyebrowStyle = {
+  color: "var(--gold-600)",
+  fontSize: "0.82rem",
   fontWeight: 700,
-  textDecoration: "none",
-  transition: "all 0.15s ease",
-} as const;
-
-const tabActiveStyle = {
-  background: "var(--burgundy-900)",
-  borderColor: "var(--burgundy-900)",
-  color: "#ffffff",
-} as const;
-
-const tabInactiveStyle = {
-  background: "#ffffff",
-  border: "1px solid var(--line)",
-  color: "var(--burgundy-900)",
+  textTransform: "uppercase",
+  letterSpacing: "0.04em",
+  margin: "0 0 0.3rem 0",
 } as const;
 
 const infoLabel = {
@@ -288,7 +249,7 @@ const infoValueEmail = {
 const examCardStyle = {
   background: "#ffffff",
   border: "1px solid var(--line)",
-  borderRadius: 8,
+  borderRadius: 10,
   padding: "1.25rem 1.5rem",
   display: "flex",
   justifyContent: "space-between",
@@ -298,12 +259,26 @@ const examCardStyle = {
   boxShadow: "var(--shadow-sm)",
 } as const;
 
+const testBadgeStyle = {
+  background: "#faf6f0",
+  border: "1px solid var(--gold-400)",
+  color: "var(--burgundy-900)",
+  width: 44,
+  height: 44,
+  borderRadius: "50%",
+  display: "grid",
+  placeItems: "center",
+  fontWeight: 800,
+  fontSize: "0.9rem",
+  flexShrink: 0,
+} as const;
+
 const startButtonProps = {
   background: "var(--burgundy-900)",
   color: "#ffffff",
-  padding: "0.55rem 1.1rem",
+  padding: "0.6rem 1.25rem",
   borderRadius: 6,
-  fontSize: "0.85rem",
+  fontSize: "0.88rem",
   fontWeight: 700,
   textDecoration: "none",
   whiteSpace: "nowrap",
