@@ -192,7 +192,7 @@ export default function StudentShell({
         <aside className="student-sidebar">
           <nav className="student-nav" aria-label="Student Navigation">
             {navItems.map((item) => {
-              const active = isNavActive(item.href, item.tab);
+              const active = isNavActive(item.href);
               return (
                 <Link
                   key={item.label}
@@ -253,7 +253,7 @@ export default function StudentShell({
 
             <nav className="student-drawer-nav">
               {navItems.map((item) => {
-                const active = isNavActive(item.href, item.tab);
+                const active = isNavActive(item.href);
                 return (
                   <Link
                     key={item.label}
