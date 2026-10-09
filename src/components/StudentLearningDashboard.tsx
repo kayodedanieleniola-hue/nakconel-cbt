@@ -124,7 +124,7 @@ export default function StudentLearningDashboard({
 
                   {item.startsAt && (
                     <p style={{ margin: "0.25rem 0 0 0", color: "var(--gold-600)", fontSize: "0.82rem", fontWeight: 700 }}>
-                      Date: {new Date(item.startsAt).toLocaleString("en-US", {
+                      📅 {new Date(item.startsAt).toLocaleString("en-US", {
                         weekday: "short",
                         month: "short",
                         day: "numeric",
@@ -138,7 +138,7 @@ export default function StudentLearningDashboard({
                 <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
                   {isLive ? (
                     <Link href={targetUrl} style={joinLiveBtnStyle}>
-                      Join Live Class &rarr;
+                      🔴 Join Live Class &rarr;
                     </Link>
                   ) : item.status === "SCHEDULED" || item.status === "DRAFT" ? (
                     <Link href={targetUrl} style={previewBtnStyle}>
@@ -239,7 +239,7 @@ function ClassStatusBadge({ status, isGeneral }: { status: string; isGeneral?: b
   if (status === "LIVE") {
     bg = "#dc2626";
     color = "#ffffff";
-    label = "LIVE NOW";
+    label = "🔴 LIVE NOW";
   } else if (status === "SCHEDULED") {
     bg = "#d97706";
     color = "#ffffff";

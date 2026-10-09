@@ -77,7 +77,6 @@ export default async function HomePage() {
         }}
       >
         <span>Nakconel &middot; Student examination portal</span>
-        <Link href="/admin/login" style={{ color: "var(--gold-200)" }}>Admin</Link>
       </footer>
     </main>
   );

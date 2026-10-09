@@ -138,12 +138,6 @@ export default function LoginPage() {
           </button>
         </form>
 
-        {/* Footer */}
-        <p style={{ textAlign:"center", fontSize:"0.75rem", color:MUTED, marginTop:"1.5rem" }}>
-          <Link href="/admin/login" style={{ color:MUTED, textDecoration:"none" }}>
-            Admin sign in
-          </Link>
-        </p>
       </div>
     </main>
   );
