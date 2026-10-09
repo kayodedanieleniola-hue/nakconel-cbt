@@ -21,6 +21,7 @@ import {
   type LocalTrack,
   type RemoteParticipant,
 } from "livekit-client";
+import { LocalClassroomPeer } from "@/lib/localP2P";
 
 export type PresentationState = {
   materialId: string;
@@ -125,6 +126,7 @@ export default function ClassroomVideoFeed({
   const pendingVidTrack  = useRef<LocalTrack | null>(null); // track waiting to attach
   const localVideoTrack  = useRef<LocalTrack | null>(null);
   const localAudioTrack  = useRef<LocalTrack | null>(null);
+  const p2pPeerRef       = useRef<LocalClassroomPeer | null>(null);
 
   const onRoomReadyRef       = useRef(onRoomReady);
   const onPresentationRef    = useRef(onPresentationState);
@@ -229,7 +231,36 @@ export default function ClassroomVideoFeed({
         }
       })();
 
-      // ── LiveKit token (non-blocking) ───────────────────────────────────────
+      function initP2PFallback() {
+        if (!p2pPeerRef.current && activeRef.current) {
+          console.log("[Student P2P] Starting WebRTC P2P fallback");
+          const peer = new LocalClassroomPeer(classId, "student");
+          p2pPeerRef.current = peer;
+          peer.onRemoteStream = (stream) => {
+            if (!activeRef.current) return;
+            console.log("[Student P2P] Received remote instructor stream");
+            setInstructorLive(true);
+            setStatus("● LIVE (Connected)");
+            if (instructorVidRef.current) {
+              instructorVidRef.current.srcObject = stream;
+              void instructorVidRef.current.play().catch(() => {});
+            }
+            if (instructorAudRef.current) {
+              instructorAudRef.current.srcObject = stream;
+              void instructorAudRef.current.play().catch(() => {});
+            }
+          };
+          void cameraPromise.then((cr) => {
+            if (cr && (cr.vidTrack || cr.audTrack)) {
+              const tracks = [cr.vidTrack?.mediaStreamTrack, cr.audTrack?.mediaStreamTrack].filter(Boolean) as MediaStreamTrack[];
+              if (tracks.length > 0) {
+                peer.addLocalStream(new MediaStream(tracks));
+              }
+            }
+          });
+        }
+      }
+
       let livekitUrl: string, token: string;
       try {
         const res  = await fetch(`/api/learning/livekit/token?classId=${encodeURIComponent(classId)}`);
@@ -243,9 +274,9 @@ export default function ClassroomVideoFeed({
       } catch (err) {
         if (activeRef.current) {
           const msg = err instanceof Error ? err.message : "Could not connect";
-          const localMode = msg.includes("503") || msg.includes("not configured");
-          setStatus(localMode ? "Local mode (no cloud)" : `Offline · ${msg}`);
-          console.warn("[Student] token error:", msg);
+          console.warn("[Student] LiveKit unavailable, using WebRTC P2P fallback:", msg);
+          setStatus("● Connected (Direct P2P)");
+          initP2PFallback();
         }
         return;
       }
@@ -362,6 +393,8 @@ export default function ClassroomVideoFeed({
       const r = roomRef.current;
       roomRef.current = null;
       if (r) r.disconnect().catch(() => {});
+      p2pPeerRef.current?.destroy();
+      p2pPeerRef.current = null;
       localVideoTrack.current?.stop();
       localAudioTrack.current?.stop();
     };

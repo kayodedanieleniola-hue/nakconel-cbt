@@ -19,6 +19,7 @@ import {
   RemoteParticipant, RemoteTrackPublication,
   createLocalTracks, createLocalScreenTracks, type LocalTrack,
 } from "livekit-client";
+import { LocalClassroomPeer } from "@/lib/localP2P";
 import ClassroomChat from "@/components/ClassroomChat";
 
 /* ─── tokens ─────────────────────────────────────────────────────────────── */
@@ -343,6 +344,7 @@ export default function GeneralClassroomClient({ meeting, studentName, isInstruc
   const [isMobile,     setIsMobile]     = useState(false);
   const localVideoTrack = useRef<LocalTrack|null>(null);
   const localAudioTrack = useRef<LocalTrack|null>(null);
+  const p2pPeerRef      = useRef<LocalClassroomPeer|null>(null);
   const screenTracks = useRef<LocalTrack[]>([]);
   const [screenSharing, setScreenSharing] = useState(false);
   const [remoteScreenTrack, setRemoteScreenTrack] = useState<any | null>(null);
@@ -508,6 +510,48 @@ export default function GeneralClassroomClient({ meeting, studentName, isInstruc
         } catch { if (isActive()) setCameraError("Camera access denied."); return { vid:null, aud:null }; }
       })();
 
+      function initP2PFallback() {
+        if (!p2pPeerRef.current && activeRef.current) {
+          const role = isInstructor ? "instructor" : "student";
+          console.log(`[${role} P2P] Starting WebRTC P2P fallback`);
+          const peer = new LocalClassroomPeer(meeting.id, role);
+          p2pPeerRef.current = peer;
+          setConnStatus("live");
+
+          peer.onRemoteStream = (stream) => {
+            if (!activeRef.current) return;
+            console.log(`[${role} P2P] Received remote stream`);
+            setConnStatus("live");
+            if (isInstructor) {
+              const studentTile: PTile = {
+                identity: "student-p2p",
+                name: "Student Participant",
+                videoPub: { track: { kind: Track.Kind.Video, attach: (el: HTMLVideoElement) => { el.srcObject = stream; void el.play().catch(() => {}); }, detach: (el: HTMLVideoElement) => { el.srcObject = null; } } } as any,
+                audioPub: { track: { kind: Track.Kind.Audio, attach: (el: HTMLAudioElement) => { el.srcObject = stream; void el.play().catch(() => {}); }, detach: (el: HTMLAudioElement) => { el.srcObject = null; } } } as any,
+              };
+              setParticipants(prev => ({ ...prev, [studentTile.identity]: studentTile }));
+            } else {
+              const hostTile: PTile = {
+                identity: "instructor-p2p",
+                name: meeting.instructor || "Instructor",
+                videoPub: { track: { kind: Track.Kind.Video, attach: (el: HTMLVideoElement) => { el.srcObject = stream; void el.play().catch(() => {}); }, detach: (el: HTMLAudioElement) => { el.srcObject = null; } } } as any,
+                audioPub: { track: { kind: Track.Kind.Audio, attach: (el: HTMLAudioElement) => { el.srcObject = stream; void el.play().catch(() => {}); }, detach: (el: HTMLAudioElement) => { el.srcObject = null; } } } as any,
+              };
+              setParticipants(prev => ({ ...prev, [hostTile.identity]: hostTile }));
+            }
+          };
+
+          void camP.then((cr) => {
+            if (cr && (cr.vid || cr.aud)) {
+              const tracks = [cr.vid?.mediaStreamTrack, cr.aud?.mediaStreamTrack].filter(Boolean) as MediaStreamTrack[];
+              if (tracks.length > 0) {
+                peer.addLocalStream(new MediaStream(tracks));
+              }
+            }
+          });
+        }
+      }
+
       let url: string, token: string;
       try {
         const res = await fetch(`/api/learning/livekit/token?classId=${encodeURIComponent(meeting.id)}`);
@@ -515,7 +559,14 @@ export default function GeneralClassroomClient({ meeting, studentName, isInstruc
         if (!res.ok || !d.url || !d.token) throw new Error(d.error ?? "Token unavailable");
         url   = (d.url as string).replace(/^https:\/\//,"wss://").replace(/^http:\/\//,"ws://");
         token = d.token as string;
-      } catch { if (isActive()) setConnStatus("error"); return; }
+      } catch {
+        if (isActive()) {
+          console.warn("[GeneralClassroomClient] LiveKit token unavailable, starting WebRTC P2P fallback");
+          setConnStatus("live");
+          initP2PFallback();
+        }
+        return;
+      }
       if (!isActive()) return;
 
       const room = new Room({ adaptiveStream:false, dynacast:true, disconnectOnPageLeave:false });
@@ -614,6 +665,8 @@ export default function GeneralClassroomClient({ meeting, studentName, isInstruc
       if (r) {
         r.disconnect().catch(() => {});
       }
+      p2pPeerRef.current?.destroy();
+      p2pPeerRef.current = null;
       localVideoTrack.current?.stop();
       localAudioTrack.current?.stop();
     };

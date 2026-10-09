@@ -35,7 +35,7 @@ export async function GET(request: Request) {
   const isGeneral = learningClass.isGeneral;
 
   // Check whether the student is enrolled in the class's course
-  const enrolledStudent = studentSession
+  const enrolledStudent = studentSession && learningClass.course
     ? learningClass.course.students.find(
         (s) => s.id === studentSession.sub && s.status === "active"
       )
