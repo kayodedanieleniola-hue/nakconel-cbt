@@ -245,7 +245,7 @@ export default function AdminCurriculumManager({
             onClick={() => setShowBulk(!showBulk)}
             style={toggleBtnStyle}
           >
-            {showBulk ? "Single Topic Form" : "⚡ Bulk Add Topics"}
+            {showBulk ? "Single Topic Form" : "Bulk Add Topics"}
           </button>
         </div>
 

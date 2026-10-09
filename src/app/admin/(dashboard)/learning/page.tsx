@@ -611,7 +611,7 @@ function ClassCard({
           <div>
             <p style={eyebrow}>
               {item.status}
-              {item.isGeneral && <span style={{ marginLeft: "0.5rem", background: "#98661B", color: "#fff", borderRadius: 99, padding: "0.1rem 0.5rem", fontSize: "0.68rem", fontWeight: 700 }}>🌐 GENERAL</span>}
+              {item.isGeneral && <span style={{ marginLeft: "0.5rem", background: "#98661B", color: "#fff", borderRadius: 99, padding: "0.1rem 0.5rem", fontSize: "0.68rem", fontWeight: 700 }}>GENERAL</span>}
             </p>
             <strong>{item.title}</strong>
             <p style={muted}>
@@ -633,7 +633,7 @@ function ClassCard({
                   window.open(`/admin/general/${item.id}`, "_blank");
                 }}
               >
-                {item.status === "LIVE" ? "🌐 Join Meeting" : "🌐 Start Meeting"}
+                {item.status === "LIVE" ? "Join Meeting" : "Start Meeting"}
               </button>
             ) : (
               <button
