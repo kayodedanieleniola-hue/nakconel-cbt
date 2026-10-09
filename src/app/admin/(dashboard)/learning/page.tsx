@@ -61,7 +61,7 @@ export default function LearningManagementPage() {
     description: "",
     startsAt: "",
     endsAt: "",
-    status: "DRAFT",
+    status: "SCHEDULED",
     activeMaterialId: "",
     isGeneral: false,
   });
@@ -155,7 +155,7 @@ export default function LearningManagementPage() {
         description: "",
         startsAt: "",
         endsAt: "",
-        status: "DRAFT",
+        status: "SCHEDULED",
         activeMaterialId: "",
         isGeneral: false,
       });

@@ -310,9 +310,9 @@ export default function AdminCurriculumManager({
                   onChange={(e) => setStatus(e.target.value)}
                   style={inputStyle}
                 >
-                  <option value="NOT_DONE">🔴 Not Done</option>
-                  <option value="PARTIAL">🟡 Partially Done</option>
-                  <option value="DONE">🟢 Done (Completed)</option>
+                  <option value="NOT_DONE">Not Done</option>
+                  <option value="PARTIAL">Partially Done</option>
+                  <option value="DONE">Done (Completed)</option>
                 </select>
               </div>
             </div>
@@ -450,12 +450,13 @@ export default function AdminCurriculumManager({
                                   onClick={() => handleUpdateStatus(item.id, "NOT_DONE")}
                                   style={{
                                     ...statusBtnStyle,
-                                    background: item.status === "NOT_DONE" ? "#fee2e2" : "#f5f5f5",
-                                    color: item.status === "NOT_DONE" ? "#991b1b" : "#666",
-                                    borderColor: item.status === "NOT_DONE" ? "#fca5a5" : "#ddd",
+                                    background: item.status === "NOT_DONE" ? "#dc2626" : "#f3f4f6",
+                                    color: item.status === "NOT_DONE" ? "#ffffff" : "#4b5563",
+                                    borderColor: item.status === "NOT_DONE" ? "#dc2626" : "#d1d5db",
+                                    boxShadow: item.status === "NOT_DONE" ? "0 2px 4px rgba(220, 38, 38, 0.25)" : "none",
                                   }}
                                 >
-                                  🔴 Not Done
+                                  Not Done
                                 </button>
 
                                 <button
@@ -464,12 +465,13 @@ export default function AdminCurriculumManager({
                                   onClick={() => handleUpdateStatus(item.id, "PARTIAL")}
                                   style={{
                                     ...statusBtnStyle,
-                                    background: item.status === "PARTIAL" ? "#fef3c7" : "#f5f5f5",
-                                    color: item.status === "PARTIAL" ? "#92400e" : "#666",
-                                    borderColor: item.status === "PARTIAL" ? "#fde68a" : "#ddd",
+                                    background: item.status === "PARTIAL" ? "#d97706" : "#f3f4f6",
+                                    color: item.status === "PARTIAL" ? "#ffffff" : "#4b5563",
+                                    borderColor: item.status === "PARTIAL" ? "#d97706" : "#d1d5db",
+                                    boxShadow: item.status === "PARTIAL" ? "0 2px 4px rgba(217, 119, 6, 0.25)" : "none",
                                   }}
                                 >
-                                  🟡 Partial
+                                  Partially Done
                                 </button>
 
                                 <button
@@ -478,12 +480,13 @@ export default function AdminCurriculumManager({
                                   onClick={() => handleUpdateStatus(item.id, "DONE")}
                                   style={{
                                     ...statusBtnStyle,
-                                    background: item.status === "DONE" ? "#dcfce7" : "#f5f5f5",
-                                    color: item.status === "DONE" ? "#166534" : "#666",
-                                    borderColor: item.status === "DONE" ? "#86efac" : "#ddd",
+                                    background: item.status === "DONE" ? "#16a34a" : "#f3f4f6",
+                                    color: item.status === "DONE" ? "#ffffff" : "#4b5563",
+                                    borderColor: item.status === "DONE" ? "#16a34a" : "#d1d5db",
+                                    boxShadow: item.status === "DONE" ? "0 2px 4px rgba(22, 163, 74, 0.25)" : "none",
                                   }}
                                 >
-                                  🟢 Done
+                                  Done
                                 </button>
 
                                 <button

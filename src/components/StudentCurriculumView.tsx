@@ -201,7 +201,7 @@ export default function StudentCurriculumView({
 function StatusBadge({ status }: { status: string }) {
   if (status === "DONE") {
     return (
-      <span style={{ ...badgeBase, background: "#dcfce7", color: "#15803d", borderColor: "#86efac" }}>
+      <span style={{ ...badgeBase, background: "#16a34a", color: "#ffffff", borderColor: "#16a34a" }}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 4 }}>
           <polyline points="20 6 9 17 4 12" />
         </svg>
@@ -212,7 +212,7 @@ function StatusBadge({ status }: { status: string }) {
 
   if (status === "PARTIAL") {
     return (
-      <span style={{ ...badgeBase, background: "#fef3c7", color: "#b45309", borderColor: "#fde68a" }}>
+      <span style={{ ...badgeBase, background: "#d97706", color: "#ffffff", borderColor: "#d97706" }}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 4 }}>
           <circle cx="12" cy="12" r="10" />
           <polyline points="12 6 12 12 16 14" />
@@ -223,7 +223,7 @@ function StatusBadge({ status }: { status: string }) {
   }
 
   return (
-    <span style={{ ...badgeBase, background: "#fee2e2", color: "#b91c1c", borderColor: "#fca5a5" }}>
+    <span style={{ ...badgeBase, background: "#dc2626", color: "#ffffff", borderColor: "#dc2626" }}>
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 4 }}>
         <circle cx="12" cy="12" r="10" />
         <line x1="15" y1="9" x2="9" y2="15" />

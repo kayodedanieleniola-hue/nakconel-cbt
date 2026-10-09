@@ -99,13 +99,13 @@ export default async function MyCoursePage() {
               lessons: { orderBy: { position: "asc" }, select: { id: true, title: true } },
               classes: {
                 orderBy: { startsAt: "asc" },
-                select: { id: true, title: true, startsAt: true, endsAt: true, status: true, recordingUrl: true },
+                select: { id: true, title: true, instructor: true, description: true, isGeneral: true, startsAt: true, endsAt: true, status: true, recordingUrl: true },
               },
             },
           },
           classes: {
             orderBy: { startsAt: "asc" },
-            select: { id: true, title: true, moduleId: true, startsAt: true, endsAt: true, status: true, recordingUrl: true },
+            select: { id: true, title: true, instructor: true, description: true, isGeneral: true, moduleId: true, startsAt: true, endsAt: true, status: true, recordingUrl: true },
           },
           materials: { orderBy: { createdAt: "desc" }, select: { id: true, title: true, fileName: true, sizeBytes: true } },
           exams: { orderBy: { order: "asc" }, select: { id: true, name: true, published: true, startAt: true, endAt: true } },
@@ -182,6 +182,9 @@ export default async function MyCoursePage() {
           allClasses={allClasses.map((c) => ({
             id: c.id,
             title: c.title,
+            instructor: c.instructor,
+            description: c.description,
+            isGeneral: c.isGeneral,
             startsAt: c.startsAt ? c.startsAt.toISOString() : null,
             endsAt: c.endsAt ? c.endsAt.toISOString() : null,
             status: c.status,
